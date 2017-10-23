@@ -1,0 +1,150 @@
+% !TeX root = report.tex
+% !TEX encoding = UTF-8
+% !TEX spellcheck = en-US
+% !TEX TS-program = xelatex
+% !BIB TS-program = bibtex
+
+\RequirePackage[l2tabu,orthodox]{nag}
+
+\documentclass[a4paper,10pt,parskip=half]{scrartcl}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[autostyle,strict]{csquotes}
+\usepackage[hyphens]{url}
+\usepackage{newtxtext}
+\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+\usepackage[backend=bibtex]{biblatex}
+
+\usepackage{microtype}
+
+\bibstyle{plain}
+\bibliography{references.bib}
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+\title{Aufgabenbeschreibung (Bachelorarbeit):\\
+       Implemention of a Benchmark Suite for Strymon}
+ \author{(student's name goes here)\\ \\ Advisers: Dr. John Liagouris, Prof. Timothy Roscoe \\
+        Systems Group, ETH Z\"urich}
+\date{Autumn Semester 2017}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+The goal of this project is to provide a comprehensive survey of existing benchmarks for streaming engines and implement two such popular benchmarks on Strymon~\cite{strymon}, 
+a novel system for online analytics developed by the Systems Group at ETH Z\"urich.
+
+% This text was partly inspired by: https://blog.twitter.com/2013/observability-at-twitter
+%
+% This paragraph should expand on the project setting.  It currently describes
+% instrumentation points but it might be more illustrative to give examples of
+% questions we are trying to answer.
+The project fits into a broader effort to understand and
+compare the performance of streaming engines like Beam, Flink, Heron, Spark Streaming, and Apex.  
+Although these system have gained much popularity over the last years, there is a surprising lack of standard benchmarks in the area:
+some works rely on rather old and complicated workloads, which are difficult to implement and understand, whereas others introduce custom dataflows, which are often too simple (e.g., word count)
+and do not reflect the requirements of real-world use cases. 
+
+The Yahoo Streaming Benchmark (YSB)~\cite{ysb} and NexMark~\cite{nexmark} were introduced to fill exactly this gap, and both of them have already been implemented on the most promising streaming engines such as
+Flink, Heron, and Spark Streaming. The main goal of this thesis is to implement these two benchmarks on Strymon and conduct a thorough experimental evaluation.
+
+Apart from the evaluation, the thesis will also provide a comparative study of existing benchmarks and current experimental practices.
+This includes a classification of benchmarks based on various criteria such as the types of operators used (sliding vs tumbling vs variable-length windows, stateful vs stateless operators),
+the support for testing fault-tolerance, scaling and other core system mechanisms, the requirements for integration with external systems (e.g., Kafka), 
+and the complexity of custom operators (e.g., pattern matching), among others.
+
+Optionally, the thesis could result in the specification of a new streaming benchmark that unifies and extends the existing ones.\\
+
+\printbibliography[heading=none]
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+\section{Work plan}
+
+The work consists of the following stages, some of which can be performed in
+parallel:
+
+\begin{itemize}
+  \item[1.] Survey of literature on streaming benchmarks and current experimental practices. 
+ 
+  \item[2.] Familiarization with Strymon's architecture and programming model.
+
+  \item[3.] Implementation of some commonly used operators (e.g., tumbling window) as built-in Strymon operators.
+
+  \item[4a.] Implementation of YSB and NexMark on Strymon using the operators of the previous step.
+  \item[4b.] Experimental evaluation of Strymon and analysis of performance results.
+
+  \item[5a.] (Optional) Implementation of an Apache Beam runner for Strymon.
+  \item[5b.] (Optional) Specification of a good benchmark for streaming engines.
+  
+\end{itemize}
+
+There is the opportunity to select new computations and repeat step 4 either
+because early attempts failed, or if new avenues open up.  Additionally, it is
+to be expected that, in a system with weird and interesting performance
+properties, new trade-offs, opportunities, and restrictions may emerge.
+Identifying and articulating their details is also valuable.
+
+It should be stressed that the primary goal of the project is not "to produce a
+new benchmark", but to highlight the pros and cons of existing benchmarks and implement two popular benchmarks
+on Strymon. 
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+\section{Deliverables}
+
+The project should result in the following concrete deliverables:
+
+\begin{enumerate}
+  \item Thesis dissertation. This should follow the normal format for
+    such a report, and contain at least the following:
+    \begin{enumerate}
+    \item Introduction / motivation of the problem
+    \item Survey of streaming benchmarks
+    \item Detailed description of the design and implementation of YSB and NexMark on Strymon
+    \item Description of Strymon's experimental evaluation
+    \item Discussion of unresolved issues, lessons learned, and future work
+    \end{enumerate}
+
+  \item Complete source code for:
+    \begin{enumerate}
+      \item Operator libraries and benchmarks, including any micro-benchmarks used
+      \item Patches introducing necessary functionality in Strymon
+      \item All tooling used to analyze the benchmark results
+      \item Scripts used to conduct experiments
+    \end{enumerate}
+
+  \item Presentation of thesis results and demonstration of functionality
+\end{enumerate}
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+\section{Notenschema}
+
+The minimum requirements for a grade of 5.0 are as follows:
+
+\begin{itemize}
+  \item Successful completion of work items 1 -- 4.
+  \item Completion of deliverables 1 -- 3 to a satisfactory standard.
+\end{itemize}
+
+The grade will be reduced if these goals are not achieved, except in the case
+of extreme extenuating circumstances (such as an unforeseeable and unresolvable
+technical barrier to completing the work, accompanied by an acceptable
+alternative work item).
+
+A grade of 5.50 will be awarded for the completion of the minimum work to an
+unusually high quality, or with the addition of extra research work accompanied
+by documentation and writeup in the thesis.
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+\end{document}
