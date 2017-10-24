@@ -28,8 +28,8 @@
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
 \title{Aufgabenbeschreibung (Bachelorarbeit):\\
-       Implemention of a Benchmark Suite for Strymon}
- \author{(student's name goes here)\\ \\ Advisers: Dr. John Liagouris, Prof. Timothy Roscoe \\
+       Implementation of a Benchmark Suite for Strymon}
+ \author{Nicolas Hafner\\ \\ Advisers: Dr. John Liagouris, Prof. Timothy Roscoe \\
         Systems Group, ETH Z\"urich}
 \date{Autumn Semester 2017}
 
@@ -39,7 +39,7 @@
 
 \section{Introduction}
 
-The goal of this project is to provide a comprehensive survey of existing benchmarks for streaming engines and implement two such popular benchmarks on Strymon~\cite{strymon}, 
+The goal of this project is to provide a comprehensive survey of existing benchmarks for streaming engines and implement three such popular benchmarks on Strymon~\cite{strymon}, 
 a novel system for online analytics developed by the Systems Group at ETH Z\"urich.
 
 % This text was partly inspired by: https://blog.twitter.com/2013/observability-at-twitter
@@ -47,19 +47,20 @@ a novel system for online analytics developed by the Systems Group at ETH Z\"uri
 % This paragraph should expand on the project setting.  It currently describes
 % instrumentation points but it might be more illustrative to give examples of
 % questions we are trying to answer.
-The project fits into a broader effort to understand and
-compare the performance of streaming engines like Beam, Flink, Heron, Spark Streaming, and Apex.  
-Although these system have gained much popularity over the last years, there is a surprising lack of standard benchmarks in the area:
-some works rely on rather old and complicated workloads, which are difficult to implement and understand, whereas others introduce custom dataflows, which are often too simple (e.g., word count)
+The thesis fits into a broader effort to understand and
+compare the performance of existing streaming engines like Google's Beam, Flink, Twitter's Heron, Spark Streaming, and Apex.  
+Although such systems have gained much popularity in both academia and industry over the last years, there is a surprising lack of standard benchmarks in the area:
+researchers and practitioners either rely on rather old and complicated computations, which are difficult to implement and understand, or introduce their custom testing dataflows, which are often too simple (e.g., word count)
 and do not reflect the requirements of real-world use cases. 
 
-The Yahoo Streaming Benchmark (YSB)~\cite{ysb} and NexMark~\cite{nexmark} were introduced to fill exactly this gap, and both of them have already been implemented on the most promising streaming engines such as
-Flink, Heron, and Spark Streaming. The main goal of this thesis is to implement these two benchmarks on Strymon and conduct a thorough experimental evaluation.
+Recent attempts to fill this gap resulted in the specification of the following three benchmarks: the Yahoo! Streaming Benchmark (YSB)~\cite{ysb}, NexMark~\cite{nexmark}, and Intel's HiBench~\cite{hibench}, 
+all of which have already been implemented on the most promising streaming engines including Beam, Flink, Heron, and Spark Streaming. 
+The main goal of the thesis is to implement these three benchmarks on Strymon and conduct a thorough experimental evaluation.
 
-Apart from the evaluation, the thesis will also provide a comparative study of existing benchmarks and current experimental practices.
-This includes a classification of benchmarks based on various criteria such as the types of operators used (sliding vs tumbling vs variable-length windows, stateful vs stateless operators),
-the support for testing fault-tolerance, scaling and other core system mechanisms, the requirements for integration with external systems (e.g., Kafka), 
-and the complexity of custom operators (e.g., pattern matching), among others.
+Apart from Strymon's evaluation, the thesis will also provide a comparative study of existing benchmarks and current experimental practices.
+This includes a comprehensive benchmark classification based on various criteria, such as the types of operators used (sliding vs tumbling vs variable-length windows, stateful vs stateless operators, etc.),
+the complexity of operators (e.g., pattern matching, window-based joins, etc.), the requirements for integration with external systems (e.g., Kafka, YARN, etc.),
+and the support for testing fault-tolerance, dynamic scaling and other core system mechanisms.
 
 Optionally, the thesis could result in the specification of a new streaming benchmark that unifies and extends the existing ones.\\
 
@@ -75,15 +76,14 @@ parallel:
 \begin{itemize}
   \item[1.] Survey of literature on streaming benchmarks and current experimental practices. 
  
-  \item[2.] Familiarization with Strymon's architecture and programming model.
+  \item[2.] Familiarization with Rust and Strymon's programming model.
 
-  \item[3.] Implementation of some commonly used operators (e.g., tumbling window) as built-in Strymon operators.
+  \item[3.] Implementation of some commonly used operators (e.g., tumbling window, sliding window, equi-join, etc.) as built-in Strymon operators.
 
-  \item[4a.] Implementation of YSB and NexMark on Strymon using the operators of the previous step.
+  \item[4a.] Implementation of YSB, NexMark, and HiBench on Strymon using the operators of the previous step.
   \item[4b.] Experimental evaluation of Strymon and analysis of performance results.
 
-  \item[5a.] (Optional) Implementation of an Apache Beam runner for Strymon.
-  \item[5b.] (Optional) Specification of a good benchmark for streaming engines.
+  \item[5.] \textbf{[Optional]} Specification of a proper benchmark for streaming engines based on the pros and cons of existing benchmarks.
   
 \end{itemize}
 
@@ -93,9 +93,10 @@ to be expected that, in a system with weird and interesting performance
 properties, new trade-offs, opportunities, and restrictions may emerge.
 Identifying and articulating their details is also valuable.
 
-It should be stressed that the primary goal of the project is not "to produce a
-new benchmark", but to highlight the pros and cons of existing benchmarks and implement two popular benchmarks
-on Strymon. 
+\textbf{Milestones}: Having smaller deliverables reduces risk of failing and allows us to provide intermediate feedback on the work done.
+To this end, it is highly recommended that each benchmark is implemented, evaluated, and documented as a whole before continuing with the next one. 
+By the final submission, the benchmark suite should contain all three individual benchmarks, and direct comparisons between Strymon and other systems that already implement the above benchmarks should be feasible.
+
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
@@ -109,7 +110,7 @@ The project should result in the following concrete deliverables:
     \begin{enumerate}
     \item Introduction / motivation of the problem
     \item Survey of streaming benchmarks
-    \item Detailed description of the design and implementation of YSB and NexMark on Strymon
+    \item Detailed description of the design and implementation of YSB, NexMark, and HiBench on Strymon
     \item Description of Strymon's experimental evaluation
     \item Discussion of unresolved issues, lessons learned, and future work
     \end{enumerate}
