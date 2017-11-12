@@ -1,0 +1,51 @@
+\documentclass[12pt,a4paper,titlepage]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=3cm]{geometry}
+\usepackage{textcomp}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{fix-cm}
+\usepackage{graphicx}
+\usepackage{etoolbox}
+\usepackage{xcolor}
+\usepackage[bottom,marginal]{footmisc}
+\setlength{\headheight}{30pt}
+\usepackage[breaklinks]{hyperref}
+\usepackage[backend=biber,style=numeric,natbib=true]{biblatex}
+\usepackage[bachelorthesis]{systems-cover/systems-cover}
+\pagestyle{fancy}
+
+\hypersetup{
+  colorlinks,
+  linkcolor={darkgray},
+  citecolor={blue!50!black},
+  urlcolor={blue!80!black}
+}
+
+\covernum{197b}
+\covertitle{Implementation of a Benchmark Suite for Strymon}
+\coverauthor{Nicolas Hafner}
+\coverdate{November 2017 - May 2018}
+\coversupervisedby{Dr.\ John Liagouris \\ Prof.\ Timothy Roscoe}
+
+\addbibresource{content/references.bib}
+
+\begin{document}
+\input{content/abstract}
+\input{content/acknowledgements}
+\tableofcontents\newpage
+\input{content/1-introduction}
+\input{content/2-related-work}
+\input{content/3-timely-dataflow}
+\input{content/4-ysb}
+\input{content/5-hibench}
+\input{content/6-nexmark}
+\input{content/7-conclusion}
+\printbibliography
+\end{document}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-engine: luatex
+%%% TeX-master: t
+%%% End:
