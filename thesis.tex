@@ -9,6 +9,7 @@
 \usepackage{graphicx}
 \usepackage{etoolbox}
 \usepackage{xcolor}
+\usepackage{float}
 \usepackage[bottom,marginal]{footmisc}
 \setlength{\headheight}{30pt}
 \usepackage[breaklinks]{hyperref}
@@ -32,7 +33,7 @@
 
 \addbibresource{content/references.bib}
 
-\newcommand{\imagefigure}[2]{\begin{figure}%
+\newcommand{\imagefigure}[2]{\begin{figure}[H]%
     \centering%
     \includegraphics[width=1.0\linewidth]{#1}%
     \caption{#2}%
