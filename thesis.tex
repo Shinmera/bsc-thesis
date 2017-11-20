@@ -12,9 +12,9 @@
 \usepackage{float}
 \usepackage[bottom,marginal]{footmisc}
 \setlength{\headheight}{30pt}
-\usepackage[breaklinks]{hyperref}
+\usepackage[breaklinks=true]{hyperref}
 \usepackage{cleveref}
-\usepackage[backend=biber,style=numeric,natbib=true]{biblatex}
+\usepackage[backend=biber,style=numeric,natbib=true,sorting=none]{biblatex}
 \usepackage[bachelorthesis]{systems-cover/systems-cover}
 \pagestyle{fancy}
 
@@ -33,6 +33,20 @@
 
 \addbibresource{content/references.bib}
 
+\setcounter{biburllcpenalty}{7000}
+\setcounter{biburlucpenalty}{8000}
+\DeclareFieldFormat*{citetitle}{#1}
+\DeclareFieldFormat{formaturl}{\newline #1}
+\newbibmacro*{url+urldate}{%
+  \printtext[formaturl]{%
+    \printfield{url}}%
+  \iffieldundef{urlyear}
+  {}
+  {\setunit*{\addspace}%
+    \printtext[urldate]{\printurldate}}}
+
+\newcommand{\sectioncite}[1]{\citetitle*{#1}\cite{#1}}
+
 \newcommand{\imagefigure}[2]{\begin{figure}[H]%
     \centering%
     \includegraphics[width=1.0\linewidth]{#1}%
@@ -50,6 +64,7 @@
 \input{content/5-hibench}
 \input{content/6-nexmark}
 \input{content/7-conclusion}
+\newpage
 \printbibliography
 \end{document}
 %%% Local Variables:

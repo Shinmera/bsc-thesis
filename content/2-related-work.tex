@@ -1,22 +1,31 @@
 \section{Related Work}
-\subsection{S4: Distributed Stream Computing Platform\cite{s4}}
+\subsection{\sectioncite{s4}}
 \imagefigure{images/s4-graphs.pdf}{Graphs of the three tests used to evaluate the S4 platform. From left to right: word count, click-through rate, and online parameter optimisation. Orange nodes are stateful. Nodes coloured in red retain state of previous stream events.}
 
-\subsection{SPADE: the system s declarative stream processing engine\cite{spade}}
+\subsection{\sectioncite{spade}}
 \imagefigure{images/spade-graphs.pdf}{Graph of the example used in the SPADE paper: a bargain index computation. Nodes coloured in red retain state of previous stream events.}
 
-\subsection{Discretized streams: an efficient and fault-tolerant model for stream processing on large clusters\cite{discretized}}
+\subsection{\sectioncite{discretized}}
 \imagefigure{images/discretized-graphs.pdf}{Graph of the Word Count example used to illustrate the discretized streams. Not shown is the incremental reduction done between batches.}
 
-\subsection{MillWheel: fault-tolerant stream processing at internet scale\cite{millwheel}}
+\subsection{\sectioncite{millwheel}}
 
-\subsection{BigDataBench: A big data benchmark suite from internet services\cite{bigdatabench}}
+\subsection{\sectioncite{bigdatabench}}
 
-\subsection{StreamCloud: An elastic and scalable data streaming system\cite{streamcloud}}
+\subsection{\sectioncite{streamcloud}}
 \imagefigure{images/streamcloud-graphs.pdf}{Graph of the query used to evaluate StreamCloud. Nodes coloured in red retain state of previous stream events.}
 
-\subsection{Integrating scale out and fault tolerance in stream processing using operator state management\cite{integrating}}
+\subsection{\sectioncite{integrating}}
 \imagefigure{images/integrating-graphs.pdf}{Illustration of the queries for the Linear Road Benchmark (top) and the Top-K (bottom) tests used to evaluate their system. Orange nodes maintain internal state.}
+
+\subsection{\sectioncite{timestream}}
+\imagefigure{images/timestream-graphs.pdf}{The Distinct Count query used to evaluate the Timestream system. Nodes in orange have internal state.}
+
+\subsection{\sectioncite{storm}}
+\imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers. Orange nodes are stateful. ``Shuffle'' connections send the output event to a random destination node. ``Fields'' connections send the output event to a specific destination node based on a field of the event.}
+
+\subsection{\sectioncite{storm2}}
+\imagefigure{images/storm2-graphs.pdf}{An illustration of the topology used for the Twitter \& Bitly link trend analysis. Nodes coloured orange maintain internal state.}
 
 %%% Local Variables:
 %%% mode: latex
