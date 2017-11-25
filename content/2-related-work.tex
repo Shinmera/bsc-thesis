@@ -21,6 +21,8 @@
 \subsection{\sectioncite{timestream}}
 \imagefigure{images/timestream-graphs.pdf}{The Distinct Count query used to evaluate the Timestream system. Nodes in orange have internal state.}
 
+The sentiment analysis has no description of the graph used and we could thus not replicate it here.
+
 \subsection{\sectioncite{storm}}
 \imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers. Orange nodes are stateful. ``Shuffle'' connections send the output event to a random destination node. ``Fields'' connections send the output event to a specific destination node based on a field of the event.}
 
@@ -32,82 +34,82 @@
   \centering
   {
     \scriptsize
-    \hspace*{-1.5cm}
-    \begin{tabularx}{0.85\pagewidth}{|l|X|l|l|l|}
+    \hspace*{-1cm}
+    \begin{tabular}{|l|p{4cm}|p{3cm}|p{2.5cm}|p{2.5cm}|}
       \hline
-      Paper & Goal & Application & Dataflows & Operators
+      Paper & Goal & Application & Dataflow Properties & Dataflow Operators
       \\\hline
       
       S4\cite{s4}
       & A practical application of the system to a real-life problem.
       & Search
       & Stateful
-      & Join, Filter
+      & Map, Join, Filter
       \\\hline
       
       SPADE\cite{spade}
       & Sample application, performance study.
       & Finance
       & Stateful
-      & Aggregate, Join, Filter
+      & Map, Aggregate, Join, Filter
       \\\hline
 
       D-Streams\cite{discretized}
       & Scalability and recovery test.
       & None
-      & 
-      & Window Reduce
+      & None
+      & Map, Window Reduce
       \\\hline
 
       Millwheel\cite{millwheel}
-      &
-      &
-      &
-      &
+      & In-Out Latency.
+      & Ads
+      & Unspecified
+      & Unspecified
       \\\hline
 
       BigDataBench\cite{bigdatabench}
-      &
-      &
-      &
-      &
+      & Fair performance evaluation of big data systems.
+      & Search, Social, Commerce
+      & Unspecified
+      & Unspecified
       \\\hline
 
       StreamCloud\cite{streamcloud}
-      &
-      &
-      &
-      &
+      & Evaluation of scalability and elasticity.
+      & Telephony
+      & Stateful
+      & Map, Aggregate, Join, Filter
       \\\hline
 
-      Integrating\cite{integrating}
-      &
-      &
-      &
-      &
+      Operator State\cite{integrating}
+      & Testing dynamic scaling and fault-tolerance.
+      & Road tolls
+      & Stateful
+      & Map, Aggregate, Join
       \\\hline
 
       TimeStream\cite{timestream}
-      &
-      &
-      &
-      &
+      & Low-latency test for real-world applications.
+      & Search, Social Network
+      & None
+      & Filter, Window, Map, Aggregate
       \\\hline
 
       Storm\cite{storm}
-      &
-      &
-      &
-      &
+      & Evaluating performance of scheduling algorithms.
+      & None
+      & Stateful
+      & None
       \\\hline
 
       Big Data Storm\cite{storm2}
-      &
-      &
-      &
-      &
+      & Analysing trends for links on Twitter.
+      & Social Network
+      & Stateful
+      & Map, Filter, Aggregate, Window Aggregate
       \\\hline
-    \end{tabularx}
+    \end{tabular}
   }
   \caption{Comparison of the test properties of the reference papers.}
 \end{table}
@@ -116,86 +118,85 @@
   \centering
   {
     \scriptsize
-    \hspace*{-1.5cm}
-    \begin{tabularx}{0.85\pagewidth}{|l|X|X|l|l|}
+    \hspace*{-1cm}
+    \begin{tabular}{|l|p{3.5cm}|p{4cm}|p{2.5cm}|p{2cm}|}
       \hline
       Paper & Workloads & Testbed & External Systems & Public Data
       \\\hline
       
       S4\cite{s4}
-      & About 1M live events per day for two weeks.
-      & 16 servers with 4 32-bit CPUs and 2GB RAM each.
+      & \textasciitilde 1M live events per day for two weeks.
+      & 16 servers with 4x32-bit CPUs, 2GB RAM each.
       & Unspecified
       & No
       \\\hline
       
       SPADE\cite{spade}
-      & Around 250M transactions, resulting in about 20GB of data.
+      & \textasciitilde 250M transactions, resulting in about 20GB of data.
       & 16 cluster nodes. Further details not available.
       & IBM GPFS
-      & Yes\footnotemark
+      & Maybe\tablefootnote{The data was retrieved from the IBM WebSphere Web Front Office for all of December 2005.}
       \\\hline
 
       D-Streams\cite{discretized}
-      & About 20 MB/s/node (200K records/s/node) for WordCount.
-      & Up to 60 Amazon EC2 nodes with 4 cores and 15GB RAM.
+      & \textasciitilde 20 MB/s/node (200K records/s/node) for WordCount.
+      & Up to 60 Amazon EC2 nodes, 4 cores, 15GB RAM each.
       & Unspecified
       & No
       \\\hline
 
       Millwheel\cite{millwheel}
-      &
-      &
-      &
-      &
+      & Unspecified.
+      & 200 CPUs. Nothing further is specified.
+      & BigTable
+      & No
       \\\hline
 
       BigDataBench\cite{bigdatabench}
-      &
-      &
-      &
-      &
+      & Up to 1TB.
+      & 15 nodes, Xeon E5645, 16GB RAM, 8TB disks each.
+      & Hadoop, MPI, Hbase, Hive, MySQL
+      & Yes\tablefootnote{Obtainable at \url{http://prof.ict.ac.cn/BigDataBench/}}
       \\\hline
 
       StreamCloud\cite{streamcloud}
-      &
-      &
-      &
-      &
+      & Up to 450'000 transactions per second.
+      & 100 nodes, 32 cores, 8GB RAM, 0.5TB disks each, 1Gbit LAN.
+      & Unspecified
+      & No
       \\\hline
 
-      Integrating\cite{integrating}
-      &
-      &
-      &
-      &
+      Operator State\cite{integrating}
+      & Up to 600'000 tuples/s.
+      & Up to 50 Amazon EC2 ``small'' instances with 1.7GB RAM.
+      & Unspecified
+      & No
       \\\hline
 
       TimeStream\cite{timestream}
-      &
-      &
-      &
-      &
+      & \textasciitilde 30M URLs, \textasciitilde 1.2B Tweets.
+      & Up to 16 Dual Xeon X3360 2.83GHz, 8GB RAM, 2TB disks each, 1Gbit LAN.
+      & Unspecified
+      & No
       \\\hline
 
       Storm\cite{storm}
-      &
-      &
-      &
-      &
+      & Generated.
+      & 8 nodes, 2x2.8GHz CPU, 3GB RAM, 15GB disks each, 10Gbit LAN.
+      & Nimbus, Zookeper
+      & Yes\tablefootnote{The data is generated on the fly, the algorithm of which is specified in the paper.}
       \\\hline
 
       Big Data Storm\cite{storm2}
-      &
-      &
-      &
-      &
+      & \textasciitilde 1'600GB of compressed text data.
+      & 4 nodes, Intel i7-2600 CPU, 8GB RAM each.
+      & Kafka, Cassandra
+      & Maybe\tablefootnote{Data stems from Twitter and Bit.ly for June of 2012, but is not publicly available.}
       \\\hline
-    \end{tabularx}
+    \end{tabular}
   }
   \caption{Comparison of the test setups of the reference papers.}
 \end{table}
-\footnotetext{The data was retrieved from the IBM WebSphere Web Front Office for all of December 2005.}
 
 %%% Local Variables:
 %%% mode: latex
