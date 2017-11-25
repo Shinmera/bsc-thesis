@@ -28,19 +28,174 @@
 \imagefigure{images/storm2-graphs.pdf}{An illustration of the topology used for the Twitter \& Bitly link trend analysis. Nodes coloured orange maintain internal state.}
 
 \subsection{Comparison}
-\begin{figure}[H]
+\begin{table}[H]
   \centering
   {
     \scriptsize
     \hspace*{-1.5cm}
-    \begin{tabularx}{0.85\pagewidth}{|X|X|X|X|X|X|X|X|X|}
+    \begin{tabularx}{0.85\pagewidth}{|l|X|l|l|l|}
       \hline
-      Paper & Goal & Application & Dataflows & Operators & Workloads & Testbed & External Systems & Reproducibility \\
-      \hline
+      Paper & Goal & Application & Dataflows & Operators
+      \\\hline
+      
+      S4\cite{s4}
+      & A practical application of the system to a real-life problem.
+      & Search
+      & Stateful
+      & Join, Filter
+      \\\hline
+      
+      SPADE\cite{spade}
+      & Sample application, performance study.
+      & Finance
+      & Stateful
+      & Aggregate, Join, Filter
+      \\\hline
+
+      D-Streams\cite{discretized}
+      & Scalability and recovery test.
+      & None
+      & 
+      & Window Reduce
+      \\\hline
+
+      Millwheel\cite{millwheel}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      BigDataBench\cite{bigdatabench}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      StreamCloud\cite{streamcloud}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      Integrating\cite{integrating}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      TimeStream\cite{timestream}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      Storm\cite{storm}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      Big Data Storm\cite{storm2}
+      &
+      &
+      &
+      &
+      \\\hline
     \end{tabularx}
   }
-  \caption{Comparison of various features of the reference papers.}
-\end{figure}
+  \caption{Comparison of the test properties of the reference papers.}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  {
+    \scriptsize
+    \hspace*{-1.5cm}
+    \begin{tabularx}{0.85\pagewidth}{|l|X|X|l|l|}
+      \hline
+      Paper & Workloads & Testbed & External Systems & Public Data
+      \\\hline
+      
+      S4\cite{s4}
+      & About 1M live events per day for two weeks.
+      & 16 servers with 4 32-bit CPUs and 2GB RAM each.
+      & Unspecified
+      & No
+      \\\hline
+      
+      SPADE\cite{spade}
+      & Around 250M transactions, resulting in about 20GB of data.
+      & 16 cluster nodes. Further details not available.
+      & IBM GPFS
+      & Yes\footnotemark
+      \\\hline
+
+      D-Streams\cite{discretized}
+      & About 20 MB/s/node (200K records/s/node) for WordCount.
+      & Up to 60 Amazon EC2 nodes with 4 cores and 15GB RAM.
+      & Unspecified
+      & No
+      \\\hline
+
+      Millwheel\cite{millwheel}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      BigDataBench\cite{bigdatabench}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      StreamCloud\cite{streamcloud}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      Integrating\cite{integrating}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      TimeStream\cite{timestream}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      Storm\cite{storm}
+      &
+      &
+      &
+      &
+      \\\hline
+
+      Big Data Storm\cite{storm2}
+      &
+      &
+      &
+      &
+      \\\hline
+    \end{tabularx}
+  }
+  \caption{Comparison of the test setups of the reference papers.}
+\end{table}
+\footnotetext{The data was retrieved from the IBM WebSphere Web Front Office for all of December 2005.}
 
 %%% Local Variables:
 %%% mode: latex
