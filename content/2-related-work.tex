@@ -1,34 +1,34 @@
 \section{Related Work}
 In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available.
 
-\subsection{\sectioncite{s4}}
+\subsection{\citefulltitle{s4}}
 \imagefigure{images/s4-graphs.pdf}{Graphs of the three tests used to evaluate the S4 platform. From left to right: word count, click-through rate, and online parameter optimisation. Orange nodes are stateful. Nodes coloured in red retain state of previous stream events.}
 
-\subsection{\sectioncite{spade}}
+\subsection{\citefulltitle{spade}}
 \imagefigure{images/spade-graphs.pdf}{Graph of the example used in the SPADE paper: a bargain index computation. Nodes coloured in red retain state of previous stream events.}
 
-\subsection{\sectioncite{discretized}}
+\subsection{\citefulltitle{discretized}}
 \imagefigure{images/discretized-graphs.pdf}{Graph of the Word Count example used to illustrate the discretized streams. Not shown is the incremental reduction done between batches.}
 
-\subsection{\sectioncite{millwheel}}
+\subsection{\citefulltitle{millwheel}}
 
-\subsection{\sectioncite{bigdatabench}}
+\subsection{\citefulltitle{bigdatabench}}
 
-\subsection{\sectioncite{streamcloud}}
+\subsection{\citefulltitle{streamcloud}}
 \imagefigure{images/streamcloud-graphs.pdf}{Graph of the query used to evaluate StreamCloud. Nodes coloured in red retain state of previous stream events.}
 
-\subsection{\sectioncite{integrating}}
+\subsection{\citefulltitle{integrating}}
 \imagefigure{images/integrating-graphs.pdf}{Illustration of the queries for the Linear Road Benchmark (top) and the Top-K (bottom) tests used to evaluate their system. Orange nodes maintain internal state.}
 
-\subsection{\sectioncite{timestream}}
+\subsection{\citefulltitle{timestream}}
 \imagefigure{images/timestream-graphs.pdf}{The Distinct Count query used to evaluate the Timestream system. Nodes in orange have internal state.}
 
 The sentiment analysis has no description of the graph used and we could thus not replicate it here.
 
-\subsection{\sectioncite{storm}}
+\subsection{\citefulltitle{storm}}
 \imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers. Orange nodes are stateful. ``Shuffle'' connections send the output event to a random destination node. ``Fields'' connections send the output event to a specific destination node based on a field of the event.}
 
-\subsection{\sectioncite{storm2}}
+\subsection{\citefulltitle{storm2}}
 \imagefigure{images/storm2-graphs.pdf}{An illustration of the topology used for the Twitter \& Bitly link trend analysis. Nodes coloured orange maintain internal state.}
 
 \subsection{Comparison}
@@ -39,7 +39,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
   {
     \scriptsize
     \hspace*{-1cm}
-    \begin{tabular}{|l|p{4cm}|p{3cm}|p{2.5cm}|p{2.5cm}|}
+    \begin{tabular}{|p{3cm}|p{4cm}|p{3cm}|p{2.5cm}|p{2.5cm}|}
       \hline
       Paper & Goal & Application & Dataflow Properties & Dataflow Operators
       \\\hline
@@ -100,14 +100,14 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Filter, Window, Map, Aggregate
       \\\hline
 
-      Storm\cite{storm}
+      Adaptive Scheduling\cite{storm}
       & Evaluating performance of scheduling algorithms.
       & None
       & Stateful
       & None
       \\\hline
 
-      Big Data Storm\cite{storm2}
+      Analytics on High Velocity Streams\cite{storm2}
       & Analysing trends for links on Twitter.
       & Social Network
       & Stateful
@@ -124,7 +124,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
   {
     \scriptsize
     \hspace*{-1cm}
-    \begin{tabular}{|l|p{3.5cm}|p{4cm}|p{2.5cm}|p{2cm}|}
+    \begin{tabular}{|p{3cm}|p{3.5cm}|p{4cm}|p{2.5cm}|p{2cm}|}
       \hline
       Paper & Workloads & Testbed & External Systems & Public Data
       \\\hline
@@ -185,14 +185,14 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & No
       \\\hline
 
-      Storm\cite{storm}
+      Adaptive Scheduling\cite{storm}
       & Generated.
       & 8 nodes, 2x2.8GHz CPU, 3GB RAM, 15GB disks each, 10Gbit LAN.
       & Nimbus, Zookeper
       & Yes\tablefootnote{The data is generated on the fly, the algorithm of which is specified in the paper.}
       \\\hline
 
-      Big Data Storm\cite{storm2}
+      Analytics on High Velocity Streams\cite{storm2}
       & \textasciitilde 1'600GB of compressed text data.
       & 4 nodes, Intel i7-2600 CPU, 8GB RAM each.
       & Kafka, Cassandra
