@@ -2,7 +2,13 @@
 In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available.
 
 \subsection{\citefulltitle{s4}}
-\imagefigure{images/s4-graphs.pdf}{Graphs of the three tests used to evaluate the S4 platform. From left to right: word count, click-through rate, and online parameter optimisation. Orange nodes are stateful. Nodes coloured in red retain state of previous stream events.}
+The S4 paper evaluates its performance with two sample algorithms: click-through rate (CTR), and online parameter optimisation (OPO). The system uses typed events between nodes and distributes them to physical nodes based on a ``key property'' on the event. \\
+
+The CTR test is implemented by four nodes: the first assigns keys to the initially keyless events coming in. It passes them to a node that combines matching events. From there the events go on to a filter that removes unwanted events. Finally, the events are passed to a node that computes the CTR, and emits it as a new event. \\
+
+The OPO test consists of five nodes: the first node assigns keys to route the events to either the second or third node. The second and third nodes perform some computations on the events and emit the results as new ones. The fourth node compares the events it gets from nodes two and three, to determine the optimisation parameters. The fifth node runs an adaptation depending on the parameters it receives.
+
+\imagefigure{images/s4-graphs.pdf}{Graphs of the two tests used to evaluate the S4 platform: click-through rate and online parameter optimisation. Orange nodes are stateful. Nodes coloured in red retain state of previous stream events.}
 
 \subsection{\citefulltitle{spade}}
 \imagefigure{images/spade-graphs.pdf}{Graph of the example used in the SPADE paper: a bargain index computation. Nodes coloured in red retain state of previous stream events.}
@@ -48,21 +54,21 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & A practical application of the system to a real-life problem.
       & Search
       & Stateful
-      & Map, Join, Filter
+      & Map, Filter, Join
       \\\hline
       
       SPADE\cite{spade}
       & Sample application, performance study.
       & Finance
       & Stateful
-      & Map, Aggregate, Join, Filter
+      & Map, Filter, Aggregate, Join
       \\\hline
 
       D-Streams\cite{discretized}
       & Scalability and recovery test.
       & None
       & None
-      & Map, Window Reduce
+      & Map, Window Aggregate
       \\\hline
 
       Millwheel\cite{millwheel}
@@ -83,7 +89,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Evaluation of scalability and elasticity.
       & Telephony
       & Stateful
-      & Map, Aggregate, Join, Filter
+      & Map, Filter, Aggregate, Join
       \\\hline
 
       Operator State\cite{integrating}
@@ -97,7 +103,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Low-latency test for real-world applications.
       & Search, Social Network
       & None
-      & Filter, Window, Map, Aggregate
+      & Map, Filter, Aggregate, Window
       \\\hline
 
       Adaptive Scheduling\cite{storm}
@@ -111,7 +117,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Analysing trends for links on Twitter.
       & Social Network
       & Stateful
-      & Map, Filter, Aggregate, Window Aggregate
+      & Map, Filter, Aggregate, Window
       \\\hline
     \end{tabular}
   }
