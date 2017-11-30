@@ -18,17 +18,58 @@ In order to evaluate the system, a simple algorithm is run to determine bargains
 The data flow is composed of six nodes: the first filters out trade information and computes its price. It passes its information on to a moving aggregation node, with a window size of 15, and a slide of 1. The aggregate is passed on to a mapping node that computes the volume weighted average price (VWAP). The fourth node filters out quote information. This is then, together with the VWAP, passed to the fifth node, which joins the two together to compute the bargain index. The final node simply filters out the zero indexes.
 
 \subsection{\citefulltitle{discretized}}
+In the Discretized Streams paper, the performance is evaluated through a simple Word Count algorithm. The system operates on tuples of data, and uses a rather simple API of predefined operators to construct a data flow. \\
+
 \imagefigure{images/discretized-graphs.pdf}{Graph of the Word Count example used to illustrate the discretized streams. Not shown is the incremental reduction done between batches.}
 
+The Word Count test is implemented through three operators: a ``flat map'' that splits an incoming string into words, a map that turns each word into a tuple of the word and a counter, and finally a hopping-window aggregation that adds the counters together grouped by word.
+
 \subsection{\citefulltitle{millwheel}}
+The Millwheel paper unfortunately provides barely any information at all about the tests implemented. The only mention is about how many stages the pipelines have they use to evaluate the system. Two tests are performed: a single-stage test to measure the latency, and a three-stage test to measure the lag of their fault tolerance system. \\
+
+The system follows a similar model to S4, where nodes handle typed data, and the data is clustered by a key property. Unlike S4 where the key is a direct property of the data, in MillWheel ``key extractors'' of each node provide the keys, and thus the same data can be separated into multiple clusters.
 
 \subsection{\citefulltitle{bigdatabench}}
+This paper proposes a suite of benchmarks and tests to evaluate Big Data systems. The paper primarily focuses on the generation of suitable testing data sets, and proposes the following algorithms to test the system:
+
+\begin{multicols}{2}
+\begin{itemize}
+\item Sort
+\item Grep
+\item Word Count
+\item Retrieving Data
+\item Storing Data
+\item Scanning Data
+\item Select Query
+\item Aggregate Query
+\item Join Query
+\item Nutch Server
+\item Indexing
+\item Page Rank
+\item Olio Server
+\item K-means
+\item Connected Components
+\item Rubis Server
+\item Collaborative Filtering
+\item Naive Bayes
+\end{itemize}
+\end{multicols}
+
+The paper does not propose any particular implementation strategies. They provide performance evaluation for an implementation of different parts of the benchmark suite on the Hadoop, MPI, Hbase, Hive, and MySQL systems, but no particular details of the implementation are discussed.
 
 \subsection{\citefulltitle{streamcloud}}
-\imagefigure{images/streamcloud-graphs.pdf}{Graph of the query used to evaluate StreamCloud. Nodes coloured in red retain state of previous stream events.}
+In this paper, the system is evaluated by two distinct queries. It is not stated whether either of the queries have any real-world application. The system declares a set of nodes that operate on tuples. These predefined nodes can then be connected together to perform a query. \\
+
+\imagefigure{images/streamcloud-graphs.pdf}{Graph of the query used to evaluate StreamCloud. Nodes coloured in orange retain some state.}
+
+Both queries perform a sequence of maps and filters followed by aggregations. The aggregate is based on a window size and slide, which can be configured for each node. However, the configurations used are not provided by the paper.
 
 \subsection{\citefulltitle{integrating}}
-\imagefigure{images/integrating-graphs.pdf}{Illustration of the queries for the Linear Road Benchmark (top) and the Top-K (bottom) tests used to evaluate their system. Orange nodes maintain internal state.}
+To evaluate their approach for fault tolerance using Operator State Management, two queries were implemented: a linear road benchmark to determine tolls in a network, and a Top-K query to determine the top visited pages. The data flow is composed out of stateless and stateful nodes, where stateful nodes use explicitly declared state variables. Data is exchanged between nodes in the form of tuples. \\
+
+\imagefigure{images/integrating-graphs.pdf}{Illustration of the queries for the Linear Road Benchmark and the Top-K tests used to evaluate their system. Orange nodes maintain internal state.}
+
+
 
 \subsection{\citefulltitle{timestream}}
 \imagefigure{images/timestream-graphs.pdf}{The Distinct Count query used to evaluate the Timestream system. Nodes in orange have internal state.}
@@ -42,7 +83,7 @@ The sentiment analysis has no description of the graph used and we could thus no
 \imagefigure{images/storm2-graphs.pdf}{An illustration of the topology used for the Twitter \& Bitly link trend analysis. Nodes coloured orange maintain internal state.}
 
 \subsection{Comparison}
-In \autoref{table:test-properties} and \autoref{table:test-setups} we compare the most important features of the tests performed in the various papers. Unfortunately, most of the papers do not supply or use publicly available data, making it difficult to compare them, even if the test data flow were replicated.
+In \autoref{table:test-properties} and \autoref{table:test-setups} we compare the most important features of the tests performed in the various papers. Unfortunately, most of the papers do not supply or use publicly available data, making it difficult to compare them, even if the test data flows were replicated.
 
 \begin{table}[H]
   \centering
@@ -65,14 +106,14 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Sample application, performance study.
       & Finance
       & Stateful
-      & Map, Filter, Aggregate, Join
+      & Map, Filter, Reduce, Join
       \\\hline
 
       D-Streams\cite{discretized}
       & Scalability and recovery test.
       & None
       & None
-      & Map, Window Aggregate
+      & Map, Reduce, Window
       \\\hline
 
       Millwheel\cite{millwheel}
@@ -93,21 +134,21 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Evaluation of scalability and elasticity.
       & Telephony
       & Stateful
-      & Map, Filter, Aggregate, Join
+      & Map, Filter, Reduce, Join
       \\\hline
 
       Operator State\cite{integrating}
       & Testing dynamic scaling and fault-tolerance.
       & Road tolls
       & Stateful
-      & Map, Aggregate, Join
+      & Map, Reduce, Join
       \\\hline
 
       TimeStream\cite{timestream}
       & Low-latency test for real-world applications.
       & Search, Social Network
       & None
-      & Map, Filter, Aggregate, Window
+      & Map, Filter, Reduce, Window
       \\\hline
 
       Adaptive Scheduling\cite{storm}
@@ -121,21 +162,21 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Analysing trends for links on Twitter.
       & Social Network
       & Stateful
-      & Map, Filter, Aggregate, Window
+      & Map, Filter, Reduce, Window
       \\\hline
 
       YSB\cite{ysb}
       & Benchmarking streaming systems via Ad analytics.
       & Ads
       & Stateful
-      & Map, Filter, Aggregate, Join, Window
+      & Map, Filter, Reduce, Join, Window
       \\\hline
 
       HiBench\cite{hibench}
       & Evaluating big data processing systems.
       & Big Data
       & Stateful
-      & Map, Aggregate, Window
+      & Map, Reduce, Window
       \\\hline
 
       NEXMark\cite{nexmark}
