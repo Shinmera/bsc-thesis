@@ -4,14 +4,18 @@ In this section we analyse and compare a number of papers about stream processor
 \subsection{\citefulltitle{s4}}
 The S4 paper evaluates its performance with two sample algorithms: click-through rate (CTR), and online parameter optimisation (OPO). The system uses typed events between nodes and distributes them to physical nodes based on a ``key property'' on the event. \\
 
+\imagefigure{images/s4-graphs.pdf}{Graphs of the two tests used to evaluate the S4 platform: click-through rate and online parameter optimisation. Orange nodes are stateful. Nodes coloured in red retain state of previous stream events.}
+
 The CTR test is implemented by four nodes: the first assigns keys to the initially keyless events coming in. It passes them to a node that combines matching events. From there the events go on to a filter that removes unwanted events. Finally, the events are passed to a node that computes the CTR, and emits it as a new event. \\
 
 The OPO test consists of five nodes: the first node assigns keys to route the events to either the second or third node. The second and third nodes perform some computations on the events and emit the results as new ones. The fourth node compares the events it gets from nodes two and three, to determine the optimisation parameters. The fifth node runs an adaptation depending on the parameters it receives.
 
-\imagefigure{images/s4-graphs.pdf}{Graphs of the two tests used to evaluate the S4 platform: click-through rate and online parameter optimisation. Orange nodes are stateful. Nodes coloured in red retain state of previous stream events.}
-
 \subsection{\citefulltitle{spade}}
+In order to evaluate the system, a simple algorithm is run to determine bargains to buy. The system uses typed data payloads between nodes. The distribution and allocation of physical nodes is automatically performed by the system. \\
+
 \imagefigure{images/spade-graphs.pdf}{Graph of the example used in the SPADE paper: a bargain index computation. Nodes coloured in red retain state of previous stream events.}
+
+The data flow is composed of six nodes: the first filters out trade information and computes its price. It passes its information on to a moving aggregation node, with a window size of 15, and a slide of 1. The aggregate is passed on to a mapping node that computes the volume weighted average price (VWAP). The fourth node filters out quote information. This is then, together with the VWAP, passed to the fifth node, which joins the two together to compute the bargain index. The final node simply filters out the zero indexes.
 
 \subsection{\citefulltitle{discretized}}
 \imagefigure{images/discretized-graphs.pdf}{Graph of the Word Count example used to illustrate the discretized streams. Not shown is the incremental reduction done between batches.}
