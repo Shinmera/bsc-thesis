@@ -65,22 +65,36 @@ In this paper, the system is evaluated by two distinct queries. It is not stated
 Both queries perform a sequence of maps and filters followed by aggregations. The aggregate is based on a window size and slide, which can be configured for each node. However, the configurations used are not provided by the paper.
 
 \subsection{\citefulltitle{integrating}}
-To evaluate their approach for fault tolerance using Operator State Management, two queries were implemented: a linear road benchmark to determine tolls in a network, and a Top-K query to determine the top visited pages. The data flow is composed out of stateless and stateful nodes, where stateful nodes use explicitly declared state variables. Data is exchanged between nodes in the form of tuples. \\
+To evaluate their approach for fault tolerance using Operator State Management, two queries were implemented: a linear road benchmark (LRB) to determine tolls in a network, and a Top-K query to determine the top visited pages. The data flow is composed out of stateless and stateful nodes, where stateful nodes use explicitly declared state variables. Data is exchanged between nodes in the form of tuples. \\
 
 \imagefigure{images/integrating-graphs.pdf}{Illustration of the queries for the Linear Road Benchmark and the Top-K tests used to evaluate their system. Orange nodes maintain internal state.}
 
+The LRB is implemented using six nodes. The first node routes the tuples depending on their type. The following map node calculates tolls and accidents, the information of which is then forwarded to a node that collects toll information, and a node that evaluates the toll information. The output from the evaluation, together with account balance information, is aggregated and finally reduced to a single tuple together with the information from the toll collector node. \\
 
+The Top-K query is implemented using three nodes. The first node strips unnecessary information from the tuples. The second tuple reduces the tuples to local top-k counts. Finally the many local counts are reduced to a single top-k count for the whole data.
 
 \subsection{\citefulltitle{timestream}}
-\imagefigure{images/timestream-graphs.pdf}{The Distinct Count query used to evaluate the Timestream system. Nodes in orange have internal state.}
+The TimeStream system is evaluated using two algorithms: a distinct count to count URLs and a Twitter sentiment analysis. A query is composed from a set of stateless and stateful operators that act on typed tuples. Custom operators can be implemented as well to extend the set. \\
 
-The sentiment analysis has no description of the graph used and we could thus not replicate it here.
+\imagefigure{images/timestream-graphs.pdf}{The Distinct Count and Sentiment Analysis queries used to evaluate the Timestream system. Nodes in orange have internal state, while nodes in red retain previous events.}
+
+The distinct count is implemented using five nodes. The first node distributes the tuples based on a hash. The following filter removes bot-generated queries, and passes them on to a windowing operator with a window of 30'000 and a slide of 2'000. The windowed events are then reduced into local counts. The local counts are finally aggregated into global counts. \\
+
+The sentiment analysis performs two individual computations before finally joining the results together with a custom operator. The first computation determines changes in sentiments. It uses a tumbling window on the tweets, averages the sentiments, for each window, then uses a sliding window of size 2 to feed a filter that only returns sentiments that changed. The second computation returns the change in word counts. It uses a tumbling window of the same size as the first computation, then aggregates the word counts for each batch. Using another sliding window of 2 it then computes a delta in the counts. Using a custom operator the sentiment changes and word count deltas are then joined together to analyse them.
 
 \subsection{\citefulltitle{storm}}
+This paper proposes a new scheduling algorithm for Storm. It then uses an artificially crafted query to compare the performance of the standard scheduler to the proposed one. This query is believed to be representative of typical topologies found in applications of Storm.\\
+
 \imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers. Orange nodes are stateful. ``Shuffle'' connections send the output event to a random destination node. ``Fields'' connections send the output event to a specific destination node based on a field of the event.}
 
+The query is composed of a sequence of nodes that produce arbitrary, new events distinguished by a counter. The nodes are laid out in such a way that the way in which the events are propagated is always alternated between a ``shuffle'' and a ``field'' strategy. For ``shuffle'', each event is sent to a random physical node of the following node in the data flow. For ``field'', each event is sent to a physical node based on a hash of a particular field of the event.
+
 \subsection{\citefulltitle{storm2}}
+This paper presents a case study to perform real-time analysis of trends on Twitter using Storm. As it is implemented using Storm, the same model is used for the data flow: nodes communicate via streams of tuples, where each node can consume an arbitrary amount of input tuples and may emit any number of output tuples. \\
+
 \imagefigure{images/storm2-graphs.pdf}{An illustration of the topology used for the Twitter \& Bitly link trend analysis. Nodes coloured orange maintain internal state.}
+
+The data flow for this is the most complicated one presented in the related works we analysed. It uses a total of eleven nodes, excluding edge nodes that act as interfaces to the external systems. The computation can be separated into three stages: Twitter extraction, Bit.ly extraction, and trend analysis. The first stage filters out tweets that contain Bit.ly links. Those are then sent to the Bit.ly extraction stage and a map that extracts useful values for the trend analysis. The second stage extracts relevant information from the Bit.ly feed, then uses this together with the code received from the first stage to perform a Bloom filter. The output from there is then filtered for useful values before being saved. The trend analysis uses the extracted values from the tweets to find hashtags, which are then put through a rolling-window count. The resulting counts are reduced by two stages of ranking.
 
 \subsection{Comparison}
 In \autoref{table:test-properties} and \autoref{table:test-setups} we compare the most important features of the tests performed in the various papers. Unfortunately, most of the papers do not supply or use publicly available data, making it difficult to compare them, even if the test data flows were replicated.
