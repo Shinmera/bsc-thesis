@@ -1,4 +1,4 @@
-%%% FIXME: Note what state is retained for each stateful node
+%% FIXME: Note what state is retained for each stateful node
 \section{Related Work}
 In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. The nodes are coloured in orange if they are stateful, and covered in red if they perform windowing of some kind and thus retain previous inputs. \\
 
@@ -208,6 +208,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
   \label{table:test-properties}
 \end{table}
 
+%% FIXME: Clarify whether workloads are generated or real data sets.
 \begin{table}[H]
   \centering
   {
