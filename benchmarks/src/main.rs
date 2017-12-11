@@ -10,19 +10,19 @@ use timely::dataflow::operators::{Input, Probe, Inspect};
 use timely::dataflow::{Stream, Scope};
 
 pub trait RollingCount<G: Scope, D: Data> {
-    fn rolling_count<H: Hash+Eq+Data, K: Fn(&D)->(H, usize)+'static>(&self, key_extractor: K) -> Stream<G, (D, usize)>;
+    fn rolling_count<H: Hash+Eq+Data+Clone, K: Fn(&D)->(H, usize)+'static>(&self, key_extractor: K) -> Stream<G, (H, usize)>;
 }
 
 impl<G: Scope, D: Data> RollingCount<G, D> for Stream<G, D> {
-    fn rolling_count<H: Hash+Eq+Data, K: Fn(&D)->(H, usize)+'static>(&self, key_extractor: K) -> Stream<G, (D, usize)> {
+    fn rolling_count<H: Hash+Eq+Data+Clone, K: Fn(&D)->(H, usize)+'static>(&self, key_extractor: K) -> Stream<G, (H, usize)> {
         let mut counts = HashMap::new();
         self.unary_stream(Pipeline, "RollingCount", move |input, output| {
             input.for_each(|time, data| {
                 output.session(&time).give_iterator(data.drain(..).map(|x|{
                     let (key, inc) = key_extractor(&x);
                     let count = counts.get(&key).unwrap_or(&0)+inc;
-                    counts.insert(key, count);
-                    (x, count)
+                    counts.insert(key.clone(), count);
+                    (key, count)
                 }));
             });
         })
@@ -45,7 +45,7 @@ fn main() {
         let _probe = worker.dataflow(|scope| {
             scope.input_from(&mut input)
                 .rolling_count(|&(name, score)| (name, score))
-                .inspect(move |&((name, _), score)| println!("worker {}:\t {}: {}", index, name, score))
+                .inspect(move |&(name, score)| println!("worker {}:\t {}: {}", index, name, score))
                 .probe()
         });
 
