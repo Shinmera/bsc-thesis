@@ -60,9 +60,9 @@ The sentiment analysis performs two individual computations before finally joini
 \subsection{\citefulltitle{storm}}
 This paper proposes a new scheduling algorithm for Storm. It then uses a query specifically geared towards evaluating the scheduling. This query is believed to be representative of typical topologies found in applications of Storm.\\
 
-\imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers. ``Shuffle'' connections send the output event to a random destination node. ``Fields'' connections send the output event to a specific destination node based on a field of the event.}
+\imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers.}
 
-The query is composed of a sequence of nodes that produce arbitrary, new events distinguished by a counter. The nodes are laid out in such a way that the way in which the events are propagated is always alternated between a ``shuffle'' and a ``field'' strategy. For ``shuffle'', each event is sent to a random physical node of the following node in the data flow. For ``field'', each event is sent to a physical node based on a hash of a particular field of the event.
+The query is composed of a sequence of nodes that produce arbitrary, new events distinguished by a counter. The data flow has no interesting properties aside from the alternation between stateless and stateful nodes.
 
 \subsection{\citefulltitle{storm2}}
 This paper presents a case study to perform real-time analysis of trends on Twitter using Storm. \\
