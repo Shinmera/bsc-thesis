@@ -11,18 +11,41 @@ pub trait EpochWindow<G: Scope, D: Data> {
 
 impl<G: Scope, D: Data> EpochWindow<G, D> for Stream<G, D> {
     fn epoch_window<>(&self, size: usize, slide: usize) -> Stream<G, Vec<D>> {
-        // Note: size and slide currently ignored, for now just implementing size 1 slide 1.
+        assert!(slide <= size, "The window slide cannot be greater than the window size.");
         let mut windows = HashMap::new();
+        let mut times = Vec::new();
         self.unary_notify(Pipeline, "EpochWindow", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
-                let mut window = windows.entry(&time).or_insert(&Vec::new());
+                // Push the data onto a partial window for the current time.
+                let window = windows.entry(time.clone()).or_insert(Vec::new());
                 window.append(data.deref_mut());
-                notificator.notify_at(time);
+                // Remember this time for reconstruction of partial windows.
+                if !times.contains(&time) {
+                    times.push(time.clone());
+                    // Only notify if we have a full window and slide.
+                    if size <= times.len() && (times.len()-size) % slide == 0 {
+                        notificator.notify_at(time);
+                    }
+                }
             });
             notificator.for_each(|time,_,_| {
-                let mut window = windows.remove(&time).unwrap_or(&Vec::new());
+                // Gather complete window from partial windows.
+                let mut window = Vec::new();
+                for t in &times {
+                    if time.time() < t.time() { break; }
+                    for entry in windows.get(&t).unwrap_or(&Vec::new()) {
+                        window.push(entry.clone());
+                    }
+                }
+                // Send out the completed window.
                 output.session(&time).give(window);
+                // Invalidate partial windows that fell out of the slide.
+                for _ in 0..slide {
+                    let time = times.remove(0);
+                    windows.remove(&time);
+                }
             });
+            // FIXME: What to do if we run out of epochs before we can fill all slides?
         })
     }
 }
