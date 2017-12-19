@@ -15,12 +15,12 @@ impl<G: Scope, D: Data> EpochWindow<G, D> for Stream<G, D> {
         let mut windows = HashMap::new();
         self.unary_notify(Pipeline, "EpochWindow", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
-                let mut window = windows.get(&time).unwrap_or(&Vec::new());
+                let mut window = windows.entry(&time).or_insert(&Vec::new());
                 window.append(data.deref_mut());
                 notificator.notify_at(time);
             });
             notificator.for_each(|time,_,_| {
-                let mut window = windows.remove(&time).unwrap_or(Vec::new());
+                let mut window = windows.remove(&time).unwrap_or(&Vec::new());
                 output.session(&time).give(window);
             });
         })
