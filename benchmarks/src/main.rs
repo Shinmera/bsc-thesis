@@ -45,5 +45,7 @@ fn main() {
                 input2.send(dat);
             }
         }
+        input1.close();
+        input2.close();
     }).unwrap();
 }
