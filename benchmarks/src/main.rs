@@ -23,7 +23,7 @@ fn main() {
 
         let index = worker.index();
 
-        let (mut input1, mut input2, _probe) = worker.dataflow(move |scope| {
+        let (mut input1, mut input2, probe) = worker.dataflow(move |scope| {
             let (input1, stream1) = scope.new_input();
             let (input2, stream2) = scope.new_input();
             let probe = stream1
@@ -36,13 +36,16 @@ fn main() {
         });
 
         for epoch in 0..data1.len() {
-            input1.advance_to(epoch);
             for dat in data1.pop().unwrap(){
                 input1.send(dat);
             }
-            input2.advance_to(epoch);
+            input1.advance_to(epoch+1);
             for dat in data2.pop().unwrap(){
                 input2.send(dat);
+            }
+            input2.advance_to(epoch+1);
+            while probe.less_than(input1.time()) && probe.less_than(input2.time()) {
+                worker.step();
             }
         }
         input1.close();
