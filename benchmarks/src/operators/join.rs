@@ -47,11 +47,11 @@ impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
             });
             
             notificator.for_each(|time, _, _|{
-                if let Some(k1) = epoch1.get(&time) {
-                    if let Some(k2) = epoch2.get(&time) {
+                if let Some(k1) = epoch1.remove(&time) {
+                    if let Some(k2) = epoch2.remove(&time) {
                         let mut out = output.session(&time);
                         for (key, data1) in k1{
-                            if let Some(data2) = k2.get(key) {
+                            if let Some(data2) = k2.get(&key) {
                                 for i in 0..min(data1.len(), data2.len()){
                                     out.give(joiner(&data1[i], &data2[i]));
                                 }
