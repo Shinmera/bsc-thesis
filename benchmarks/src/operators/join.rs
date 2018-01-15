@@ -58,6 +58,8 @@ impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
                             }
                         }
                     }
+                } else {
+                    epoch2.remove(&time);
                 }
             });
         })
