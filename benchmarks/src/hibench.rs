@@ -3,7 +3,7 @@ use operators::EpochWindow;
 use timely::dataflow::operators::{Input, Exchange};
 use timely::dataflow::scopes::child::Child;
 use timely::dataflow::Stream;
-use common::Test;
+use test::Test;
 
 struct Identity {}
 impl Test for Identity {
