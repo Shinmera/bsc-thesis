@@ -10,6 +10,7 @@
 \usepackage{etoolbox}
 \usepackage{xcolor}
 \usepackage{float}
+\usepackage{ifthen}
 \usepackage{multicol}
 \usepackage{tablefootnote}
 \usepackage[margin=1cm]{caption}
@@ -51,10 +52,13 @@
 
 \newcommand{\citefulltitle}[1]{\citetitle*{#1}\cite{#1}}
 
-\newcommand{\imagefigure}[2]{\begin{figure}[H]%
+\newcommand{\imagefigure}[3][]{\begin{figure}[H]%
     \centering%
-    \includegraphics[width=1.0\linewidth]{#1}%
-    \caption{#2}%
+    \includegraphics[width=1.0\linewidth]{#2}%
+    \caption{#3}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1}}%
   \end{figure}}
 
 \begin{document}

@@ -1,8 +1,19 @@
 \section{HiBench: A Cross-Platforms Micro-Benchmark Suite for Big Data\cite{hibench}}
+HiBench is a benchmarking suite created by Intel in 2012. It proposes a set of microbenchmarks to test Big Data processing systems. It includes implementations of the tests for Spark, Flink, Storm, and Gearpump. For our purposes in testing Strymon, we will focus only on the four tests of the streaming suite:
+
+\begin{itemize}
+\item {\bfseries Identity} This test is supposed to measure the minimum latency of the system, by simply immediately outputting the input data.
+\item {\bfseries Repartition} This tests the distribution of the workload across workers, but just like Identity does not perform any computation on the data.
+\item {\bfseries Wordcount} This is a basic word count test that simply focuses on counting the occurrences of individual words, regularly outputting the current tally. It is intended to test the performance of stateful operators.
+\item {\bfseries Fixwindow} This test performs a simple hopping window reduction.
+\end{itemize}
+
+The tests are illustrated as data flows in \autoref{figure:hibench}.
+
+\imagefigure[hibench]{images/hibench-graphs.pdf}{Graphs of the four streaming benchmarks that HiBench specifies.}
 
 \subsection{Implementation}
 
-\imagefigure{images/hibench-graphs.pdf}{Graphs of the four streaming benchmarks that HiBench specifies.}
 
 \subsection{Evaluation}
 
