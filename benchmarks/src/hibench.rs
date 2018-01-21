@@ -1,49 +1,64 @@
 use operators::RollingCount;
 use operators::EpochWindow;
-use operators::Join;
-use timely::dataflow::scopes::root::Root;
-use timely::dataflow::{Stream, Scope};
-use timely::dataflow::operators::{Input};
+use timely::dataflow::operators::{Input, Exchange};
+use timely::dataflow::scopes::child::Child;
+use timely::dataflow::Stream;
+use common::Test;
 
-fn identity(worker: &mut Root) -> ([Input], Stream) {
-    worker.dataflow(move |scope| {
+struct Identity {}
+impl Test for Identity {
+    fn name(&self) -> str { "Identity" }
+
+    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
         let (input, stream) = scope.new_input();
         (vec![input], stream)
-    })
+    }
 }
 
-fn repartition(worker: &mut Root) -> ([Input], Stream) {
-    worker.dataflow(move |scope| {
+struct Repartition {}
+impl Test for Repartition {
+    fn name(&self) -> str { "Repartition" }
+    
+    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
         let (input, stream) = scope.new_input();
+        let stream = stream
+            .exchange(|&x| x);
         (vec![input], stream)
-    })
+    }
 }
 
-fn wordcount(worker: &mut Root) -> ([Input], Stream) {
-    worker.dataflow(move |scope| {
+struct Wordcount {}
+impl Test for Wordcount {
+    fn name(&self) -> str { "Wordcount" }
+
+    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
         let (input, stream) = scope.new_input();
         let stream = stream
             .flat_map(|text| text.split_whitespace())
+            .exchange(|word| word)
             .rolling_count(|word| (word, 1));
         (vec![input], stream)
-    })
+    }
 }
 
-fn fixwindow(worker: &mut Root) -> ([Input], Stream){
-    worker.dataflow(move |scope| {
+struct Fixwindow {}
+impl Test for Fixwindow {
+    fn name(&self) -> str { "Fixwindow" }
+
+    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
         let (input, stream) = scope.new_input();
         let stream = stream
-            .epochwindow(n, n)
+            .epoch_window(1, 1)
             .map(|data| data.iter().sum());
         (vec![input], stream)
-    })
+    }
 }
 
-pub fn hibench() -> [([Input], Stream)]{
+pub fn hibench() -> [Test]{
     vec![
-        identity(),
-        repartition(),
-        wordcount(),
-        fixwindow()
+        Identity{},
+        Repartition{},
+        Wordcount{},
+        Fixwindow{}
     ]
 }
