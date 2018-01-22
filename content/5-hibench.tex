@@ -8,7 +8,9 @@ HiBench is a benchmarking suite created by Intel in 2012. It proposes a set of m
 \item {\bfseries Fixwindow} This test performs a simple hopping window reduction.
 \end{itemize}
 
-The tests are illustrated as data flows in \autoref{figure:hibench}.
+The tests are illustrated as data flows in \autoref{figure:hibench}. As the benchmarks focus on very small tests, they can only really give insight about the performance of the system for a select few individual operations. This might not translate to the performance of the system for complex data flows with many interacting components. \\
+
+Hibench only focuses on the latency component of the system, measuring how long it takes the system to process data at a fixed input rate. It does not consider other important factors of a streaming system such as fault tolerance, scaling, and load bearing.
 
 \imagefigure[hibench]{images/hibench-graphs.pdf}{Graphs of the four streaming benchmarks that HiBench specifies.}
 
