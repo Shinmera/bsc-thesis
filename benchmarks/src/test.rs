@@ -22,7 +22,7 @@ pub trait TestImpl<A: Allocate> : Test<A>{
         Ok(false)
     }
 
-    fn generate_data(&self) -> Option<[Self::D]> {
+    fn generate_data(&self) -> Option<Vec<Self::D>> {
         println!("Warning: {} does not implement a data generator.", self.name());
         None
     }
