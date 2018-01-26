@@ -6,19 +6,17 @@ mod hibench;
 
 use test::Test;
 use hibench::hibench;
-use timely::dataflow::operators::{Input, Probe};
-use timely::dataflow::scopes::Root;
-use timely::Data;
+use timely_communication::allocator::generic::Generic;
 
-fn run_tests(tests: [Test]) {
-    for test in tests {
-        println!("Running test {}", test.name());
-        timely::execute_from_args(std::env::args(), move |worker| {
-            test.run(worker);
-        }).unwrap();
-    }
+fn run_test(test: &Test<Generic>) {
+    println!("Running test {}", test.name());
+    timely::execute_from_args(std::env::args(), move |worker| {
+        if let Err(e) = test.run(worker) {
+            println!("Failed: {}", e);
+        }
+    }).unwrap();
 }
 
 fn main() {
-    run_tests(hibench());
+    hibench().to_iter().map(run_test);
 }

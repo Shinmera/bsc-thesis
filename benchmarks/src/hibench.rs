@@ -1,25 +1,36 @@
 use operators::RollingCount;
 use operators::EpochWindow;
 use timely::dataflow::operators::{Input, Exchange};
+use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::child::Child;
-use timely::dataflow::Stream;
+use timely::dataflow::{Stream};
+use timely_communication::{Allocate};
 use test::Test;
+use test::TestImpl;
 
 struct Identity {}
-impl Test for Identity {
+impl<A: Allocate> Test<A> for Identity{}
+impl<A: Allocate> TestImpl<A> for Identity {
+    type D = String;
+    type T = usize;
+    
     fn name(&self) -> str { "Identity" }
 
-    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
+    fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
         let (input, stream) = scope.new_input();
-        (vec![input], stream)
+        (stream, vec![Box::new(input)])
     }
 }
 
 struct Repartition {}
-impl Test for Repartition {
+impl<A: Allocate> Test<A> for Repartition{}
+impl<A: Allocate> TestImpl<A> for Repartition {
+    type D = String;
+    type T = usize;
+    
     fn name(&self) -> str { "Repartition" }
     
-    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
+    fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
         let (input, stream) = scope.new_input();
         let stream = stream
             .exchange(|&x| x);
@@ -28,10 +39,14 @@ impl Test for Repartition {
 }
 
 struct Wordcount {}
-impl Test for Wordcount {
+impl<A: Allocate> Test<A> for Wordcount{}
+impl<A: Allocate> TestImpl<A> for Wordcount {
+    type D = String;
+    type T = usize;
+    
     fn name(&self) -> str { "Wordcount" }
 
-    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
+    fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
         let (input, stream) = scope.new_input();
         let stream = stream
             .flat_map(|text| text.split_whitespace())
@@ -42,10 +57,14 @@ impl Test for Wordcount {
 }
 
 struct Fixwindow {}
-impl Test for Fixwindow {
+impl<A: Allocate> Test<A> for Fixwindow{}
+impl<A: Allocate> TestImpl<A> for Fixwindow {
+    type D = String;
+    type T = usize;
+    
     fn name(&self) -> str { "Fixwindow" }
 
-    fn construct_dataflow(&self, scope: &mut Child) -> ([Input], Stream) {
+    fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
         let (input, stream) = scope.new_input();
         let stream = stream
             .epoch_window(1, 1)
@@ -54,11 +73,6 @@ impl Test for Fixwindow {
     }
 }
 
-pub fn hibench() -> [Test]{
-    vec![
-        Identity{},
-        Repartition{},
-        Wordcount{},
-        Fixwindow{}
-    ]
+pub fn hibench<A: Allocate>() -> [Box<Test<A>>]{
+    vec![Box::new(Identity{})]
 }
