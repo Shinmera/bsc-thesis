@@ -18,8 +18,6 @@ impl TestImpl for Identity {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn next_epoch(&self, epoch: Self::T) -> Self::T { epoch+1 }
-
     fn construct_dataflow(&self, scope: &mut Child<Root<Generic>, Self::T>) -> (Stream<Child<Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         (stream, vec![input])

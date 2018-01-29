@@ -9,10 +9,29 @@ use timely_communication::{Allocate};
 use timely_communication::allocator::Generic;
 use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
+use std::ops::Add;
+
+pub trait Inc: Copy {
+    fn next(&mut self) -> Self;
+}
+
+impl Inc for () { fn next(&mut self) -> Self {()} }
+impl Inc for u8  { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for u16 { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for u32 { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for u64 { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for usize { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for i8  { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for i16 { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for i32 { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for i64 { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for isize { fn next(&mut self) -> Self {self.add(1)} }
+impl Inc for f32 { fn next(&mut self) -> Self {self.add(1.0)} }
+impl Inc for f64 { fn next(&mut self) -> Self {self.add(1.0)} }
 
 pub trait TestImpl : Sync+Send{
     type D: Data;
-    type T: Timestamp;
+    type T: Timestamp+Inc;
     
     fn name(&self) -> &str;
     
@@ -38,8 +57,6 @@ pub trait TestImpl : Sync+Send{
 
     fn initial_epoch(&self) -> Self::T;
 
-    fn next_epoch(&self, epoch: Self::T) -> Self::T;
-
     fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{
         let provides_input = self.prepare_data(worker.index())?;
         let (probe, inputs) = worker.dataflow(|scope|{
@@ -58,7 +75,7 @@ pub trait TestImpl : Sync+Send{
                     break;
                 }
             }
-            epoch = self.next_epoch(epoch);
+            epoch = epoch.next();
             for i in 0..inputs.len() {
                 inputs[i].advance_to(epoch);
             }
@@ -76,7 +93,7 @@ pub trait Test : Sync+Send{
     fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>;
 }
 
-impl<I, T: Timestamp, D: Data> Test for I where I: TestImpl<T=T,D=D> {
+impl<I, T: Timestamp+Inc, D: Data> Test for I where I: TestImpl<T=T,D=D> {
     fn name(&self) -> &str { I::name(self) }
     fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{ I::run(self, worker) }
 }
