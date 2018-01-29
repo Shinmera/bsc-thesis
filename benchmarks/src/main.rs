@@ -6,9 +6,8 @@ mod hibench;
 
 use test::Test;
 use hibench::hibench;
-use timely_communication::allocator::generic::Generic;
 
-fn run_test(test: &Test<Generic>) {
+fn run_test(test: Box<Test>) {
     println!("Running test {}", test.name());
     timely::execute_from_args(std::env::args(), move |worker| {
         if let Err(e) = test.run(worker) {
@@ -18,5 +17,5 @@ fn run_test(test: &Test<Generic>) {
 }
 
 fn main() {
-    hibench().to_iter().map(run_test);
+    for test in hibench() { run_test(test); }
 }

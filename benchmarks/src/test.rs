@@ -1,22 +1,22 @@
 use timely::dataflow::{Stream};
-use timely::dataflow::scopes::child::Child;
 use timely::dataflow::operators::{Probe};
-use timely::dataflow::scopes::{Scope, Root};
+use timely::dataflow::scopes::{Child, Scope, Root};
 use timely::progress::Timestamp;
 use timely::dataflow::operators::input::Handle;
+use timely::dataflow::operators::probe::Handle as ProbeHandle;
 use timely::Data;
 use timely_communication::{Allocate};
+use timely_communication::allocator::Generic;
+use timely::progress::nested::product::Product;
+use timely::progress::timestamp::RootTimestamp;
 
-pub trait TestImpl<A: Allocate> : Test<A>{
-    // I have no idea if how I'm using G is right, nor what
-    // concrete type I should use for it in an implementation.
-    type G: Scope;
+pub trait TestImpl : Sync+Send{
     type D: Data;
     type T: Timestamp;
     
-    fn name(&self) -> str;
+    fn name(&self) -> &str;
     
-    fn construct_dataflow(&self, &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]);
+    fn construct_dataflow(&self, &mut Child<Root<Generic>, Self::T>) -> (Stream<Child<Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>);
 
     fn prepare_data(&self, index: usize) -> Result<bool, String> {
         Ok(false)
@@ -27,7 +27,7 @@ pub trait TestImpl<A: Allocate> : Test<A>{
         None
     }
 
-    fn frontier_behind(probe: Probe<Self::G, Self::D>, inputs: [Box<Handle<Self::T, Self::D>>]) {
+    fn frontier_behind(&self, probe: ProbeHandle<Product<RootTimestamp, Self::T>>, inputs: Vec<Handle<Self::T, Self::D>>) -> bool{
         for input in inputs {
             if probe.less_than(input.time()) {
                 return true;
@@ -36,11 +36,17 @@ pub trait TestImpl<A: Allocate> : Test<A>{
         return false;
     }
 
-    fn run(&self, worker: &mut Root<A>) -> Result<(), String>{
+    fn initial_epoch(&self) -> Self::T;
+
+    fn next_epoch(&self, epoch: Self::T) -> Self::T;
+
+    fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{
         let provides_input = self.prepare_data(worker.index())?;
-        let (inputs, stream) = worker.dataflow(self.construct_dataflow);
-        let probe = stream.probe();
-        let mut epoch = 0;
+        let (probe, inputs) = worker.dataflow(|scope|{
+            let (stream, inputs) = self.construct_dataflow(scope);
+            (stream.probe(), inputs)
+        });
+        let mut epoch = self.initial_epoch();
         
         loop {
             if provides_input {
@@ -52,7 +58,7 @@ pub trait TestImpl<A: Allocate> : Test<A>{
                     break;
                 }
             }
-            epoch = epoch + 1;
+            epoch = self.next_epoch(epoch);
             for i in 0..inputs.len() {
                 inputs[i].advance_to(epoch);
             }
@@ -60,12 +66,17 @@ pub trait TestImpl<A: Allocate> : Test<A>{
                 worker.step();
             }
         }
-        inputs.to_iter.map(|i|i.close());
+        for input in inputs { input.close(); }
         Ok(())
     }
 }
 
-pub trait Test<A: Allocate>{
-    fn name(&self) -> str;
-    fn run(&self, worker: &mut Root<A>) -> Result<(), String>;
+pub trait Test : Sync+Send{
+    fn name(&self) -> &str;
+    fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>;
+}
+
+impl<I, T: Timestamp, D: Data> Test for I where I: TestImpl<T=T,D=D> {
+    fn name(&self) -> &str { I::name(self) }
+    fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{ I::run(self, worker) }
 }
