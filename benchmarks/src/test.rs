@@ -1,11 +1,10 @@
 use timely::dataflow::{Stream};
 use timely::dataflow::operators::{Probe};
-use timely::dataflow::scopes::{Child, Scope, Root};
+use timely::dataflow::scopes::{Child, Root};
 use timely::progress::Timestamp;
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::operators::probe::Handle as ProbeHandle;
 use timely::Data;
-use timely_communication::{Allocate};
 use timely_communication::allocator::Generic;
 use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
@@ -31,11 +30,12 @@ impl Inc for f64 { fn next(&mut self) -> Self {self.add(1.0)} }
 
 pub trait TestImpl : Sync+Send{
     type D: Data;
+    type DO: Data;
     type T: Timestamp+Inc;
     
     fn name(&self) -> &str;
     
-    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>);
+    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>);
 
     fn prepare_data(&self, _index: usize) -> Result<bool, String> {
         Ok(false)
@@ -95,7 +95,7 @@ pub trait Test : Sync+Send{
     fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>;
 }
 
-impl<I, T: Timestamp+Inc, D: Data> Test for I where I: TestImpl<T=T,D=D> {
+impl<I, T: Timestamp+Inc, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
     fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{ I::run(self, worker) }
 }
