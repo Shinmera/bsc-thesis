@@ -35,7 +35,7 @@ pub trait TestImpl : Sync+Send{
     
     fn name(&self) -> &str;
     
-    fn construct_dataflow(&self, &mut Child<Root<Generic>, Self::T>) -> (Stream<Child<Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>);
+    fn construct_dataflow<'a, 'scope>(&'a self, &'scope mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>);
 
     fn prepare_data(&self, index: usize) -> Result<bool, String> {
         Ok(false)
