@@ -18,60 +18,63 @@ impl TestImpl for Identity {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn construct_dataflow<'a, 'scope>(&'a self, scope: &'scope mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         (stream, vec![input])
     }
 }
 
 // struct Repartition {}
-// impl<A: Allocate> Test<A> for Repartition{}
-// impl<A: Allocate> TestImpl<A> for Repartition {
+// impl TestImpl for Repartition {
 //     type D = String;
 //     type T = usize;
     
-//     fn name(&self) -> str { "Repartition" }
+//     fn name(&self) -> &str { "Repartition" }
+
+//     fn initial_epoch(&self) -> Self::T { 0 }
     
-//     fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
+//     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>) {
 //         let (input, stream) = scope.new_input();
 //         let stream = stream
 //             .exchange(|&x| x);
-//         (vec![input], stream)
+//         (stream, vec![input])
 //     }
 // }
 
 // struct Wordcount {}
-// impl<A: Allocate> Test<A> for Wordcount{}
-// impl<A: Allocate> TestImpl<A> for Wordcount {
+// impl TestImpl for Wordcount {
 //     type D = String;
 //     type T = usize;
     
-//     fn name(&self) -> str { "Wordcount" }
+//     fn name(&self) -> &str { "Wordcount" }
 
-//     fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
+//     fn initial_epoch(&self) -> Self::T { 0 }
+
+//     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>) {
 //         let (input, stream) = scope.new_input();
 //         let stream = stream
 //             .flat_map(|text| text.split_whitespace())
 //             .exchange(|word| word)
 //             .rolling_count(|word| (word, 1));
-//         (vec![input], stream)
+//         (stream, vec![input])
 //     }
 // }
 
 // struct Fixwindow {}
-// impl<A: Allocate> Test<A> for Fixwindow{}
-// impl<A: Allocate> TestImpl<A> for Fixwindow {
+// impl TestImpl for Fixwindow {
 //     type D = String;
 //     type T = usize;
     
-//     fn name(&self) -> str { "Fixwindow" }
+//     fn name(&self) -> &str { "Fixwindow" }
 
-//     fn construct_dataflow(&self, scope: &mut Child<Self::G, Self::T>) -> (Stream<Self::G, Self::D>, [Box<Handle<Self::T, Self::D>>]) {
+//     fn initial_epoch(&self) -> Self::T { 0 }
+
+//     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>) {
 //         let (input, stream) = scope.new_input();
 //         let stream = stream
 //             .epoch_window(1, 1)
 //             .map(|data| data.iter().sum());
-//         (vec![input], stream)
+//         (stream, vec![input])
 //     }
 // }
 

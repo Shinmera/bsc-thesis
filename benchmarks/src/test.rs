@@ -35,9 +35,9 @@ pub trait TestImpl : Sync+Send{
     
     fn name(&self) -> &str;
     
-    fn construct_dataflow<'a, 'scope>(&'a self, &'scope mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>);
+    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>, Vec<Handle<Self::T, Self::D>>);
 
-    fn prepare_data(&self, index: usize) -> Result<bool, String> {
+    fn prepare_data(&self, _index: usize) -> Result<bool, String> {
         Ok(false)
     }
 
@@ -46,7 +46,7 @@ pub trait TestImpl : Sync+Send{
         None
     }
 
-    fn frontier_behind(&self, probe: ProbeHandle<Product<RootTimestamp, Self::T>>, inputs: Vec<Handle<Self::T, Self::D>>) -> bool{
+    fn frontier_behind(&self, probe: &ProbeHandle<Product<RootTimestamp, Self::T>>, inputs: &Vec<Handle<Self::T, Self::D>>) -> bool{
         for input in inputs {
             if probe.less_than(input.time()) {
                 return true;
@@ -59,7 +59,7 @@ pub trait TestImpl : Sync+Send{
 
     fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{
         let provides_input = self.prepare_data(worker.index())?;
-        let (probe, inputs) = worker.dataflow(|scope|{
+        let (probe, mut inputs) = worker.dataflow(|scope|{
             let (stream, inputs) = self.construct_dataflow(scope);
             (stream.probe(), inputs)
         });
@@ -67,9 +67,11 @@ pub trait TestImpl : Sync+Send{
         
         loop {
             if provides_input {
-                if let Some(data) = self.generate_data() {
-                    for i in 0..inputs.len() {
-                        inputs[i].send(data[i]);
+                if let Some(mut data) = self.generate_data() {
+                    let mut i = inputs.len()-1;
+                    while let Some(input) = data.pop() {
+                        inputs[i].send(input);
+                        i = i-1;
                     }
                 } else {
                     break;
@@ -79,7 +81,7 @@ pub trait TestImpl : Sync+Send{
             for i in 0..inputs.len() {
                 inputs[i].advance_to(epoch);
             }
-            while self.frontier_behind(probe, inputs) {
+            while self.frontier_behind(&probe, &inputs) {
                 worker.step();
             }
         }
