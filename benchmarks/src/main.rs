@@ -3,9 +3,11 @@ extern crate timely_communication;
 mod operators;
 mod test;
 mod hibench;
+mod ysb;
 
 use test::Test;
 use hibench::hibench;
+use ysb::ysb;
 
 fn run_test(test: Box<Test>) {
     println!("Running test {}", test.name());
@@ -18,4 +20,5 @@ fn run_test(test: Box<Test>) {
 
 fn main() {
     for test in hibench() { run_test(test); }
+    for test in ysb() { run_test(test); }
 }
