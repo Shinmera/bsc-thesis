@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate abomonation;
 extern crate timely;
 extern crate timely_communication;
 mod operators;

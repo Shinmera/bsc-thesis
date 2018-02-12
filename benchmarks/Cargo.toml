@@ -6,3 +6,4 @@ authors = ["Shinmera <shinmera@tymoon.eu>"]
 [dependencies]
 timely = "*"
 timely_communication = "*"
+abomonation = "*"
