@@ -37,7 +37,7 @@ pub trait TestImpl : Sync+Send{
     
     fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>);
 
-    fn prepare_data(&self, _index: usize) -> Result<bool, String> {
+    fn prepare_data(&self, _index: usize) -> Result<bool, &str> {
         Ok(false)
     }
 
@@ -57,7 +57,7 @@ pub trait TestImpl : Sync+Send{
 
     fn initial_epoch(&self) -> Self::T;
 
-    fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{
+    fn run(&self, worker: &mut Root<Generic>) -> Result<(), &str>{
         let provides_input = self.prepare_data(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
             let (stream, inputs) = self.construct_dataflow(scope);
@@ -92,10 +92,10 @@ pub trait TestImpl : Sync+Send{
 
 pub trait Test : Sync+Send{
     fn name(&self) -> &str;
-    fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>;
+    fn run(&self, worker: &mut Root<Generic>) -> Result<(), &str>;
 }
 
 impl<I, T: Timestamp+Inc, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
-    fn run(&self, worker: &mut Root<Generic>) -> Result<(), String>{ I::run(self, worker) }
+    fn run(&self, worker: &mut Root<Generic>) -> Result<(), &str>{ I::run(self, worker) }
 }

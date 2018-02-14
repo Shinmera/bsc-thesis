@@ -1,4 +1,6 @@
+extern crate serde_json;
 use std::collections::HashMap;
+use std::fs::File;
 use abomonation::Abomonation;
 use timely::dataflow::operators::{Input, Map, Filter};
 use timely::dataflow::operators::input::Handle;
@@ -35,9 +37,24 @@ impl TestImpl for YSB {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn prepare_data(&self, _index: usize) -> Result<bool, String> {
-        // FIXME: fill campaign_map
-        Ok(false)
+    fn prepare_data(&self, _index: usize) -> Result<bool, &str> {
+        match File::open("FIXME"){
+            Ok(file) => 
+                match serde_json::from_reader(file){
+                    Ok(serde_json::Value::Object(map)) => {
+                        map.iter().for_each(|(key, inner)|{
+                            if key != "campaigns" {
+                                if let Some(&serde_json::Value::String(campaign)) = inner.get("value"){
+                                    self.campaign_map.insert(key.clone(), campaign);
+                                }
+                            }
+                        });
+                        Ok(true)
+                    },
+                    _ => Err("Bad JSON, expected an object.")
+                },
+            _ => Err("Failed to open campaign map file.")
+        }
     }
 
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {

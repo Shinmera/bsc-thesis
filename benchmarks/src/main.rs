@@ -2,6 +2,7 @@
 extern crate abomonation;
 extern crate timely;
 extern crate timely_communication;
+extern crate serde_json;
 mod operators;
 mod test;
 mod hibench;

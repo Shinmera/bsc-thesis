@@ -7,3 +7,4 @@ authors = ["Shinmera <shinmera@tymoon.eu>"]
 timely = "*"
 timely_communication = "*"
 abomonation = "*"
+serde_json = "*"
