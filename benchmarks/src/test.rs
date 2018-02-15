@@ -88,18 +88,8 @@ pub trait TestImpl : Sync+Send{
 
     /// This function handles the actual running of the test.
     ///
-    /// It first calls prepare_data to prepare the local test.
-    /// It then runs the dataflow construction, coercing it to
-    /// a list of inputs and a probe. It then starts to loop.
-    /// If the current worker feeds data, it will call
-    /// generate_data and send it on to each of the inputs.
-    /// It then advances the epoch and steps the worker until
-    /// the frontier is no longer behind.
-    /// Once the loop exits, due to no longer having any new
-    /// input, all inputs are closed and Ok(()) is returned.
-    ///
     /// This function is the primary raison d'être of this
-    /// framework, as this behaviour is the same across each
+    /// framework, as its behaviour is the same across each
     /// possible test we might to run; you open some streams,
     /// construct the data flow, loop to feed data and advance
     /// the workers as needed.
