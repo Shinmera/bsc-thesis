@@ -9,6 +9,7 @@ use timely_communication::allocator::Generic;
 use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
 use std::ops::Add;
+use std::io::{Result, Error, ErrorKind};
 
 /// Simple trait for incrementable objects.
 /// This is used to automatically advance the timestamp.
@@ -40,16 +41,19 @@ pub trait TestImpl : Sync+Send{
     type DO: Data;
     type T: Timestamp+Inc;
 
+    /// Constructor to configure the test with the requested
+    /// properties.
+    fn new(&[String]) -> Self;
+
     /// The name of the test as a human readable string.
     fn name(&self) -> &str;
-    
-    /// This function is responsible for constructing the data flow
-    /// used for the computation, returning the last node of the
-    /// graph and a vector of input handles.
-    ///
-    /// The input argument should be the object received by the
-    /// function passed to worker.dataflow()
-    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>);
+
+    /// This function is used to generate a workload or data set
+    /// for use during testing. It will write it out to a configured
+    /// file, which is then read back when the test is actually run.
+    fn generate_data(&self) -> Result<()>{
+        Ok(())
+    }
 
     /// This function is called at the beginning of a test run and
     /// is responsible for opening input streams and preparing data.
@@ -60,17 +64,25 @@ pub trait TestImpl : Sync+Send{
     /// should be Ok(false), otherwise Ok(true). Err(..) can be used
     /// to report on unexpected failures in preparing or parsing the
     /// data.
-    fn prepare_data(&self, _index: usize) -> Result<bool, &str> {
+    fn prepare(&mut self, _index: usize) -> Result<bool> {
         Ok(false)
     }
 
-    /// Generates a single run of data for an epoch. If there is no
-    /// more data available (and the test is thus over), the function
-    /// should return None.
-    fn generate_data(&self) -> Option<Vec<Self::D>> {
-        println!("Warning: {} does not implement a data generator.", self.name());
-        None
+    /// Used to close open file handles and otherwise tear down stuff
+    /// that was opened up in prepare().
+    fn finish(&mut self) {
     }
+    
+    /// This function is responsible for constructing the data flow
+    /// used for the computation, returning the last node of the
+    /// graph and a vector of input handles.
+    ///
+    /// The input argument should be the object received by the
+    /// function passed to worker.dataflow()
+    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>);
+
+    /// This function will return the starting epoch timestamp.
+    fn initial_epoch(&self) -> Self::T;
 
     /// A shorthand function to test whether the frontier has reached
     /// all the inputs yet.
@@ -83,8 +95,13 @@ pub trait TestImpl : Sync+Send{
         return false;
     }
 
-    /// This function will return the starting epoch timestamp.
-    fn initial_epoch(&self) -> Self::T;
+    /// Generates a single run of data for an epoch. If there is no
+    /// more data available (and the test is thus over), the function
+    /// should return 
+    fn epoch_data(&mut self, _epoch: &Self::T) -> Result<Vec<Self::D>> {
+        println!("Warning: {} does not implement a data generator.", self.name());
+        Err(Error::new(ErrorKind::Other, "Out of data"))
+    }
 
     /// This function handles the actual running of the test.
     ///
@@ -93,8 +110,8 @@ pub trait TestImpl : Sync+Send{
     /// possible test we might to run; you open some streams,
     /// construct the data flow, loop to feed data and advance
     /// the workers as needed.
-    fn run(&self, worker: &mut Root<Generic>) -> Result<(), &str>{
-        let provides_input = self.prepare_data(worker.index())?;
+    fn run(&mut self, worker: &mut Root<Generic>) -> Result<()>{
+        let provides_input = self.prepare(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
             let (stream, inputs) = self.construct_dataflow(scope);
             (stream.probe(), inputs)
@@ -103,14 +120,19 @@ pub trait TestImpl : Sync+Send{
         
         loop {
             if provides_input {
-                if let Some(mut data) = self.generate_data() {
-                    let mut i = inputs.len()-1;
-                    while let Some(input) = data.pop() {
-                        inputs[i].send(input);
-                        i = i-1;
+                match self.epoch_data(&epoch){
+                    Ok(mut data) => {
+                        let mut i = inputs.len()-1;
+                        while let Some(input) = data.pop() {
+                            inputs[i].send(input);
+                            i = i-1;
+                        }
+                    },
+                    Err(error) => {
+                        for input in inputs { input.close(); }
+                        self.finish();
+                        return Err(error);
                     }
-                } else {
-                    break;
                 }
             }
             epoch = epoch.next();
@@ -121,8 +143,6 @@ pub trait TestImpl : Sync+Send{
                 worker.step();
             }
         }
-        for input in inputs { input.close(); }
-        Ok(())
     }
 }
 
@@ -133,10 +153,12 @@ pub trait TestImpl : Sync+Send{
 /// TestImpl's trait types.
 pub trait Test : Sync+Send{
     fn name(&self) -> &str;
-    fn run(&self, worker: &mut Root<Generic>) -> Result<(), &str>;
+    fn generate_data(&self) -> Result<()>;
+    fn run(&mut self, worker: &mut Root<Generic>) -> Result<()>;
 }
 
 impl<I, T: Timestamp+Inc, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
-    fn run(&self, worker: &mut Root<Generic>) -> Result<(), &str>{ I::run(self, worker) }
+    fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
+    fn run(&mut self, worker: &mut Root<Generic>) -> Result<()>{ I::run(self, worker) }
 }
