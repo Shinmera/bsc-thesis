@@ -7,6 +7,8 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 extern crate getopts;
+extern crate rand;
+extern crate uuid;
 mod operators;
 mod test;
 mod hibench;
@@ -35,7 +37,7 @@ fn main() {
         for test in hibench(&args[2..]) { run_test(test); }
         for test in ysb(&args[2..]) { run_test(test); }
     }else if args[1] == "generate" {
-        for test in hibench(&args[2..]) { test.generate_data(); }
-        for test in ysb(&args[2..]) { test.generate_data(); }
+        for test in hibench(&args[2..]) { test.generate_data().unwrap(); }
+        for test in ysb(&args[2..]) { test.generate_data().unwrap(); }
     }
 }

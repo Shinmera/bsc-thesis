@@ -11,3 +11,5 @@ serde = "*"
 serde_json = "*"
 serde_derive = "*"
 getopts = "*"
+rand = "*"
+uuid = { version = "*", features = ["v4"] }
