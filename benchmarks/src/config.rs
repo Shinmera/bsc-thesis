@@ -28,6 +28,10 @@ impl Config {
         Ok(Config{ args: args })
     }
 
+    pub fn insert<T>(&mut self, key: &str, value: String) {
+        self.args.insert(String::from(key), value);
+    }
+
     pub fn get(&self, key: &str) -> Option<String> {
         self.args.get(key).map(|x| x.clone())
     }

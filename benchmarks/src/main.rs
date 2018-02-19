@@ -18,20 +18,20 @@ use test::Test;
 use config::Config;
 use hibench::hibench;
 use ysb::ysb;
-use timely_communication::Configuration;
+use timely::Configuration;
 use std::io::BufRead;
+use std::io::{Result, Error, ErrorKind};
 
-fn run_test(configuration: Configuration, test: Box<Test>) {
-    println!("Running test {}", test.name());
-    timely::execute_logging(configuration, Default::default(), move |worker| {
-        if let Err(e) = test.run(worker) {
-            println!("Failed: {}", e);
-        } else {
-            println!("Successfully completed.");
-        }
-    }).unwrap();
+fn report<A>(result: Result<A>) {
+    if let Err(e) = result {
+        println!("Failed: {}", e);
+    } else {
+        println!("Successfully completed.");
+    }
 }
 
+/// This function extracts the timely_communication
+/// configuration object from the supplied Config.
 fn timely_configuration(config: &Config) -> Configuration {
     let threads = config.get_as_or("threads", 1);
     let process = config.get_as_or("process", 0);
@@ -66,6 +66,21 @@ fn timely_configuration(config: &Config) -> Configuration {
     }
 }
 
+fn run_test(config: &Config, test: Box<Test>) {
+    println!("> Running test {}", test.name());
+    let configuration = timely_configuration(config);
+    report(timely::execute_logging(configuration, Default::default(), move |worker| {
+        test.run(worker)
+    }).and_then(|x| x.join().pop().unwrap())
+           .map_err(|x| Error::new(ErrorKind::Other, x))
+           .and_then(|x| x));
+}
+
+fn generate_test(test: Box<Test>) {
+    println!("> Generating test {}", test.name());
+    report(test.generate_data());
+}
+
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
     let mode = config.get_or("1", "help");
@@ -74,12 +89,11 @@ fn main() {
     tests.append(&mut ysb(&config));
     if mode == "test" {
         for test in tests {
-            let configuration = timely_configuration(&config);
-            run_test(configuration, test);
+            run_test(&config, test);
         }
     }else if mode == "generate" {
         for test in tests {
-            test.generate_data().unwrap();
+            generate_test(test);
         }
     }else if mode == "help" {
         println!("Timely Benchmarks v0.1

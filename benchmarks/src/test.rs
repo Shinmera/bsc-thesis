@@ -1,5 +1,5 @@
 use timely::dataflow::{Stream};
-use timely::dataflow::operators::{Probe};
+use timely::dataflow::operators::{Inspect, Probe};
 use timely::dataflow::scopes::{Child, Root};
 use timely::progress::Timestamp;
 use timely::dataflow::operators::input::Handle;
@@ -11,6 +11,7 @@ use timely::progress::timestamp::RootTimestamp;
 use config::Config;
 use std::ops::Add;
 use std::io::{Result, Error, ErrorKind};
+use std::fmt::Debug;
 
 /// Simple trait for incrementable objects.
 /// This is used to automatically advance the timestamp.
@@ -38,9 +39,9 @@ impl Inc for f64 { fn next(&mut self) -> Self {self.add(1.0)} }
 /// the tests and avoids duplicating code. It also presents a
 /// simple framework for implementing a benchmark.
 pub trait TestImpl : Sync+Send{
-    type D: Data;
-    type DO: Data;
-    type T: Timestamp+Inc;
+    type D: Data+Debug;
+    type DO: Data+Debug;
+    type T: Timestamp+Inc+Debug;
     type G;
 
     /// Constructor to configure the test with the requested
@@ -114,13 +115,14 @@ pub trait TestImpl : Sync+Send{
         let mut feeder_data = self.prepare(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
             let (stream, inputs) = self.construct_dataflow(scope);
-            (stream.probe(), inputs)
+            (stream.inspect(|x| println!("<< {:?}", x)).probe(), inputs)
         });
         let mut epoch = self.initial_epoch();
         
         loop {
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
+                    println!(">> {:?}", data);
                     let mut i = inputs.len();
                     while let Some(input) = data.pop() {
                         i = i-1;
@@ -155,7 +157,7 @@ pub trait Test : Sync+Send{
     fn run(&self, worker: &mut Root<Generic>) -> Result<()>;
 }
 
-impl<I, T: Timestamp+Inc, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
+impl<I, T: Timestamp+Inc+Debug, D: Data+Debug, DO: Data+Debug> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
     fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
     fn run(&self, worker: &mut Root<Generic>) -> Result<()>{ I::run(self, worker) }

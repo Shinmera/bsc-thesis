@@ -19,7 +19,7 @@ use config::Config;
 use rand::Rng;
 use uuid::Uuid;
 
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Event {
     user_id: String,
     page_id: String,
