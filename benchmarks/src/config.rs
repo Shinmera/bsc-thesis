@@ -40,7 +40,7 @@ impl Config {
         self.args.get(key).map_or(String::from(default), |x| x.clone())
     }
 
-    pub fn get_or_as<T: FromStr>(&self, key: &str, default: T) -> T {
+    pub fn get_as_or<T: FromStr>(&self, key: &str, default: T) -> T {
         self.get_as(key).unwrap_or(default)
     }
 }
