@@ -8,6 +8,7 @@ use timely::Data;
 use timely_communication::allocator::Generic;
 use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
+use config::Config;
 use std::ops::Add;
 use std::io::{Result, Error, ErrorKind};
 
@@ -40,10 +41,11 @@ pub trait TestImpl : Sync+Send{
     type D: Data;
     type DO: Data;
     type T: Timestamp+Inc;
+    type G;
 
     /// Constructor to configure the test with the requested
     /// properties.
-    fn new(&[String]) -> Self;
+    fn new(&Config) -> Self;
 
     /// The name of the test as a human readable string.
     fn name(&self) -> &str;
@@ -60,17 +62,23 @@ pub trait TestImpl : Sync+Send{
     /// The index is the current worker's index, which is used to
     /// decide whether this should feed the dataflow at all.
     ///
-    /// If this worker should not feed the dataflow, the result
-    /// should be Ok(false), otherwise Ok(true). Err(..) can be used
-    /// to report on unexpected failures in preparing or parsing the
-    /// data.
-    fn prepare(&mut self, _index: usize) -> Result<bool> {
-        Ok(false)
+    /// The Ok result should contain data that the worker can use
+    /// with epoch_data to generate the next round of inputs.
+    fn prepare(&self, _index: usize) -> Result<Self::G> {
+        Err(Error::new(ErrorKind::Other, "No data"))
+    }
+
+    /// Generates a single run of data for an epoch. If there is no
+    /// more data available (and the test is thus over), the function
+    /// should return 
+    fn epoch_data(&self, _data: &mut Self::G, _epoch: &Self::T) -> Result<Vec<Self::D>> {
+        println!("Warning: {} does not implement a data generator.", self.name());
+        Err(Error::new(ErrorKind::Other, "Out of data"))
     }
 
     /// Used to close open file handles and otherwise tear down stuff
     /// that was opened up in prepare().
-    fn finish(&mut self) {
+    fn finish(&self, _data: &mut Self::G) {
     }
     
     /// This function is responsible for constructing the data flow
@@ -95,14 +103,6 @@ pub trait TestImpl : Sync+Send{
         return false;
     }
 
-    /// Generates a single run of data for an epoch. If there is no
-    /// more data available (and the test is thus over), the function
-    /// should return 
-    fn epoch_data(&mut self, _epoch: &Self::T) -> Result<Vec<Self::D>> {
-        println!("Warning: {} does not implement a data generator.", self.name());
-        Err(Error::new(ErrorKind::Other, "Out of data"))
-    }
-
     /// This function handles the actual running of the test.
     ///
     /// This function is the primary raison d'être of this
@@ -110,8 +110,8 @@ pub trait TestImpl : Sync+Send{
     /// possible test we might to run; you open some streams,
     /// construct the data flow, loop to feed data and advance
     /// the workers as needed.
-    fn run(&mut self, worker: &mut Root<Generic>) -> Result<()>{
-        let provides_input = self.prepare(worker.index())?;
+    fn run(&self, worker: &mut Root<Generic>) -> Result<()>{
+        let mut feeder_data = self.prepare(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
             let (stream, inputs) = self.construct_dataflow(scope);
             (stream.probe(), inputs)
@@ -119,20 +119,18 @@ pub trait TestImpl : Sync+Send{
         let mut epoch = self.initial_epoch();
         
         loop {
-            if provides_input {
-                match self.epoch_data(&epoch){
-                    Ok(mut data) => {
-                        let mut i = inputs.len()-1;
-                        while let Some(input) = data.pop() {
-                            inputs[i].send(input);
-                            i = i-1;
-                        }
-                    },
-                    Err(error) => {
-                        for input in inputs { input.close(); }
-                        self.finish();
-                        return Err(error);
+            match self.epoch_data(&mut feeder_data, &epoch){
+                Ok(mut data) => {
+                    let mut i = inputs.len()-1;
+                    while let Some(input) = data.pop() {
+                        inputs[i].send(input);
+                        i = i-1;
                     }
+                },
+                Err(error) => {
+                    for input in inputs { input.close(); }
+                    self.finish(&mut feeder_data);
+                    return Err(error);
                 }
             }
             epoch = epoch.next();
@@ -154,11 +152,11 @@ pub trait TestImpl : Sync+Send{
 pub trait Test : Sync+Send{
     fn name(&self) -> &str;
     fn generate_data(&self) -> Result<()>;
-    fn run(&mut self, worker: &mut Root<Generic>) -> Result<()>;
+    fn run(&self, worker: &mut Root<Generic>) -> Result<()>;
 }
 
 impl<I, T: Timestamp+Inc, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
     fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
-    fn run(&mut self, worker: &mut Root<Generic>) -> Result<()>{ I::run(self, worker) }
+    fn run(&self, worker: &mut Root<Generic>) -> Result<()>{ I::run(self, worker) }
 }

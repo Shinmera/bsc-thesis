@@ -9,6 +9,7 @@ use operators::RollingCount;
 use operators::EpochWindow;
 use test::Test;
 use test::TestImpl;
+use config::Config;
 
 fn hasher(x: &String) -> u64 {
     let mut s = DefaultHasher::new();
@@ -21,8 +22,9 @@ impl TestImpl for Identity {
     type D = String;
     type DO = String;
     type T = usize;
+    type G = ();
 
-    fn new(_args: &[String]) -> Self { Identity{} }
+    fn new(_args: &Config) -> Self { Identity{} }
     
     fn name(&self) -> &str { "Identity" }
 
@@ -39,8 +41,9 @@ impl TestImpl for Repartition {
     type D = String;
     type DO = String;
     type T = usize;
+    type G = ();
 
-    fn new(_args: &[String]) -> Self { Repartition{} }
+    fn new(_args: &Config) -> Self { Repartition{} }
     
     fn name(&self) -> &str { "Repartition" }
 
@@ -59,8 +62,9 @@ impl TestImpl for Wordcount {
     type D = String;
     type DO = (String, usize);
     type T = usize;
+    type G = ();
 
-    fn new(_args: &[String]) -> Self { Wordcount{} }
+    fn new(_args: &Config) -> Self { Wordcount{} }
     
     fn name(&self) -> &str { "Wordcount" }
 
@@ -81,8 +85,9 @@ impl TestImpl for Fixwindow {
     type D = usize;
     type DO = usize;
     type T = usize;
+    type G = ();
 
-    fn new(_args: &[String]) -> Self { Fixwindow{} }
+    fn new(_args: &Config) -> Self { Fixwindow{} }
     
     fn name(&self) -> &str { "Fixwindow" }
 
@@ -97,7 +102,7 @@ impl TestImpl for Fixwindow {
     }
 }
 
-pub fn hibench(args: &[String]) -> Vec<Box<Test>>{
+pub fn hibench(args: &Config) -> Vec<Box<Test>>{
     vec![Box::new(Identity::new(args)),
          Box::new(Repartition::new(args)),
          Box::new(Wordcount::new(args)),

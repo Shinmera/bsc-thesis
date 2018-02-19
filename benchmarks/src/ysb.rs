@@ -4,8 +4,8 @@ extern crate uuid;
 use std::io::{Result, Error, ErrorKind, Lines, BufRead, BufReader, Write};
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::Path;
 use std::fs;
+use std::sync::RwLock;
 use abomonation::Abomonation;
 use timely::dataflow::operators::{Input, Map, Filter};
 use timely::dataflow::operators::input::Handle;
@@ -15,7 +15,7 @@ use timely_communication::allocator::Generic;
 use operators::{EpochWindow};
 use test::Test;
 use test::TestImpl;
-use getopts::Options;
+use config::Config;
 use rand::Rng;
 use uuid::Uuid;
 
@@ -35,10 +35,8 @@ struct Event {
 unsafe_abomonate!(Event : user_id, page_id, ad_id, ad_type, event_type, event_time, ip_address);
 
 struct YSB {
-    campaign_map: HashMap<String, String>,
-    campaign_file: String,
-    event_file: String,
-    event_stream: Option<Lines<BufReader<File>>>,
+    campaign_map: RwLock<HashMap<String, String>>,
+    data_dir: String,
     campaign_count: usize,
     ad_count: usize,
     event_count: usize,
@@ -48,41 +46,25 @@ impl TestImpl for YSB {
     type D = Event;
     type DO = Vec<(String, usize)>;
     type T = usize;
+    type G = Lines<BufReader<File>>;
 
-    fn new(args: &[String]) -> Self {
-        let mut opts = Options::new();
-        let mut dir = String::from("data/");
-        let mut campaign_count = 10;
-        let mut ad_count = 10;
-        let mut event_count = 1000;
-        opts.optopt("d", "data", "Specify the data directory.", "DIR");
-        opts.optopt("c", "campaigns", "The number of campaigns to generate", "NUM");
-        opts.optopt("a", "ads", "The number of ads to generate per campaign", "NUM");
-        opts.optopt("e", "events", "The number of events to generate", "NUM");
-        if let Ok(matches) = opts.parse(args){
-            dir = matches.opt_str("d").unwrap_or(dir);
-            campaign_count = matches.opt_str("c").map_or(campaign_count, |x|x.parse::<usize>().unwrap());
-            ad_count = matches.opt_str("c").map_or(ad_count, |x|x.parse::<usize>().unwrap());
-            event_count = matches.opt_str("c").map_or(event_count, |x|x.parse::<usize>().unwrap());
-        }
+    fn new(config: &Config) -> Self {
         YSB{
-            campaign_map: HashMap::new(),
-            campaign_file: format!("{}/ysb-campaigns.json", dir),
-            event_file: format!("{}/ysb-events.json", dir),
-            event_stream: None,
-            campaign_count: campaign_count,
-            ad_count: ad_count,
-            event_count: event_count
+            campaign_map: RwLock::new(HashMap::new()),
+            data_dir: config.get_or("data-dir", "data/ysb/"),
+            campaign_count: config.get_or_as("campaigns", 10),
+            ad_count: config.get_or_as("ads", 10),
+            event_count: config.get_or_as("events", 10)
         }
     }
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
     fn generate_data(&self) -> Result<()> {
-        fs::create_dir_all(Path::new(&self.campaign_file).parent().unwrap())?;
+        fs::create_dir_all(&self.data_dir)?;
         let mut rng = rand::thread_rng();
         // Generate campaigns map
-        let campaigns = File::create(&self.campaign_file)?;
+        let campaigns = File::create(format!("{}/campaigns.json", &self.data_dir))?;
         let mut map = HashMap::new();
         for _ in 0..self.campaign_count {
             let campaign_id = format!("{}", Uuid::new_v4());
@@ -93,7 +75,7 @@ impl TestImpl for YSB {
         }
         serde_json::to_writer(campaigns, &map)?;
         // Generate events
-        let mut events = File::create(&self.event_file)?;
+        let mut events = File::create(format!("{}/events.json", &self.data_dir))?;
         let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"];
         let event_types = vec!["view", "click", "purchase"];
         let mut time = 1000000;
@@ -117,21 +99,18 @@ impl TestImpl for YSB {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn prepare(&mut self, index: usize) -> Result<bool> {
-        if index != 0 { return Ok(false); }
-        
-        let campaigns = File::open(&self.campaign_file)?;
-        let events = File::open(&self.event_file)?;
+    fn prepare(&self, index: usize) -> Result<Self::G> {
+        let campaigns = File::open(format!("{}/campaigns.json", &self.data_dir))?;
+        let events = File::open(format!("{}/events-{}.json", &self.data_dir, index))?;
         let mut map: HashMap<String, String> = serde_json::from_reader(campaigns)?;
-        for (k, v) in map.drain(){ self.campaign_map.insert(k, v); }
-        self.event_stream = Some(BufReader::new(events).lines());
-        Ok(true)
+        let mut target = self.campaign_map.write().unwrap();
+        for (k, v) in map.drain(){ target.insert(k, v); }
+        Ok(BufReader::new(events).lines())
     }
 
-    fn epoch_data(&mut self, epoch: &Self::T) -> Result<Vec<Self::D>> {
+    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
         let mut data = Vec::new();
-        let events = self.event_stream.as_mut().unwrap();
-        for line in events {
+        for line in stream {
             let event: Event = serde_json::from_str(&line.unwrap())?;
             // We create second epochs to match up with what they do in YSB.
             if event.event_time / 1000 > *epoch {
@@ -147,13 +126,13 @@ impl TestImpl for YSB {
         }
     }
 
-    fn finish(&mut self) {
-        self.event_stream = None;
+    fn finish(&self, stream: &mut Self::G) {
+        drop(stream);
     }
 
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
-        let table = self.campaign_map.clone();
+        let table = self.campaign_map.read().unwrap().clone();
         let stream = stream
             // Filter to view event_type events.
             .filter(|x: &Event| x.event_type == "view")
@@ -182,6 +161,6 @@ impl TestImpl for YSB {
     }
 }
 
-pub fn ysb(args: &[String]) -> Vec<Box<Test>>{
+pub fn ysb(args: &Config) -> Vec<Box<Test>>{
     vec![Box::new(YSB::new(args))]
 }

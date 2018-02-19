@@ -10,19 +10,19 @@ extern crate getopts;
 extern crate rand;
 extern crate uuid;
 mod operators;
+mod config;
 mod test;
 mod hibench;
 mod ysb;
 
-use std::ops::DerefMut;
 use test::Test;
+use config::Config;
 use hibench::hibench;
 use ysb::ysb;
 
 fn run_test(test: Box<Test>) {
     println!("Running test {}", test.name());
     timely::execute_from_args(std::env::args(), move |worker| {
-        let test = test.deref_mut();
         if let Err(e) = test.run(worker) {
             println!("Failed: {}", e);
         }
@@ -30,14 +30,14 @@ fn run_test(test: Box<Test>) {
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() == 1 {
-        println!("Please choose a mode (test or generate).");
-    }else if args[1] == "test" {
-        for test in hibench(&args[2..]) { run_test(test); }
-        for test in ysb(&args[2..]) { run_test(test); }
-    }else if args[1] == "generate" {
-        for test in hibench(&args[2..]) { test.generate_data().unwrap(); }
-        for test in ysb(&args[2..]) { test.generate_data().unwrap(); }
+    let config = Config::from(std::env::args()).unwrap();
+    let mode = config.get("1").unwrap();
+    let mut tests = Vec::new();
+    tests.append(&mut hibench(&config));
+    tests.append(&mut ysb(&config));
+    if mode == "test" {
+        for test in tests { run_test(test); }
+    }else if mode == "generate" {
+        for test in tests { test.generate_data().unwrap(); }
     }
 }
