@@ -23,10 +23,10 @@ impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
         
         self.unary_notify(Pipeline, "Reduce", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
-                let window = epochs.entry(time.clone()).or_insert(HashMap::new());
+                let window = epochs.entry(time.clone()).or_insert_with(|| HashMap::new());
                 while let Some(dat) = data.pop() {
                     let key = key_extractor(&dat);
-                    let value = reductor(&dat, window.remove(&key).unwrap_or(initial_value.clone()));
+                    let value = reductor(&dat, window.remove(&key).unwrap_or_else(|| initial_value.clone()));
                     window.insert(key, value);
                 }
                 notificator.notify_at(time);
