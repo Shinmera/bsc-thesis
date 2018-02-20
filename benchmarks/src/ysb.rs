@@ -89,8 +89,10 @@ impl TestImpl for YSB {
             let mut event_file = File::create(format!("{}/events-{}.json", &self.data_dir, partition))?;
             let mut time = 1000000;
             for _ in 0..events_per_partition {
-                // We step randomly between event times, with a max of 10 seconds.
-                time = time + rng.gen_range(0, 10000);
+                // We step randomly between event times, with a max of 1 second.
+                // Since the ad_types are randomised too, relevant "view" events
+                // will likely still often be more than a second apart.
+                time = time + rng.gen_range(0, 1000);
                 let event = Event {
                     user_id: format!("{}", Uuid::new_v4()),
                     page_id: format!("{}", Uuid::new_v4()),
