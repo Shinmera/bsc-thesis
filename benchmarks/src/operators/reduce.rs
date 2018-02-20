@@ -6,7 +6,7 @@ use timely::dataflow::operators::generic::Unary;
 use timely::dataflow::{Stream, Scope};
 
 pub trait Reduce<G: Scope, D: Data> {
-    fn reduce_by<H, V, K, R>(&self, key_extractor: K, reductor: R, initial_value: V) -> Stream<G, (H, V)>
+    fn reduce_by<H, V, K, R>(&self, key_extractor: K, initial_value: V, reductor: R) -> Stream<G, (H, V)>
         where H: Hash+Eq+Data+Clone,
               V: Eq+Data+Clone,
               K: Fn(&D)->H+'static,
@@ -14,7 +14,7 @@ pub trait Reduce<G: Scope, D: Data> {
 }
 
 impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
-    fn reduce_by<H, V, K, R>(&self, key_extractor: K, reductor: R, initial_value: V) -> Stream<G, (H, V)>
+    fn reduce_by<H, V, K, R>(&self, key_extractor: K, initial_value: V, reductor: R) -> Stream<G, (H, V)>
         where H: Hash+Eq+Data+Clone,
               V: Eq+Data+Clone,
               K: Fn(&D)->H+'static,

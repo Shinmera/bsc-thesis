@@ -157,7 +157,7 @@ impl TestImpl for YSB {
             // Aggregate to 10s windows based on 1s epochs.
             .epoch_window(10, 10)
             // Count each campaign in the window and return as tuples of id + count.
-            .reduce_by(|campaign_id| campaign_id.clone(), |_, count| count+1, 0);
+            .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1);
         (stream, vec![input])
     }
 }
