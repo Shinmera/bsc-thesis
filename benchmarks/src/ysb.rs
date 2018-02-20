@@ -12,7 +12,7 @@ use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely_communication::allocator::Generic;
-use operators::{EpochWindow};
+use operators::{EpochWindow, Reduce};
 use test::Test;
 use test::TestImpl;
 use config::Config;
@@ -45,7 +45,7 @@ struct YSB {
 
 impl TestImpl for YSB {
     type D = Event;
-    type DO = Vec<(String, usize)>;
+    type DO = (String, usize);
     type T = usize;
     type G = Lines<BufReader<File>>;
 
@@ -157,16 +157,7 @@ impl TestImpl for YSB {
             // Aggregate to 10s windows based on 1s epochs.
             .epoch_window(10, 10)
             // Count each campaign in the window and return as tuples of id + count.
-            .map(|x| {
-                let mut counts = HashMap::new();
-                for campaign_id in x {
-                    let count = counts.get(&campaign_id).unwrap_or(&0)+1;
-                    counts.insert(campaign_id, count);
-                }
-                // Not sure why I need to do this, Rust complains if I return directly.
-                let data = counts.drain().collect::<Vec<_>>();
-                data
-            });
+            .reduce_by(|campaign_id| campaign_id.clone(), |_, count| count+1, 0);
         (stream, vec![input])
     }
 }
