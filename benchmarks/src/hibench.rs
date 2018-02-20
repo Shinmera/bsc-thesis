@@ -12,6 +12,7 @@ use test::Test;
 use test::TestImpl;
 use std::cmp;
 use std::str::FromStr;
+use config::Config;
 
 // Hasher used for data shuffling
 fn hasher(x: &String) -> u64 {
@@ -38,6 +39,9 @@ impl TestImpl for Identity {
     type D = (String,String);
     type DO = (String,String);
     type T = usize;
+    type G = ();
+
+    fn new(_args: &Config) -> Self { Identity{} }
     
     fn name(&self) -> &str { "Identity" }
 
@@ -55,6 +59,9 @@ impl TestImpl for Repartition {
     type D = String;
     type DO = String;
     type T = usize;
+    type G = ();
+
+    fn new(_args: &Config) -> Self { Repartition{} }
     
     fn name(&self) -> &str { "Repartition" }
 
@@ -75,6 +82,9 @@ impl TestImpl for Wordcount {
     type D = (String,String);
     type DO = (String, String, usize);
     type T = usize;
+    type G = ();
+
+    fn new(_args: &Config) -> Self { Wordcount{} }
     
     fn name(&self) -> &str { "Wordcount" }
 
@@ -96,6 +106,9 @@ impl TestImpl for Fixwindow {
     type D = (String,String);
     type DO = (String,u64,u32);
     type T = usize;
+    type G = ();
+
+    fn new(_args: &Config) -> Self { Fixwindow{} }
     
     fn name(&self) -> &str { "Fixwindow" }
 
@@ -123,11 +136,11 @@ impl TestImpl for Fixwindow {
     }
 }
 
-pub fn hibench() -> Vec<Box<Test>>{
-    vec![Box::new(Identity{}),
-         Box::new(Repartition{}),
-         Box::new(Wordcount{}),
-         Box::new(Fixwindow{})]
+pub fn hibench(args: &Config) -> Vec<Box<Test>>{
+    vec![Box::new(Identity::new(args)),
+         Box::new(Repartition::new(args)),
+         Box::new(Wordcount::new(args)),
+         Box::new(Fixwindow::new(args))]
 }
 
 #[cfg(test)]

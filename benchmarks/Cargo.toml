@@ -7,4 +7,8 @@ authors = ["Shinmera <shinmera@tymoon.eu>"]
 timely = "*"
 timely_communication = "*"
 abomonation = "*"
+serde = "*"
 serde_json = "*"
+serde_derive = "*"
+rand = "*"
+uuid = { version = "*", features = ["v4"] }
