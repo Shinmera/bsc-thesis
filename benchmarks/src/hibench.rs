@@ -5,7 +5,6 @@ use timely::dataflow::operators::aggregation::Aggregate;
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::timestamp::RootTimestamp;
 use timely_communication::allocator::Generic;
 use operators::RollingCount;
 use operators::EpochWindow;
@@ -41,8 +40,6 @@ impl TestImpl for Identity {
     type DO = (String,String);
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Identity{} }
     
     fn name(&self) -> &str { "Identity" }
 
@@ -61,8 +58,6 @@ impl TestImpl for Repartition {
     type DO = String;
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Repartition{} }
     
     fn name(&self) -> &str { "Repartition" }
 
@@ -84,8 +79,6 @@ impl TestImpl for Wordcount {
     type DO = (String, String, usize);
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Wordcount{} }
     
     fn name(&self) -> &str { "Wordcount" }
 
@@ -108,8 +101,6 @@ impl TestImpl for Fixwindow {
     type DO = (String,u64,u32);
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Fixwindow{} }
     
     fn name(&self) -> &str { "Fixwindow" }
 
@@ -121,7 +112,7 @@ impl TestImpl for Fixwindow {
             .map(|(ts,b):Self::D| (get_ip(&b),u64::from_str(&ts).expect("FixWindow: Cannot parse event timestamp.")))
             // TODO (john): Check if timestamps in the input stream correspond to seconds
             // A tumbling window of 10 epochs
-            .epoch_window(10, 10, |t, d| RootTimestamp::new(t.inner + d))
+            .epoch_window(10, 10)
             // Group by ip and report the minimum observed timestamp and the total number of records per group
             .aggregate::<_,(u64,u32),_,_,_>(
                |_ip, ts, agg| 
@@ -137,11 +128,11 @@ impl TestImpl for Fixwindow {
     }
 }
 
-pub fn hibench(args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(Identity::new(args)),
-         Box::new(Repartition::new(args)),
-         Box::new(Wordcount::new(args)),
-         Box::new(Fixwindow::new(args))]
+pub fn hibench(_args: &Config) -> Vec<Box<Test>>{
+    vec![Box::new(Identity{}),
+         Box::new(Repartition{}),
+         Box::new(Wordcount{}),
+         Box::new(Fixwindow{})]
 }
 
 #[cfg(test)]

@@ -1,17 +1,19 @@
 use timely::dataflow::{Stream};
-use timely::dataflow::operators::{Inspect, Probe};
+use timely::dataflow::operators::{Inspect, Probe, Input};
 use timely::dataflow::scopes::{Child, Root};
 use timely::progress::Timestamp;
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::operators::probe::Handle as ProbeHandle;
-use timely::Data;
+use timely::{Data, Configuration};
 use timely_communication::allocator::Generic;
 use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
+use timely;
 use config::Config;
 use std::ops::Add;
-use std::io::{Result, Error, ErrorKind};
+use std::io::{BufRead, Result, Error, ErrorKind};
 use std::fmt::Debug;
+use std::error::Error as StdError;
 
 /// Simple trait for incrementable objects.
 /// This is used to automatically advance the timestamp.
@@ -44,10 +46,6 @@ pub trait TestImpl : Sync+Send{
     type T: Timestamp+Inc+Debug;
     type G;
 
-    /// Constructor to configure the test with the requested
-    /// properties.
-    fn new(&Config) -> Self;
-
     /// The name of the test as a human readable string.
     fn name(&self) -> &str;
 
@@ -72,7 +70,7 @@ pub trait TestImpl : Sync+Send{
     /// Generates a single run of data for an epoch. If there is no
     /// more data available (and the test is thus over), the function
     /// should return 
-    fn epoch_data(&self, _data: &mut Self::G, _epoch: &Self::T) -> Result<Vec<Self::D>> {
+    fn epoch_data(&self, _data: &mut Self::G, _epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
         println!("Warning: {} does not implement a data generator.", self.name());
         Err(Error::new(ErrorKind::Other, "Out of data"))
     }
@@ -115,7 +113,7 @@ pub trait TestImpl : Sync+Send{
         let mut feeder_data = self.prepare(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
             let (stream, inputs) = self.construct_dataflow(scope);
-            (stream.inspect(|x| println!("<< {:?}", x)).probe(), inputs)
+            (stream.inspect_batch(|t, x| println!("<< {:?} {:?}", t.inner, x)).probe(), inputs)
         });
         let mut epoch = self.initial_epoch();
         
@@ -123,9 +121,9 @@ pub trait TestImpl : Sync+Send{
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
                     let mut i = inputs.len();
-                    while let Some(input) = data.pop() {
+                    while let Some(mut input) = data.pop() {
                         i = i-1;
-                        inputs[i].send(input);
+                        inputs[i].send_batch(&mut input);
                     }
                 },
                 Err(error) => {
@@ -145,12 +143,61 @@ pub trait TestImpl : Sync+Send{
     }
 }
 
+/// This is an interface for tests that do not require a lot of
+/// functionality. It takes over timestamp stepping, limits
+/// to a single input, and only allows simplistic data generation.
+pub trait SimpleTest : Sync+Send {
+    type D: Data+Debug;
+    type DO: Data+Debug;
+
+    fn name(&self) -> &str {
+        "Simple Test"
+    }
+    
+    fn rounds(&self) -> usize {
+        10
+    }
+
+    fn generate(&self, epoch: &usize) -> Vec<Self::D>;
+
+    fn construct<'scope>(&self, stream: &mut Stream<Child<'scope, Root<Generic>, usize>, Self::D>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO>;
+}
+
+impl<I, D: Data+Debug, DO: Data+Debug> TestImpl for I where I: SimpleTest<D=D,DO=DO> {
+    type D = I::D;
+    type DO = I::DO;
+    type T = usize;
+    type G = usize;
+    
+    fn name(&self) -> &str { I::name(self) }
+    
+    fn prepare(&self, _index: usize) -> Result<Self::G> {
+        Ok(I::rounds(self))
+    }
+
+    fn epoch_data(&self, counter: &mut Self::G, epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
+        if 0 < *counter {
+            *counter -= 1;
+            Ok(vec![I::generate(self, epoch)])
+        } else {
+            Err(Error::new(ErrorKind::Other, "Out of data"))
+        }
+    }
+    
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+        let (input, mut stream) = scope.new_input();
+        (I::construct(self, &mut stream), vec![input])
+    }
+
+    fn initial_epoch(&self) -> Self::T { 0 }
+}
+
 /// This presents the public interface for a test.
 ///
 /// The reason this exists is so that you can talk about a test
 /// without having to know the precise type of the test, or the
 /// TestImpl's trait types.
-pub trait Test : Sync+Send{
+pub trait Test : Sync+Send {
     fn name(&self) -> &str;
     fn generate_data(&self) -> Result<()>;
     fn run(&self, worker: &mut Root<Generic>) -> Result<()>;
@@ -160,4 +207,59 @@ impl<I, T: Timestamp+Inc+Debug, D: Data+Debug, DO: Data+Debug> Test for I where 
     fn name(&self) -> &str { I::name(self) }
     fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
     fn run(&self, worker: &mut Root<Generic>) -> Result<()>{ I::run(self, worker) }
+}
+
+/// This function extracts the timely_communication
+/// configuration object from the supplied Config.
+fn timely_configuration(config: &Config) -> Configuration {
+    let threads = config.get_as_or("threads", 1);
+    let process = config.get_as_or("process", 0);
+    let processes = config.get_as_or("processes", 1);
+    let report = config.get_or("report", "true") == "true";
+
+    assert!(process < processes);
+
+    if processes > 1 {
+        let mut addresses = Vec::new();
+        if let Some(hosts) = config.get("hostfile") {
+            let reader = ::std::io::BufReader::new(::std::fs::File::open(hosts.clone()).unwrap());
+            for x in reader.lines().take(processes) {
+                addresses.push(x.unwrap());
+            }
+            if addresses.len() < processes {
+                panic!("could only read {} addresses from {}, but -n: {}", addresses.len(), hosts, processes);
+            }
+        }
+        else {
+            for index in 0..processes {
+                addresses.push(format!("localhost:{}", 2101 + index));
+            }
+        }
+
+        assert!(processes == addresses.len());
+        Configuration::Cluster(threads, process, addresses, report)
+    }
+    else {
+        if threads > 1 { Configuration::Process(threads) }
+        else { Configuration::Thread }
+    }
+}
+
+/// Wraps the timely parts to execute a test from a configuration.
+pub fn run_test(config: &Config, test: Box<Test>) -> Result<()> {
+    let configuration = timely_configuration(config);
+    timely::execute_logging(configuration, Default::default(), move |worker| {
+        test.run(worker)
+    }).and_then(|x| x.join().pop().unwrap())
+        .map_err(|x| Error::new(ErrorKind::Other, x))
+        .and_then(|x| x)
+        .or_else(|x| if x.kind() == ErrorKind::Other && x.description() == "Out of data" {
+            Ok(())
+        } else {
+            Err(x)
+        })
+}
+
+pub fn generate_test(test: Box<Test>) -> Result<()> {
+    test.generate_data()
 }

@@ -11,7 +11,6 @@ use timely::dataflow::operators::{Input, Map, Filter};
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::timestamp::RootTimestamp;
 use timely_communication::allocator::Generic;
 use operators::{EpochWindow, Reduce};
 use test::Test;
@@ -44,12 +43,7 @@ struct YSB {
     events: usize,
 }
 
-impl TestImpl for YSB {
-    type D = Event;
-    type DO = (String, usize);
-    type T = usize;
-    type G = Lines<BufReader<File>>;
-
+impl YSB {
     fn new(config: &Config) -> Self {
         YSB{
             campaign_map: RwLock::new(HashMap::new()),
@@ -60,6 +54,13 @@ impl TestImpl for YSB {
             events: config.get_as_or("events", 1000000)
         }
     }
+}
+
+impl TestImpl for YSB {
+    type D = Event;
+    type DO = (String, usize);
+    type T = usize;
+    type G = Lines<BufReader<File>>;
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
@@ -121,21 +122,21 @@ impl TestImpl for YSB {
         Ok(BufReader::new(event_file).lines())
     }
 
-    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
+    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
         let mut data = Vec::new();
         for line in stream {
             let event: Event = serde_json::from_str(&line.unwrap())?;
             // We create second epochs to match up with what they do in YSB.
             if event.event_time / 1000 > *epoch {
                 data.push(event);
-                return Ok(data);
+                return Ok(vec![data]);
             }
             data.push(event);
         }
         if data.is_empty(){
             return Err(Error::new(ErrorKind::Other, "Out of data"));
         } else {
-            return Ok(data);
+            return Ok(vec![data]);
         }
     }
 
@@ -158,7 +159,7 @@ impl TestImpl for YSB {
                      None => String::from("UNKNOWN AD")
                  })
             // Aggregate to 10s windows based on 1s epochs.
-            .epoch_window(10, 10, |t, d| RootTimestamp::new(t.inner + d))
+            .epoch_window(10, 10)
             // Count each campaign in the window and return as tuples of id + count.
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1);
         (stream, vec![input])
