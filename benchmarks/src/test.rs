@@ -122,7 +122,6 @@ pub trait TestImpl : Sync+Send{
         loop {
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
-                    println!(">> {:?}", data);
                     let mut i = inputs.len();
                     while let Some(input) = data.pop() {
                         i = i-1;

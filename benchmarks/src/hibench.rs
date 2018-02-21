@@ -5,6 +5,7 @@ use timely::dataflow::operators::aggregation::Aggregate;
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
+use timely::progress::timestamp::RootTimestamp;
 use timely_communication::allocator::Generic;
 use operators::RollingCount;
 use operators::EpochWindow;
@@ -120,7 +121,7 @@ impl TestImpl for Fixwindow {
             .map(|(ts,b):Self::D| (get_ip(&b),u64::from_str(&ts).expect("FixWindow: Cannot parse event timestamp.")))
             // TODO (john): Check if timestamps in the input stream correspond to seconds
             // A tumbling window of 10 epochs
-            .epoch_window(10, 10)
+            .epoch_window(10, 10, |t, d| RootTimestamp::new(t.inner + d))
             // Group by ip and report the minimum observed timestamp and the total number of records per group
             .aggregate::<_,(u64,u32),_,_,_>(
                |_ip, ts, agg| 

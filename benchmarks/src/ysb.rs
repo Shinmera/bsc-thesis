@@ -11,6 +11,7 @@ use timely::dataflow::operators::{Input, Map, Filter};
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
+use timely::progress::timestamp::RootTimestamp;
 use timely_communication::allocator::Generic;
 use operators::{EpochWindow, Reduce};
 use test::Test;
@@ -157,7 +158,7 @@ impl TestImpl for YSB {
                      None => String::from("UNKNOWN AD")
                  })
             // Aggregate to 10s windows based on 1s epochs.
-            .epoch_window(10, 10)
+            .epoch_window(10, 10, |t, d| RootTimestamp::new(t.inner + d))
             // Count each campaign in the window and return as tuples of id + count.
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1);
         (stream, vec![input])
