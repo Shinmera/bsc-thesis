@@ -13,14 +13,13 @@ mod config;
 mod test;
 mod hibench;
 mod ysb;
+mod integrity;
 
-use test::Test;
+use std::io::Result;
+use test::{run_test, generate_test};
 use config::Config;
 use hibench::hibench;
 use ysb::ysb;
-use timely::Configuration;
-use std::io::BufRead;
-use std::io::{Result, Error, ErrorKind};
 
 fn report<A>(result: Result<A>) {
     if let Err(e) = result {
@@ -28,57 +27,6 @@ fn report<A>(result: Result<A>) {
     } else {
         println!("Successfully completed.");
     }
-}
-
-/// This function extracts the timely_communication
-/// configuration object from the supplied Config.
-fn timely_configuration(config: &Config) -> Configuration {
-    let threads = config.get_as_or("threads", 1);
-    let process = config.get_as_or("process", 0);
-    let processes = config.get_as_or("processes", 1);
-    let report = config.get_or("report", "true") == "true";
-
-    assert!(process < processes);
-
-    if processes > 1 {
-        let mut addresses = Vec::new();
-        if let Some(hosts) = config.get("hostfile") {
-            let reader = ::std::io::BufReader::new(::std::fs::File::open(hosts.clone()).unwrap());
-            for x in reader.lines().take(processes) {
-                addresses.push(x.unwrap());
-            }
-            if addresses.len() < processes {
-                panic!("could only read {} addresses from {}, but -n: {}", addresses.len(), hosts, processes);
-            }
-        }
-        else {
-            for index in 0..processes {
-                addresses.push(format!("localhost:{}", 2101 + index));
-            }
-        }
-
-        assert!(processes == addresses.len());
-        Configuration::Cluster(threads, process, addresses, report)
-    }
-    else {
-        if threads > 1 { Configuration::Process(threads) }
-        else { Configuration::Thread }
-    }
-}
-
-fn run_test(config: &Config, test: Box<Test>) {
-    println!("> Running test {}", test.name());
-    let configuration = timely_configuration(config);
-    report(timely::execute_logging(configuration, Default::default(), move |worker| {
-        test.run(worker)
-    }).and_then(|x| x.join().pop().unwrap())
-           .map_err(|x| Error::new(ErrorKind::Other, x))
-           .and_then(|x| x));
-}
-
-fn generate_test(test: Box<Test>) {
-    println!("> Generating test {}", test.name());
-    report(test.generate_data());
 }
 
 fn main() {
@@ -89,11 +37,13 @@ fn main() {
     tests.append(&mut ysb(&config));
     if mode == "test" {
         for test in tests {
-            run_test(&config, test);
+            println!("> Running test {}", test.name());
+            report(run_test(&config, test));
         }
     }else if mode == "generate" {
         for test in tests {
-            generate_test(test);
+            println!("> Generating test {}", test.name());
+            report(generate_test(test));
         }
     }else if mode == "help" {
         println!("Timely Benchmarks v0.1

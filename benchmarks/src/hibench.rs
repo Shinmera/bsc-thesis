@@ -51,8 +51,6 @@ impl TestImpl for Identity {
     type DO = (String,String);
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Identity{} }
     
     fn name(&self) -> &str { "Identity" }
 
@@ -91,8 +89,6 @@ impl TestImpl for Repartition {
     type DO = String;
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Repartition{} }
     
     fn name(&self) -> &str { "Repartition" }
 
@@ -114,8 +110,6 @@ impl TestImpl for Wordcount {
     type DO = (String, String, usize);
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Wordcount{} }
     
     fn name(&self) -> &str { "Wordcount" }
 
@@ -139,8 +133,6 @@ impl TestImpl for Fixwindow {
     type DO = (String,u64,u32);
     type T = usize;
     type G = ();
-
-    fn new(_args: &Config) -> Self { Fixwindow{} }
     
     fn name(&self) -> &str { "Fixwindow" }
 
@@ -169,11 +161,11 @@ impl TestImpl for Fixwindow {
     }
 }
 
-pub fn hibench(args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(Identity::new(args)),
-         Box::new(Repartition::new(args)),
-         Box::new(Wordcount::new(args)),
-         Box::new(Fixwindow::new(args))]
+pub fn hibench(_args: &Config) -> Vec<Box<Test>>{
+    vec![Box::new(Identity{}),
+         Box::new(Repartition{}),
+         Box::new(Wordcount{}),
+         Box::new(Fixwindow{})]
 }
 
 #[cfg(test)]

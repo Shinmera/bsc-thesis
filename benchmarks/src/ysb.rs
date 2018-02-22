@@ -43,12 +43,7 @@ struct YSB {
     events: usize,
 }
 
-impl TestImpl for YSB {
-    type D = Event;
-    type DO = (String, usize);
-    type T = usize;
-    type G = Lines<BufReader<File>>;
-
+impl YSB {
     fn new(config: &Config) -> Self {
         YSB{
             campaign_map: RwLock::new(HashMap::new()),
@@ -59,6 +54,13 @@ impl TestImpl for YSB {
             events: config.get_as_or("events", 1000000)
         }
     }
+}
+
+impl TestImpl for YSB {
+    type D = Event;
+    type DO = (String, usize);
+    type T = usize;
+    type G = Lines<BufReader<File>>;
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
@@ -120,21 +122,21 @@ impl TestImpl for YSB {
         Ok(BufReader::new(event_file).lines())
     }
 
-    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
+    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
         let mut data = Vec::new();
         for line in stream {
             let event: Event = serde_json::from_str(&line.unwrap())?;
             // We create second epochs to match up with what they do in YSB.
             if event.event_time / 1000 > *epoch {
                 data.push(event);
-                return Ok(data);
+                return Ok(vec![data]);
             }
             data.push(event);
         }
         if data.is_empty(){
             return Err(Error::new(ErrorKind::Other, "Out of data"));
         } else {
-            return Ok(data);
+            return Ok(vec![data]);
         }
     }
 
