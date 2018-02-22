@@ -69,7 +69,7 @@ pub trait TestImpl : Sync+Send{
 
     /// Generates a single run of data for an epoch. If there is no
     /// more data available (and the test is thus over), the function
-    /// should return 
+    /// should return
     fn epoch_data(&self, _data: &mut Self::G, _epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
         println!("Warning: {} does not implement a data generator.", self.name());
         Err(Error::new(ErrorKind::Other, "Out of data"))
@@ -79,7 +79,7 @@ pub trait TestImpl : Sync+Send{
     /// that was opened up in prepare().
     fn finish(&self, _data: &mut Self::G) {
     }
-    
+
     /// This function is responsible for constructing the data flow
     /// used for the computation, returning the last node of the
     /// graph and a vector of input handles.
@@ -116,7 +116,7 @@ pub trait TestImpl : Sync+Send{
             (stream.inspect_batch(|t, x| println!("<< {:?} {:?}", t.inner, x)).probe(), inputs)
         });
         let mut epoch = self.initial_epoch();
-        
+
         loop {
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
@@ -153,7 +153,7 @@ pub trait SimpleTest : Sync+Send {
     fn name(&self) -> &str {
         "Simple Test"
     }
-    
+
     fn rounds(&self) -> usize {
         10
     }
@@ -168,9 +168,9 @@ impl<I, D: Data+Debug, DO: Data+Debug> TestImpl for I where I: SimpleTest<D=D,DO
     type DO = I::DO;
     type T = usize;
     type G = usize;
-    
+
     fn name(&self) -> &str { I::name(self) }
-    
+
     fn prepare(&self, _index: usize) -> Result<Self::G> {
         Ok(I::rounds(self))
     }
@@ -183,7 +183,7 @@ impl<I, D: Data+Debug, DO: Data+Debug> TestImpl for I where I: SimpleTest<D=D,DO
             Err(Error::new(ErrorKind::Other, "Out of data"))
         }
     }
-    
+
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
         let (input, mut stream) = scope.new_input();
         (I::construct(self, &mut stream), vec![input])
@@ -248,7 +248,7 @@ fn timely_configuration(config: &Config) -> Configuration {
 /// Wraps the timely parts to execute a test from a configuration.
 pub fn run_test(config: &Config, test: Box<Test>) -> Result<()> {
     let configuration = timely_configuration(config);
-    timely::execute_logging(configuration, Default::default(), move |worker| {
+    timely::execute(configuration, move |worker| {
         test.run(worker)
     }).and_then(|x| x.join().pop().unwrap())
         .map_err(|x| Error::new(ErrorKind::Other, x))
