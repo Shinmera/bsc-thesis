@@ -46,6 +46,13 @@ fn get_ip(record: &String) -> String
 }
 
 struct Identity {}
+
+impl Identity {
+    fn new(config: &Config) -> Self {
+        Identity{}
+    }
+}
+
 impl TestImpl for Identity {
     type D = (String,String);
     type DO = (String,String);
@@ -78,12 +85,19 @@ impl TestImpl for Identity {
         stream.map(|(ts,_):(String,_)| 
             (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."), SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs()))
             .capture_into(producer);
- 
+
         (stream, vec![input])
     }
 }
 
 struct Repartition {}
+
+impl Repartition {
+    fn new(config: &Config) -> Self {
+        Repartition{}
+    }
+}
+
 impl TestImpl for Repartition {
     type D = String;
     type DO = String;
@@ -96,8 +110,22 @@ impl TestImpl for Repartition {
     
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
-        let peers = scope.peers() as u64;
-        let mut counter = 0u64;
+        let peers = scope.peers() as u64;   // Total number of workers executing the dataflow
+        // Simulate a RoundRobin shuffling
+        let stream = stream.unary_stream(Pipeline, "RoundRobin", move |input, output| {
+                let mut counter = 0u64;
+                input.for_each(|time, data| {
+                    for record in data.drain(..) {
+                        let r = (counter, record);
+                        counter += 1;
+                        if counter == peers { counter = 0; }
+                        output.session(&time).give(r);
+                    }
+                });
+            })
+            // Exchange on worker id (worker ids are in [0,peers)
+            .exchange(|&(worker_id,_)| worker_id)
+            .map(|(_,record)| record);
         // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
         stream.sink(Pipeline,"Sink",|_| ());
         (stream, vec![input])
@@ -105,6 +133,13 @@ impl TestImpl for Repartition {
 }
 
 struct Wordcount {}
+
+impl Wordcount {
+    fn new(config: &Config) -> Self {
+        Wordcount{}
+    }
+}
+
 impl TestImpl for Wordcount {
     type D = (String,String);
     type DO = (String, String, usize);
@@ -128,6 +163,13 @@ impl TestImpl for Wordcount {
 }
 
 struct Fixwindow {}
+
+impl Fixwindow {
+    fn new(config: &Config) -> Self {
+        Fixwindow{}
+    }
+}
+
 impl TestImpl for Fixwindow {
     type D = (String,String);
     type DO = (String,u64,u32);
@@ -161,11 +203,11 @@ impl TestImpl for Fixwindow {
     }
 }
 
-pub fn hibench(_args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(Identity{}),
-         Box::new(Repartition{}),
-         Box::new(Wordcount{}),
-         Box::new(Fixwindow{})]
+pub fn hibench(args: &Config) -> Vec<Box<Test>>{
+    vec![Box::new(Identity::new(args)),
+         Box::new(Repartition::new(args)),
+         Box::new(Wordcount::new(args)),
+         Box::new(Fixwindow::new(args))]
 }
 
 #[cfg(test)]
