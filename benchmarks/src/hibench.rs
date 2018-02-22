@@ -1,7 +1,11 @@
+extern crate rdkafka;
+extern crate kafkaesque;
+
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
-use timely::dataflow::operators::{Input, Map, Exchange};
+use timely::dataflow::operators::{Operator, Input, Map, Exchange};
 use timely::dataflow::operators::aggregation::Aggregate;
+use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
@@ -13,6 +17,12 @@ use test::TestImpl;
 use std::cmp;
 use std::str::FromStr;
 use config::Config;
+use self::kafkaesque::EventProducer;
+use self::rdkafka::config::{ClientConfig, TopicConfig};
+use timely::dataflow::operators::Capture;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
+use timely::dataflow::operators::Unary;
 
 // Hasher used for data shuffling
 fn hasher(x: &String) -> u64 {
@@ -21,6 +31,7 @@ fn hasher(x: &String) -> u64 {
     s.finish()
 }
 
+// Function used for extracting the IP address from HiBench records with the following text format:
 // timestamp  ip, session id, something, something, browser, ...
 // 0    227.209.164.46,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1991-06-10,0.115967035,Mozilla/5.0 (iPhone; U; CPU like Mac OS X)AppleWebKit/420.1 (KHTML like Gecko) Version/3.0 Mobile/4A93Safari/419.3,YEM,YEM-AR,snowdrops,1
 // 0    35.143.225.164,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1996-05-31,0.8792629,Mozilla/5.0 (Windows; U; Windows NT 5.2) AppleWebKit/525.13 (KHTML like Gecko) Chrome/0.2.149.27 Safari/525.13,PRT,PRT-PT,fraternally,8
@@ -49,7 +60,27 @@ impl TestImpl for Identity {
 
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
+        let topic = "1".to_string();
+        let count = 1;
+        let brokers = "localhost:9092";
+
+        // Create Kafka stuff.
+        let mut topic_config = TopicConfig::new();
+        topic_config
+            .set("produce.offset.report", "true")
+            .finalize();
+
+        let mut producer_config = ClientConfig::new();
+        producer_config
+            .set("bootstrap.servers", brokers)
+            .set_default_topic_config(topic_config.clone());
+
+        let producer = EventProducer::new(producer_config, topic);
         // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
+        stream.map(|(ts,_):(String,_)| 
+            (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."), SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs()))
+            .capture_into(producer);
+ 
         (stream, vec![input])
     }
 }
@@ -69,10 +100,10 @@ impl TestImpl for Repartition {
     
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
-        //TODO: this requires a RoundRobin shuffling
-        //let stream = stream
-        //    .exchange(hasher);
+        let peers = scope.peers() as u64;
+        let mut counter = 0u64;
         // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
+        stream.sink(Pipeline,"Sink",|_| ());
         (stream, vec![input])
     }
 }
@@ -97,6 +128,7 @@ impl TestImpl for Wordcount {
             .exchange(|&(ref ip,_)| hasher(&ip))
             .rolling_count(|&(ref ip,ref ts):&(String,String)| (ip.clone(),ts.clone()));
         // TODO (john): For each tuple in the output stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
+        stream.sink(Pipeline,"Sink",|_| ());
         (stream, vec![input])
     }
 }
@@ -132,6 +164,7 @@ impl TestImpl for Fixwindow {
                |ip| hasher(ip)
             );
         // TODO (john): For each tuple in the output stream, the sinc operator must report agg.1 tuples of the form (agg.0,system_time) to Kafka
+        stream.sink(Pipeline,"Sink",|_| ());
         (stream, vec![input])
     }
 }

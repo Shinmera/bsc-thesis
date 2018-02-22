@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Shinmera <shinmera@tymoon.eu>"]
 
 [dependencies]
+rdkafka = "*"
 timely = "*"
 timely_communication = "*"
 abomonation = "*"
@@ -12,3 +13,6 @@ serde_json = "*"
 serde_derive = "*"
 rand = "*"
 uuid = { version = "*", features = ["v4"] }
+
+[dependencies.kafkaesque]
+git = "https://github.com/frankmcsherry/timely-dataflow.git"
