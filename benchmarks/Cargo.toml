@@ -5,9 +5,9 @@ authors = ["Shinmera <shinmera@tymoon.eu>"]
 
 [dependencies]
 rdkafka = "0.14"
-timely = "0.3"
-timely_communication = "0.1.8"
-abomonation = "0.4.5"
+timely = "0.5"
+timely_communication = "0.5"
+abomonation = "0.5"
 serde = "*"
 serde_json = "*"
 serde_derive = "*"
