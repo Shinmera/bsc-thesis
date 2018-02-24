@@ -18,7 +18,7 @@ use std::cmp;
 use std::str::FromStr;
 use config::Config;
 use self::kafkaesque::EventProducer;
-use self::rdkafka::config::{ClientConfig, TopicConfig};
+use self::rdkafka::config::ClientConfig;
 use timely::dataflow::operators::Capture;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -70,15 +70,10 @@ impl TestImpl for Identity {
         let brokers = "localhost:9092";
 
         // Create Kafka stuff.
-        let mut topic_config = TopicConfig::new();
-        topic_config
-            .set("produce.offset.report", "true")
-            .finalize();
-
         let mut producer_config = ClientConfig::new();
         producer_config
-            .set("bootstrap.servers", brokers)
-            .set_default_topic_config(topic_config.clone());
+            .set("produce.offset.report", "true")
+            .set("bootstrap.servers", &brokers);
 
         let producer = EventProducer::new(producer_config, topic);
         // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka

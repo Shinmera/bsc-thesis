@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Shinmera <shinmera@tymoon.eu>"]
 
 [dependencies]
-rdkafka = "0.13"
+rdkafka = "0.14"
 timely = "0.3"
 timely_communication = "0.1.8"
 abomonation = "0.4.5"
