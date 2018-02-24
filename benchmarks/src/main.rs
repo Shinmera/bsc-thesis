@@ -10,24 +10,39 @@ extern crate rand;
 extern crate uuid;
 mod operators;
 mod config;
+mod statistics;
 mod test;
 mod hibench;
 mod ysb;
 mod integrity;
 
 use std::io::Result;
+use std::fmt::Display;
 use test::{run_test, generate_test};
 use config::Config;
 use hibench::hibench;
 use ysb::ysb;
 
-fn report<A>(result: Result<A>) {
-    if let Err(e) = result {
-        println!("Failed: {}", e);
-    } else {
-        println!("Successfully completed.");
+trait Reportable { fn report(&self); }
+
+impl<T: Display> Reportable for Result<T> {
+    fn report(&self) {
+        match self {
+            &Ok(ref e) => println!("Successfully completed:\n{}", e),
+            &Err(ref e) => println!("Failed: {}", e),
+        }
     }
 }
+
+//// Rust can't do this it seems.
+// impl<T> Reportable for Result<T> {
+//     fn report(&self) {
+//         match self {
+//             &Ok(ref e) => println!("Successfully completed"),
+//             &Err(ref e) => println!("Failed: {}", e),
+//         }
+//     }
+// }
 
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
@@ -38,12 +53,12 @@ fn main() {
     if mode == "test" {
         for test in tests {
             println!("> Running test {}", test.name());
-            report(run_test(&config, test));
+            run_test(&config, test).report();
         }
     }else if mode == "generate" {
         for test in tests {
             println!("> Generating test {}", test.name());
-            report(generate_test(test));
+            generate_test(test).unwrap();
         }
     }else if mode == "help" {
         println!("Timely Benchmarks v0.1

@@ -10,10 +10,14 @@ use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
 use timely;
 use config::Config;
+use statistics::Statistics;
 use std::ops::Add;
 use std::io::{BufRead, Result, Error, ErrorKind};
 use std::fmt::Debug;
 use std::error::Error as StdError;
+use std::time::{Duration, Instant};
+use std::collections::{HashMap};
+use std::sync::{Mutex,Arc};
 
 /// Simple trait for incrementable objects.
 /// This is used to automatically advance the timestamp.
@@ -109,15 +113,22 @@ pub trait TestImpl : Sync+Send{
     /// possible test we might to run; you open some streams,
     /// construct the data flow, loop to feed data and advance
     /// the workers as needed.
-    fn run(&self, worker: &mut Root<Generic>) -> Result<()>{
+    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{
+        let mut start = HashMap::new();
+        let end = Arc::new(Mutex::new(HashMap::new()));
         let mut feeder_data = self.prepare(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
+            let end = end.clone();
             let (stream, inputs) = self.construct_dataflow(scope);
-            (stream.inspect_batch(|t, x| println!("<< {:?} {:?}", t.inner, x)).probe(), inputs)
+            (stream.inspect_batch(move |t, _|{
+                let mut end = end.lock().unwrap();
+                end.insert(t.inner, Instant::now());
+            }).probe(), inputs)
         });
+        
         let mut epoch = self.initial_epoch();
-
         loop {
+            start.insert(epoch, Instant::now());
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
                     let mut i = inputs.len();
@@ -129,6 +140,12 @@ pub trait TestImpl : Sync+Send{
                 Err(error) => {
                     for input in inputs { input.close(); }
                     self.finish(&mut feeder_data);
+                    if error.kind() == ErrorKind::Other && error.description() == "Out of data" {
+                        let end = end.lock().unwrap();
+                        let durations : Vec<Duration> = end.iter()
+                            .map(|(t, i)| i.duration_since(*start.get(t).unwrap())).collect();
+                        return Ok(Statistics::from(durations));
+                    }
                     return Err(error);
                 }
             }
@@ -200,13 +217,13 @@ impl<I, D: Data+Debug, DO: Data+Debug> TestImpl for I where I: SimpleTest<D=D,DO
 pub trait Test : Sync+Send {
     fn name(&self) -> &str;
     fn generate_data(&self) -> Result<()>;
-    fn run(&self, worker: &mut Root<Generic>) -> Result<()>;
+    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>;
 }
 
 impl<I, T: Timestamp+Inc+Debug, D: Data+Debug, DO: Data+Debug> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
     fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
-    fn run(&self, worker: &mut Root<Generic>) -> Result<()>{ I::run(self, worker) }
+    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{ I::run(self, worker) }
 }
 
 /// This function extracts the timely_communication
@@ -246,18 +263,13 @@ fn timely_configuration(config: &Config) -> Configuration {
 }
 
 /// Wraps the timely parts to execute a test from a configuration.
-pub fn run_test(config: &Config, test: Box<Test>) -> Result<()> {
+pub fn run_test(config: &Config, test: Box<Test>) -> Result<Statistics> {
     let configuration = timely_configuration(config);
     timely::execute(configuration, move |worker| {
         test.run(worker)
     }).and_then(|x| x.join().pop().unwrap())
         .map_err(|x| Error::new(ErrorKind::Other, x))
         .and_then(|x| x)
-        .or_else(|x| if x.kind() == ErrorKind::Other && x.description() == "Out of data" {
-            Ok(())
-        } else {
-            Err(x)
-        })
 }
 
 pub fn generate_test(test: Box<Test>) -> Result<()> {

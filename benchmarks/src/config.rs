@@ -7,6 +7,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Config{ args: HashMap::new() }
     }
@@ -28,6 +29,7 @@ impl Config {
         Ok(Config{ args: args })
     }
 
+    #[allow(dead_code)]
     pub fn insert<T>(&mut self, key: &str, value: String) {
         self.args.insert(String::from(key), value);
     }

@@ -51,7 +51,7 @@ impl YSB {
             partitions: config.get_as_or("partitions", 10), 
             campaigns: config.get_as_or("campaigns", 100),
             ads: config.get_as_or("ads", 10),
-            events: config.get_as_or("events", 1000000)
+            events: config.get_as_or("events", 100_000)
         }
     }
 }
