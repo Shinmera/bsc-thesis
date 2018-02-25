@@ -3,14 +3,28 @@ HiBench is a benchmarking suite created by Intel in 2012. It proposes a set of m
 
 \begin{itemize}
 \item {\bfseries Identity} This test is supposed to measure the minimum latency of the system, by simply immediately outputting the input data.
-\item {\bfseries Repartition} This tests the distribution of the workload across workers, but just like Identity does not perform any computation on the data.
+\item {\bfseries Repartition} This tests the distribution of the workload across workers, but just like Identity does not perform any computation on the data. The repartition should be handled through a round-robin scheduler.
 \item {\bfseries Wordcount} This is a basic word count test that simply focuses on counting the occurrences of individual words, regularly outputting the current tally. It is intended to test the performance of stateful operators.
-\item {\bfseries Fixwindow} This test performs a simple hopping window reduction.
+\item {\bfseries Fixwindow} This test performs a simple hopping window reduction, with each window being ten seconds long.
 \end{itemize}
 
-The tests are illustrated as data flows in \autoref{figure:hibench}. As the benchmarks focus on very small tests, they can only really give insight about the performance of the system for a select few individual operations. This might not translate to the performance of the system for complex data flows with many interacting components. \\
+The tests are illustrated as data flows in \autoref{figure:hibench}. The data used for the benchmark follows a custom CSV-like format, where each input is composed of an integer timestamp and a comma separated list of the following fields:
 
-Hibench only focuses on the latency component of the system, measuring how long it takes the system to process data at a fixed input rate. It does not consider other important factors of a streaming system such as fault tolerance, scaling, and load bearing.
+\begin{itemize}
+\item \code{ip} An IPv4 address, presumably for the event origin.
+\item \code{session_id} A unique session ID hash.
+\item \code{date} Some kind of date in \code{YYYY-MM-DD} format.
+\item \code{?} A float of some kind.
+\item \code{user_agent} A browser user-agent string, to identify the user.
+\item \code{?} Some three-letter code.
+\item \code{?} Some five-letter sub-code.
+\item \code{word} A seemingly random word.
+\item \code{?} Some integer.
+\end{itemize}
+
+As the benchmark does not publicly state the structure of the workload, and the fields aren't really specifically used for anything in the benchmarks except for the \code{word}, we can only guess what they are meant to be for. \\
+
+Since the benchmarks focus on very small tests, they can only really give insight about the performance of the system for a select few individual operations. This might not translate to the performance of the system for complex data flows with many interacting components. Hibench only focuses on the latency component of the system, measuring how long it takes the system to process data at a fixed input rate. It does not consider other important factors of a streaming system such as fault tolerance, scaling, and load bearing.
 
 \imagefigure[hibench]{images/hibench-graphs.pdf}{Graphs of the four streaming benchmarks that HiBench specifies.}
 
