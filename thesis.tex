@@ -12,6 +12,7 @@
 \usepackage{float}
 \usepackage{ifthen}
 \usepackage{multicol}
+\usepackage{minted}
 \usepackage{tablefootnote}
 \usepackage[margin=1cm]{caption}
 \usepackage[bottom,marginal]{footmisc}
@@ -22,6 +23,7 @@
 \pagestyle{fancy}
 \setlength{\headheight}{30pt}
 \renewcommand{\arraystretch}{1.5}
+\newmintinline[code]{text}{}
 
 \hypersetup{
   colorlinks,
@@ -79,4 +81,5 @@
 %%% mode: latex
 %%% TeX-engine: luatex
 %%% TeX-master: t
+%%% TeX-command-extra-options: "-shell-escape"
 %%% End:
