@@ -30,6 +30,29 @@ Since the benchmarks focus on very small tests, they can only really give insigh
 
 \subsection{Implementation}
 
+\begin{listing}[H]
+  \inputminted[firstline=80,lastline=82]{rust}{benchmarks/src/hibench.rs}
+  \caption{Implementation for the Identity query.}
+  \label{lst:hibench-identity}
+\end{listing}
+
+\begin{listing}[H]
+  \inputminted[firstline=109,lastline=123]{rust}{benchmarks/src/hibench.rs}
+  \caption{Implementation for the Repartition query.}
+  \label{lst:hibench-repartition}
+\end{listing}
+
+\begin{listing}[H]
+  \inputminted[firstline=150,lastline=153]{rust}{benchmarks/src/hibench.rs}
+  \caption{Implementation for the WordCount query.}
+  \label{lst:hibench-wordcount}
+\end{listing}
+
+\begin{listing}[H]
+  \inputminted[firstline=180,lastline=194]{rust}{benchmarks/src/hibench.rs}
+  \caption{Implementation for the Fixwindow query.}
+  \label{lst:hibench-fixwindow}
+\end{listing}
 
 \subsection{Evaluation}
 
