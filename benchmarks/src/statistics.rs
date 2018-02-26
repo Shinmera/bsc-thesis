@@ -53,7 +53,7 @@ impl From<Vec<f64>> for Statistics{
         let maximum = local.iter().cloned().fold(0./0., f64::max);
         let average = total / local.len() as f64;
         let deviation = local.iter().map(|x|{ let a=x-average; a*a }).fold(0.0, f64::add) / local.len() as f64;
-        let median = local[local.len()/2];
+        let median = *local.get(local.len()/2).unwrap_or(&0.0);
         Statistics{
             total: total,
             minimum: minimum,
