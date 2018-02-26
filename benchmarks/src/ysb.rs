@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
 use std::sync::RwLock;
+use std::ops::Deref;
 use abomonation::Abomonation;
 use timely::dataflow::operators::{Input, Map, Filter};
 use timely::dataflow::operators::input::Handle;
@@ -40,7 +41,8 @@ struct YSB {
     partitions: usize,
     campaigns: usize,
     ads: usize,
-    events: usize,
+    seconds: usize,
+    events_per_second: usize,
 }
 
 impl YSB {
@@ -51,7 +53,24 @@ impl YSB {
             partitions: config.get_as_or("partitions", 10), 
             campaigns: config.get_as_or("campaigns", 100),
             ads: config.get_as_or("ads", 10),
-            events: config.get_as_or("events", 100_000)
+            seconds: config.get_as_or("seconds", 60),
+            events_per_second: config.get_as_or("events-per-second", 100_000),
+        }
+    }
+
+    fn generate_event(&self, time: usize) -> Event {
+        let mut rng = rand::thread_rng();
+        let map = self.campaign_map.read().unwrap();
+        const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
+        const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
+        Event {
+            user_id: format!("{}", Uuid::new_v4()),
+            page_id: format!("{}", Uuid::new_v4()),
+            ad_id: map.keys().nth(rng.gen_range(0, map.len())).unwrap().clone(),
+            ad_type: String::from(*rng.choose(&AD_TYPES).unwrap()),
+            event_type: String::from(*rng.choose(&EVENT_TYPES).unwrap()),
+            event_time: time,
+            ip_address: String::from("0.0.0.0"),
         }
     }
 }
@@ -66,47 +85,38 @@ impl TestImpl for YSB {
 
     fn generate_data(&self) -> Result<()> {
         fs::create_dir_all(&self.data_dir)?;
-        let mut rng = rand::thread_rng();
 
-        println!("Generating {} events over {} partitions for {} campaigns with {} ads each.",
-                 self.events, self.partitions, self.campaigns, self.ads);
+        println!("Generating {} events/s for {}s over {} partitions for {} campaigns with {} ads each.",
+                 self.events_per_second, self.seconds, self.partitions, self.campaigns, self.ads);
         
         // Generate campaigns map
-        let campaign_file = File::create(format!("{}/campaigns.json", &self.data_dir))?;
-        let mut map = HashMap::new();
-        for _ in 0..self.campaigns {
-            let campaign_id = format!("{}", Uuid::new_v4());
-            for _ in 0..self.ads {
-                let ad_id = format!("{}", Uuid::new_v4());
-                map.insert(ad_id, campaign_id.clone());
+        {
+            let mut map = self.campaign_map.write().unwrap();
+            for _ in 0..self.campaigns {
+                let campaign_id = format!("{}", Uuid::new_v4());
+                for _ in 0..self.ads {
+                    let ad_id = format!("{}", Uuid::new_v4());
+                    map.insert(ad_id, campaign_id.clone());
+                }
             }
         }
-        serde_json::to_writer(campaign_file, &map)?;
+        let campaign_file = File::create(format!("{}/campaigns.json", &self.data_dir))?;
+        let map = self.campaign_map.read().unwrap();
+        serde_json::to_writer(campaign_file, map.deref())?;
         
         // Generate events
-        let ad_types = vec!["banner", "modal", "sponsored-search", "mail", "mobile"];
-        let event_types = vec!["view", "click", "purchase"];
-        let events_per_partition = self.events / self.partitions;
-        for partition in 0..self.partitions {
-            let mut event_file = File::create(format!("{}/events-{}.json", &self.data_dir, partition))?;
-            let mut time = 1000000;
-            for _ in 0..events_per_partition {
-                // We step randomly between event times, with a max of 1 second.
-                // Since the ad_types are randomised too, relevant "view" events
-                // will likely still often be more than a second apart.
-                time = time + rng.gen_range(0, 1000);
-                let event = Event {
-                    user_id: format!("{}", Uuid::new_v4()),
-                    page_id: format!("{}", Uuid::new_v4()),
-                    ad_id: map.keys().nth(rng.gen_range(0, map.len())).unwrap().clone(),
-                    ad_type: String::from(*rng.choose(&ad_types).unwrap()),
-                    event_type: String::from(*rng.choose(&event_types).unwrap()),
-                    event_time: time,
-                    ip_address: String::from("0.0.0.0"),
-                };
-                serde_json::to_writer(&event_file, &event)?;
-                event_file.write(b"\n")?;
-            }
+        let mut rng = rand::thread_rng();
+        let mut event_files = Vec::new();
+        for p in 0..self.partitions {
+            event_files.push(File::create(format!("{}/events-{}.json", &self.data_dir, p))?);
+        }
+        let timestep = 1000.0 / self.events_per_second as f64;
+        let mut time: f64 = 1.0;
+        for _ in 0..(self.seconds*self.events_per_second) {
+            let mut file = rng.choose(&event_files).unwrap();
+            serde_json::to_writer(file, &self.generate_event(time as usize))?;
+            file.write(b"\n")?;
+            time += timestep;
         }
         Ok(())
     }
