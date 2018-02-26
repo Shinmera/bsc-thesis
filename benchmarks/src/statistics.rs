@@ -20,7 +20,7 @@ pub struct Statistics{
 
 /// Returns the duration as a double float of seconds.
 pub fn duration_fsecs(d: &Duration) -> f64{
-    d.as_secs() as f64 + d.subsec_nanos() as f64 / 10_000_000 as f64
+    d.as_secs() as f64 + d.subsec_nanos() as f64 / 1_000_000_000 as f64
 }
 
 impl<'a> From<Vec<(&'a Instant, &'a Instant)>> for Statistics{
