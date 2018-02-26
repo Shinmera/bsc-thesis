@@ -10,12 +10,12 @@ use timely::progress::nested::product::Product;
 use timely::progress::timestamp::RootTimestamp;
 use timely;
 use config::Config;
-use statistics::Statistics;
+use statistics::{duration_fsecs, Statistics};
 use std::ops::Add;
 use std::io::{BufRead, Result, Error, ErrorKind};
 use std::fmt::Debug;
 use std::error::Error as StdError;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use std::collections::{HashMap};
 use std::sync::{Mutex,Arc};
 
@@ -114,21 +114,22 @@ pub trait TestImpl : Sync+Send{
     /// construct the data flow, loop to feed data and advance
     /// the workers as needed.
     fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{
-        let mut start = HashMap::new();
-        let end = Arc::new(Mutex::new(HashMap::new()));
+        let mut starts = HashMap::new();
+        let ends = Arc::new(Mutex::new(HashMap::new()));
         let mut feeder_data = self.prepare(worker.index())?;
         let (probe, mut inputs) = worker.dataflow(|scope|{
-            let end = end.clone();
+            let ends = ends.clone();
             let (stream, inputs) = self.construct_dataflow(scope);
             (stream.inspect_batch(move |t, _|{
-                let mut end = end.lock().unwrap();
-                end.insert(t.inner, Instant::now());
+                let mut ends = ends.lock().unwrap();
+                ends.insert(t.inner, Instant::now());
             }).probe(), inputs)
         });
         
         let mut epoch = self.initial_epoch();
+        let start = Instant::now();
         loop {
-            start.insert(epoch, Instant::now());
+            starts.insert(epoch, Instant::now());
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
                     let mut i = inputs.len();
@@ -140,11 +141,16 @@ pub trait TestImpl : Sync+Send{
                 Err(error) => {
                     for input in inputs { input.close(); }
                     self.finish(&mut feeder_data);
+                    // If we are simply out of data it means the run has finished successfully.
                     if error.kind() == ErrorKind::Other && error.description() == "Out of data" {
-                        let end = end.lock().unwrap();
-                        let durations : Vec<Duration> = end.iter()
-                            .map(|(t, i)| i.duration_since(*start.get(t).unwrap())).collect();
-                        return Ok(Statistics::from(durations));
+                        let ends = ends.lock().unwrap();
+                        let durations: Vec<_> = ends.iter().map(|(t, i)|(starts.get(t).unwrap(), i)).collect();
+                        let mut stats = Statistics::from(durations);
+                        // Typically we expect the total to be the length of the run, but since
+                        // epoch timings overlap, the default total calculated would be way too
+                        // high. We adjust it manually here.
+                        stats.total = duration_fsecs(&Instant::now().duration_since(start));
+                        return Ok(stats);
                     }
                     return Err(error);
                 }

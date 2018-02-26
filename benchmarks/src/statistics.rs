@@ -1,8 +1,14 @@
 use std::ops::Add;
 use std::convert::From;
-use std::time::Duration;
+use std::time::{Instant, Duration};
 use std::fmt;
 
+/// This is a simple struct to represent statistical values
+/// over a set of samples.
+///
+/// You can use Statistics::from to convert a vector of timing
+/// values into this statistics struct. It will automatically
+/// calculate the relevant fields.
 pub struct Statistics{
     pub total: f64,
     pub minimum: f64,
@@ -12,8 +18,23 @@ pub struct Statistics{
     pub deviation: f64
 }
 
-fn duration_fsecs(d: &Duration) -> f64{
+/// Returns the duration as a double float of seconds.
+pub fn duration_fsecs(d: &Duration) -> f64{
     d.as_secs() as f64 + d.subsec_nanos() as f64 / 10_000_000 as f64
+}
+
+impl<'a> From<Vec<(&'a Instant, &'a Instant)>> for Statistics{
+    fn from(vec: Vec<(&'a Instant, &'a Instant)>) -> Self{
+        let vec : Vec<f64> = vec.iter().map(|&(s, e)| duration_fsecs(&e.duration_since(*s))).collect();
+        Self::from(vec)
+    }
+}
+
+impl From<Vec<(Instant, Instant)>> for Statistics{
+    fn from(vec: Vec<(Instant, Instant)>) -> Self{
+        let vec : Vec<f64> = vec.iter().map(|&(s, e)| duration_fsecs(&e.duration_since(s))).collect();
+        Self::from(vec)
+    }
 }
 
 impl From<Vec<Duration>> for Statistics{
