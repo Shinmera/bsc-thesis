@@ -48,7 +48,7 @@ fn get_ip(record: &String) -> String
 struct Identity {}
 
 impl Identity {
-    fn new(config: &Config) -> Self {
+    fn new(_config: &Config) -> Self {
         Identity{}
     }
 }
@@ -88,7 +88,7 @@ impl TestImpl for Identity {
 struct Repartition {}
 
 impl Repartition {
-    fn new(config: &Config) -> Self {
+    fn new(_config: &Config) -> Self {
         Repartition{}
     }
 }
@@ -130,7 +130,7 @@ impl TestImpl for Repartition {
 struct Wordcount {}
 
 impl Wordcount {
-    fn new(config: &Config) -> Self {
+    fn new(_config: &Config) -> Self {
         Wordcount{}
     }
 }
@@ -160,7 +160,7 @@ impl TestImpl for Wordcount {
 struct Fixwindow {}
 
 impl Fixwindow {
-    fn new(config: &Config) -> Self {
+    fn new(_config: &Config) -> Self {
         Fixwindow{}
     }
 }
