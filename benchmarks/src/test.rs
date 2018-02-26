@@ -132,13 +132,10 @@ pub trait TestImpl : Sync+Send{
             starts.insert(epoch, Instant::now());
             match self.epoch_data(&mut feeder_data, &epoch){
                 Ok(mut data) => {
-                    let mut i = inputs.len();
-                    while let Some(mut input) = data.pop() {
-                        i = i-1;
-                        inputs[i].send_batch(&mut input);
-                    }
+                    data.drain(..).zip(&mut inputs).for_each(|(mut d, i)| i.send_batch(&mut d));
                 },
                 Err(error) => {
+                    let end = Instant::now();
                     for input in inputs { input.close(); }
                     self.finish(&mut feeder_data);
                     // If we are simply out of data it means the run has finished successfully.
@@ -149,7 +146,7 @@ pub trait TestImpl : Sync+Send{
                         // Typically we expect the total to be the length of the run, but since
                         // epoch timings overlap, the default total calculated would be way too
                         // high. We adjust it manually here.
-                        stats.total = duration_fsecs(&Instant::now().duration_since(start));
+                        stats.total = duration_fsecs(&end.duration_since(start));
                         return Ok(stats);
                     }
                     return Err(error);
