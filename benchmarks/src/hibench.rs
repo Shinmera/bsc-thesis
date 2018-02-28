@@ -1,5 +1,6 @@
 extern crate rdkafka;
 extern crate kafkaesque;
+extern crate rand;
 
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
@@ -16,6 +17,10 @@ use test::Test;
 use test::TestImpl;
 use std::cmp;
 use std::str::FromStr;
+use std::io::{Result, Error, ErrorKind, Lines, BufRead, BufReader, Write};
+use std::fs::File;
+use std::fs;
+use rand::Rng;
 use config::Config;
 use self::kafkaesque::EventProducer;
 use self::rdkafka::config::ClientConfig;
@@ -36,8 +41,7 @@ fn hasher(x: &String) -> u64 {
 // 0    227.209.164.46,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1991-06-10,0.115967035,Mozilla/5.0 (iPhone; U; CPU like Mac OS X)AppleWebKit/420.1 (KHTML like Gecko) Version/3.0 Mobile/4A93Safari/419.3,YEM,YEM-AR,snowdrops,1
 // 0    35.143.225.164,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1996-05-31,0.8792629,Mozilla/5.0 (Windows; U; Windows NT 5.2) AppleWebKit/525.13 (KHTML like Gecko) Chrome/0.2.149.27 Safari/525.13,PRT,PRT-PT,fraternally,8
 // 0    34.57.45.175,nbizrgdziebtsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,2001-06-29,0.14202267,Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1),DOM,DOM-ES,Gaborone's,7
-fn get_ip(record: &String) -> String 
-{
+fn get_ip(record: &String) -> String {
     // TODO (john): Change this into a regex 
     let end = record.find(',').expect("HiBench: Cannot parse IP.");
     let ip = &record[0..end];
@@ -45,11 +49,31 @@ fn get_ip(record: &String) -> String
     record[start+1..end].to_string()
 }
 
-struct Identity {}
+fn random_ip() -> String {
+    let mut rng = rand::thread_rng();
+    format!("{}.{}.{}.{}", rng.gen_range(0, 255), rng.gen_range(0, 255), rng.gen_range(0, 255), rng.gen_range(0, 255))
+}
+
+fn random_date() -> String {
+    let mut rng = rand::thread_rng();
+    format!("{}-{}-{}", rng.gen_range(1990, 2010), rng.gen_range(1, 12), rng.gen_range(0, 31))
+}
+
+struct Identity {
+    data_dir: String,
+    seconds: usize,
+    events_per_second: usize,
+    ips: usize,
+}
 
 impl Identity {
-    fn new(_config: &Config) -> Self {
-        Identity{}
+    fn new(config: &Config) -> Self {
+        Identity{
+            data_dir: format!("{}/hibench", config.get_or("data-dir", "data")),
+            seconds: config.get_as_or("seconds", 60),
+            events_per_second: config.get_as_or("events-per-second", 100_000),
+            ips: config.get_as_or("ips", 100),
+        }
     }
 }
 
@@ -60,6 +84,30 @@ impl TestImpl for Identity {
     type G = ();
     
     fn name(&self) -> &str { "HiBench Identity" }
+
+    fn generate_data(&self) -> Result<()> {
+        fs::create_dir_all(&self.data_dir)?;
+
+        let mut rng = rand::thread_rng();
+        let mut file = File::create(format!("{}/data.csv", &self.data_dir))?;
+        let ips: Vec<_> = (0..self.ips).map(|_| random_ip()).collect();
+        for t in 0..self.seconds {
+            for _ in 0..self.events_per_second {
+                let ip = rng.choose(&ips).unwrap().clone();
+                let session: String = rng.gen_ascii_chars().take(54).collect();
+                let date = random_date();
+                let float = 0.0;
+                let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
+                let s = "DOM";
+                let subs = "DOM-ES";
+                let word = "snow";
+                let int = 6;
+                writeln!(&mut file, "{:4} {},{},{},{:.8},{},{},{},{},{}",
+                         t, ip, session, date, float, agent, s, subs, word, int)?;
+            }
+        }
+        Ok(())
+    }
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
