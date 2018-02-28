@@ -134,6 +134,7 @@ pub trait TestImpl : Sync+Send{
                 Ok(mut data) => {
                     data.drain(..).zip(&mut inputs).for_each(|(mut d, i)| i.send_batch(&mut d));
                 },
+                // FIXME: Intercept SIGINT and gracefully end the test run as if it had run out of data.
                 Err(error) => {
                     let end = Instant::now();
                     for input in inputs { input.close(); }
