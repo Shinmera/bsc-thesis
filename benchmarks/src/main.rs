@@ -14,6 +14,7 @@ mod statistics;
 mod test;
 mod hibench;
 mod ysb;
+mod nexmark;
 mod integrity;
 
 use std::io::Result;
@@ -22,6 +23,7 @@ use test::{run_test, generate_test};
 use config::Config;
 use hibench::hibench;
 use ysb::ysb;
+use nexmark::nexmark;
 
 trait Reportable { fn report(&self); }
 
@@ -50,6 +52,7 @@ fn main() {
     let mut tests = Vec::new();
     tests.append(&mut hibench(&config));
     tests.append(&mut ysb(&config));
+    tests.append(&mut nexmark(&config));
     if mode == "test" {
         for test in tests {
             println!("> Running test {}", test.name());
