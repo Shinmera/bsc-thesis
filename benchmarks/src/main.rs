@@ -67,21 +67,22 @@ Usage: MODE [MODE-OPTIONS]
 
 The following modes and respective options are available:
 
-test               Runs the benchmarks.
-  --threads NUM      Number of workers per process.
-  --process IDX      The identity of this process.
-  --processes NUM    Number of processes.
-  --hostfile FILE    Process address host file.
-  --report BOOL      Whether to report connection progress.
+test                    Run the benchmarks.
+  --threads NUM           Number of workers per process.
+  --process IDX           The identity of this process.
+  --processes NUM         Number of processes.
+  --hostfile FILE         Process address host file.
+  --report BOOL           Whether to report connection progress.
 
-generate           Generates benchmark workloads.
-  --data-dir DIR     The directory for the benchmark data files.
-  --partitions NUM   The number of dataset partitions to create.
-  --campaigns NUM    (YSB) How many campaign IDs to generate.
-  --ads NUM          (YSB) How many ads per campaign to generate.
-  --events NUM       (YSB) How many events in total to generate.
+generate                Generate benchmark workloads.
+  --data-dir DIR          The directory for the benchmark data files.
+  --partitions NUM        The number of dataset partitions to create.
+  --campaigns NUM         (YSB) How many campaign IDs to generate.
+  --ads NUM               (YSB) How many ads per campaign to generate.
+  --seconds NUM           (YSB) How many seconds to generate events for.
+  --events-per-second NUM (YSN) How many events to produce per second.
 
-help               Shows this documentation.
+help                    Show this documentation.
 ");
     }
 }
