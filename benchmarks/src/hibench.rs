@@ -59,7 +59,7 @@ impl TestImpl for Identity {
     type T = usize;
     type G = ();
     
-    fn name(&self) -> &str { "Identity" }
+    fn name(&self) -> &str { "HiBench Identity" }
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
@@ -99,7 +99,7 @@ impl TestImpl for Repartition {
     type T = usize;
     type G = ();
     
-    fn name(&self) -> &str { "Repartition" }
+    fn name(&self) -> &str { "HiBench Repartition" }
 
     fn initial_epoch(&self) -> Self::T { 0 }
     
@@ -141,7 +141,7 @@ impl TestImpl for Wordcount {
     type T = usize;
     type G = ();
     
-    fn name(&self) -> &str { "Wordcount" }
+    fn name(&self) -> &str { "HiBench Wordcount" }
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
@@ -171,7 +171,7 @@ impl TestImpl for Fixwindow {
     type T = usize;
     type G = ();
     
-    fn name(&self) -> &str { "Fixwindow" }
+    fn name(&self) -> &str { "HiBench Fixwindow" }
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
