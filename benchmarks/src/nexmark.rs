@@ -9,6 +9,13 @@ use config::Config;
 type Id = usize;
 type Date = usize;
 
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Abomonation)]
+enum Event{
+    Person(Person),
+    Auction(Auction),
+    Bid(Bid),
+}
+
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Person{
     id: Id,
@@ -48,8 +55,8 @@ unsafe_abomonate!(Bid : auction, bidder, price, date_time);
 struct Query0 {}
 
 impl TestImpl for Query0 {
-    type D = Bid;
-    type DO = Bid;
+    type D = Event;
+    type DO = Event;
     type T = usize;
     type G = ();
 
