@@ -9,13 +9,11 @@ use std::sync::RwLock;
 use std::ops::Deref;
 use abomonation::Abomonation;
 use timely::dataflow::operators::{Input, Map, Filter};
-use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely_communication::allocator::Generic;
 use operators::{EpochWindow, Reduce};
-use test::Test;
-use test::TestImpl;
+use test::{Test, TestImpl, InputHandle};
 use config::Config;
 use rand::Rng;
 use uuid::Uuid;
@@ -123,7 +121,7 @@ impl TestImpl for YSB {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn prepare(&self, index: usize) -> Result<Self::G> {
+    fn prepare(&self, index: usize, _workers: usize) -> Result<Self::G> {
         let campaign_file = File::open(format!("{}/campaigns.json", &self.data_dir))?;
         let event_file = File::open(format!("{}/events-{}.json", &self.data_dir, index))?;
         let mut map: HashMap<String, String> = serde_json::from_reader(campaign_file)?;
@@ -132,21 +130,21 @@ impl TestImpl for YSB {
         Ok(BufReader::new(event_file).lines())
     }
 
-    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
+    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
         let mut data = Vec::new();
         for line in stream {
             let event: Event = serde_json::from_str(&line.unwrap())?;
             // We create second epochs to match up with what they do in YSB.
             if event.event_time / 1000 > *epoch {
                 data.push(event);
-                return Ok(vec![data]);
+                return Ok(data);
             }
             data.push(event);
         }
         if data.is_empty(){
             return Err(Error::new(ErrorKind::Other, "Out of data"));
         } else {
-            return Ok(vec![data]);
+            return Ok(data);
         }
     }
 
@@ -154,7 +152,7 @@ impl TestImpl for YSB {
         drop(stream);
     }
 
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         let table = self.campaign_map.read().unwrap().clone();
         let stream = stream
@@ -172,7 +170,7 @@ impl TestImpl for YSB {
             .epoch_window(10, 10)
             // Count each campaign in the window and return as tuples of id + count.
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1);
-        (stream, vec![input])
+        (stream, Box::new(input))
     }
 }
 

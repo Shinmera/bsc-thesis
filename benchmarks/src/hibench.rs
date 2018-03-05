@@ -7,17 +7,15 @@ use std::collections::hash_map::DefaultHasher;
 use timely::dataflow::operators::{Operator, Input, Map, Exchange};
 use timely::dataflow::operators::aggregation::Aggregate;
 use timely::dataflow::channels::pact::Pipeline;
-use timely::dataflow::operators::input::Handle;
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely_communication::allocator::Generic;
 use operators::RollingCount;
 use operators::EpochWindow;
-use test::Test;
-use test::TestImpl;
+use test::{Test, TestImpl, InputHandle};
 use std::cmp;
 use std::str::FromStr;
-use std::io::{Result, Error, ErrorKind, Lines, BufRead, BufReader, Write};
+use std::io::{Result, Write};
 use std::fs::File;
 use std::fs;
 use rand::Rng;
@@ -88,6 +86,9 @@ impl TestImpl for Identity {
     fn generate_data(&self) -> Result<()> {
         fs::create_dir_all(&self.data_dir)?;
 
+        println!("Generating {} events/s for {}s for {} ips.",
+                 self.events_per_second, self.seconds, self.ips);
+
         let mut rng = rand::thread_rng();
         let mut file = File::create(format!("{}/data.csv", &self.data_dir))?;
         let ips: Vec<_> = (0..self.ips).map(|_| random_ip()).collect();
@@ -111,7 +112,7 @@ impl TestImpl for Identity {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         let topic = "1".to_string();
         let count = 1;
@@ -129,7 +130,7 @@ impl TestImpl for Identity {
             (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."), SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs()))
             .capture_into(producer);
 
-        (stream, vec![input])
+        (stream, Box::new(input))
     }
 }
 
@@ -151,7 +152,7 @@ impl TestImpl for Repartition {
 
     fn initial_epoch(&self) -> Self::T { 0 }
     
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         let peers = scope.peers() as u64;   // Total number of workers executing the dataflow
         // Simulate a RoundRobin shuffling
@@ -171,7 +172,7 @@ impl TestImpl for Repartition {
             .map(|(_,record)| record);
         // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
         stream.sink(Pipeline,"Sink",|_| ());
-        (stream, vec![input])
+        (stream, Box::new(input))
     }
 }
 
@@ -193,7 +194,7 @@ impl TestImpl for Wordcount {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         let stream = stream
             .map(|(ts,b)| (get_ip(&b),ts))
@@ -201,7 +202,7 @@ impl TestImpl for Wordcount {
             .rolling_count(|&(ref ip,ref ts):&(String,String)| (ip.clone(),ts.clone()));
         // TODO (john): For each tuple in the output stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
         stream.sink(Pipeline,"Sink",|_| ());
-        (stream, vec![input])
+        (stream, Box::new(input))
     }
 }
 
@@ -223,7 +224,7 @@ impl TestImpl for Fixwindow {
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
         let (input, stream) = scope.new_input();
         let stream = stream
             .map(|(ts,b):Self::D| (get_ip(&b),u64::from_str(&ts).expect("FixWindow: Cannot parse event timestamp.")))
@@ -242,7 +243,7 @@ impl TestImpl for Fixwindow {
             );
         // TODO (john): For each tuple in the output stream, the sinc operator must report agg.1 tuples of the form (agg.0,system_time) to Kafka
         stream.sink(Pipeline,"Sink",|_| ());
-        (stream, vec![input])
+        (stream, Box::new(input))
     }
 }
 

@@ -2,12 +2,11 @@ use timely::dataflow::{Stream};
 use timely::dataflow::operators::{Inspect, Probe, Input};
 use timely::dataflow::scopes::{Child, Root};
 use timely::progress::Timestamp;
+use timely::progress::timestamp::RootTimestamp;
+use timely::progress::nested::product::Product;
 use timely::dataflow::operators::input::Handle;
-use timely::dataflow::operators::probe::Handle as ProbeHandle;
 use timely::{Data, Configuration};
 use timely_communication::allocator::Generic;
-use timely::progress::nested::product::Product;
-use timely::progress::timestamp::RootTimestamp;
 use timely;
 use config::Config;
 use statistics::{duration_fsecs, Statistics};
@@ -18,6 +17,8 @@ use std::error::Error as StdError;
 use std::time::Instant;
 use std::collections::{HashMap};
 use std::sync::{Mutex,Arc};
+use std::cmp::max;
+use std::ptr::drop_in_place;
 
 /// Simple trait for incrementable objects.
 /// This is used to automatically advance the timestamp.
@@ -39,91 +40,100 @@ impl Inc for isize { fn next(&mut self) -> Self {self.add(1)} }
 impl Inc for f32 { fn next(&mut self) -> Self {self.add(1.0)} }
 impl Inc for f64 { fn next(&mut self) -> Self {self.add(1.0)} }
 
-/// This trait exposes the implementation details of a benchmark.
-///
-/// The idea is that it encapsulates common functionality between
-/// the tests and avoids duplicating code. It also presents a
-/// simple framework for implementing a benchmark.
-pub trait TestImpl : Sync+Send{
+/// This presents the public interface for a test.
+pub trait Test : Sync+Send {
+    /// The name of the test as a human readable string.
+    fn name(&self) -> &str;
+    
+    /// This function is used to generate a workload or data set
+    /// for use during testing. It will write it out to a configured
+    /// file, which is then read back when the test is actually run.
+    fn generate_data(&self) -> Result<()>;
+    
+    /// This function handles the actual running of the test.
+    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>;
+}
+
+pub trait InputHandle<T, D> {
+    fn send(&mut self, Vec<D>);
+    fn advance_to(&mut self, T);
+    fn max_time(&self) -> &Product<RootTimestamp, T>;
+}
+
+impl<T: Timestamp, D: Data> InputHandle<T, D> for Handle<T, D> {
+    fn send(&mut self, mut data: Vec<D>) {
+        self.send_batch(&mut data);
+    }
+
+    fn advance_to(&mut self, t: T) {
+        Handle::advance_to(self, t);
+    }
+
+    fn max_time(&self) -> &Product<RootTimestamp, T> {
+        self.time()
+    }
+}
+
+impl<T: Timestamp, D1: Data, D2: Data> InputHandle<T, (D1, D2)> for (Handle<T, D1>, Handle<T, D2>) {
+    fn send(&mut self, mut data: Vec<(D1, D2)>) {
+        let &mut (ref mut a, ref mut b) = self;
+        data.drain(..).for_each(|(d1, d2)|{
+            a.send(d1);
+            b.send(d2);
+        });
+    }
+
+    fn advance_to(&mut self, t: T) {
+        let &mut (ref mut a, ref mut b) = self;
+        Handle::advance_to(a, t.clone());
+        Handle::advance_to(b, t);
+    }
+
+    fn max_time(&self) -> &Product<RootTimestamp, T> {
+        let &(ref a, ref b) = self;
+        max(a.time(), b.time())
+    }
+}
+
+pub trait TestImpl : Sync+Send {
     type D: Data+Debug;
     type DO: Data+Debug;
     type T: Timestamp+Inc+Debug;
     type G;
 
-    /// The name of the test as a human readable string.
     fn name(&self) -> &str;
 
-    /// This function is used to generate a workload or data set
-    /// for use during testing. It will write it out to a configured
-    /// file, which is then read back when the test is actually run.
     fn generate_data(&self) -> Result<()>{
         Ok(())
     }
 
-    /// This function is called at the beginning of a test run and
-    /// is responsible for opening input streams and preparing data.
-    /// The index is the current worker's index, which is used to
-    /// decide whether this should feed the dataflow at all.
-    ///
-    /// The Ok result should contain data that the worker can use
-    /// with epoch_data to generate the next round of inputs.
-    fn prepare(&self, _index: usize) -> Result<Self::G> {
+    fn prepare(&self, _index: usize, _workers: usize) -> Result<Self::G> {
         Err(Error::new(ErrorKind::Other, "No data"))
     }
 
-    /// Generates a single run of data for an epoch. If there is no
-    /// more data available (and the test is thus over), the function
-    /// should return
-    fn epoch_data(&self, _data: &mut Self::G, _epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
+    fn initial_epoch(&self) -> Self::T;
+
+    fn epoch_data(&self, _data: &mut Self::G, _epoch: &Self::T) -> Result<Vec<Self::D>> {
         println!("Warning: {} does not implement a data generator.", self.name());
         Err(Error::new(ErrorKind::Other, "Out of data"))
     }
-
-    /// Used to close open file handles and otherwise tear down stuff
-    /// that was opened up in prepare().
+    
     fn finish(&self, _data: &mut Self::G) {
     }
 
-    /// This function is responsible for constructing the data flow
-    /// used for the computation, returning the last node of the
-    /// graph and a vector of input handles.
-    ///
-    /// The input argument should be the object received by the
-    /// function passed to worker.dataflow()
-    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>);
+    fn construct_dataflow<'scope>(&self, &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>);
 
-    /// This function will return the starting epoch timestamp.
-    fn initial_epoch(&self) -> Self::T;
-
-    /// A shorthand function to test whether the frontier has reached
-    /// all the inputs yet.
-    fn frontier_behind(&self, probe: &ProbeHandle<Product<RootTimestamp, Self::T>>, inputs: &Vec<Handle<Self::T, Self::D>>) -> bool{
-        for input in inputs {
-            if probe.less_than(input.time()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /// This function handles the actual running of the test.
-    ///
-    /// This function is the primary raison d'être of this
-    /// framework, as its behaviour is the same across each
-    /// possible test we might to run; you open some streams,
-    /// construct the data flow, loop to feed data and advance
-    /// the workers as needed.
     fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{
         let mut starts = HashMap::new();
         let ends = Arc::new(Mutex::new(HashMap::new()));
-        let mut feeder_data = self.prepare(worker.index())?;
-        let (probe, mut inputs) = worker.dataflow(|scope|{
+        let mut feeder_data = self.prepare(worker.index(), worker.peers())?;
+        let (probe, mut input) = worker.dataflow(|scope|{
             let ends = ends.clone();
-            let (stream, inputs) = self.construct_dataflow(scope);
+            let (stream, input) = self.construct_dataflow(scope);
             (stream.inspect_batch(move |t, _|{
                 let mut ends = ends.lock().unwrap();
                 ends.insert(t.inner, Instant::now());
-            }).probe(), inputs)
+            }).probe(), input)
         });
         
         let mut epoch = self.initial_epoch();
@@ -131,13 +141,16 @@ pub trait TestImpl : Sync+Send{
         loop {
             starts.insert(epoch, Instant::now());
             match self.epoch_data(&mut feeder_data, &epoch){
-                Ok(mut data) => {
-                    data.drain(..).zip(&mut inputs).for_each(|(mut d, i)| i.send_batch(&mut d));
+                Ok(data) => {
+                    input.send(data);
                 },
                 // FIXME: Intercept SIGINT and gracefully end the test run as if it had run out of data.
                 Err(error) => {
                     let end = Instant::now();
-                    for input in inputs { input.close(); }
+                    // We cannot call close on the input as it would have to allocate the trait,
+                    // which is impossible. We instead need to drop in place, which should have
+                    // the same effect as closing.
+                    unsafe { drop_in_place(Box::into_raw(input)); }
                     self.finish(&mut feeder_data);
                     // If we are simply out of data it means the run has finished successfully.
                     if error.kind() == ErrorKind::Other && error.description() == "Out of data" {
@@ -154,14 +167,18 @@ pub trait TestImpl : Sync+Send{
                 }
             }
             epoch = epoch.next();
-            for i in 0..inputs.len() {
-                inputs[i].advance_to(epoch);
-            }
-            while self.frontier_behind(&probe, &inputs) {
+            input.advance_to(epoch);
+            while probe.less_than(input.max_time()) {
                 worker.step();
             }
         }
     }
+}
+
+impl<I, T: Timestamp+Inc+Debug, D: Data+Debug, DO: Data+Debug> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
+    fn name(&self) -> &str { I::name(self) }
+    fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
+    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{ I::run(self, worker) }
 }
 
 /// This is an interface for tests that do not require a lot of
@@ -192,42 +209,25 @@ impl<I, D: Data+Debug, DO: Data+Debug> TestImpl for I where I: SimpleTest<D=D,DO
 
     fn name(&self) -> &str { I::name(self) }
 
-    fn prepare(&self, _index: usize) -> Result<Self::G> {
+    fn prepare(&self, _index: usize, _workers: usize) -> Result<Self::G> {
         Ok(I::rounds(self))
     }
 
-    fn epoch_data(&self, counter: &mut Self::G, epoch: &Self::T) -> Result<Vec<Vec<Self::D>>> {
+    fn epoch_data(&self, counter: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
         if 0 < *counter {
             *counter -= 1;
-            Ok(vec![I::generate(self, epoch)])
+            Ok(I::generate(self, epoch))
         } else {
             Err(Error::new(ErrorKind::Other, "Out of data"))
         }
     }
 
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Vec<Handle<Self::T, Self::D>>) {
+    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
         let (input, mut stream) = scope.new_input();
-        (I::construct(self, &mut stream), vec![input])
+        (I::construct(self, &mut stream), Box::new(input))
     }
 
     fn initial_epoch(&self) -> Self::T { 0 }
-}
-
-/// This presents the public interface for a test.
-///
-/// The reason this exists is so that you can talk about a test
-/// without having to know the precise type of the test, or the
-/// TestImpl's trait types.
-pub trait Test : Sync+Send {
-    fn name(&self) -> &str;
-    fn generate_data(&self) -> Result<()>;
-    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>;
-}
-
-impl<I, T: Timestamp+Inc+Debug, D: Data+Debug, DO: Data+Debug> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
-    fn name(&self) -> &str { I::name(self) }
-    fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
-    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{ I::run(self, worker) }
 }
 
 /// This function extracts the timely_communication
