@@ -2,6 +2,7 @@ use std::io::{Result, Error, ErrorKind};
 use std::collections::HashMap;
 use std::str::FromStr;
 
+#[derive(Clone)]
 pub struct Config {
     args: HashMap<String, String>
 }

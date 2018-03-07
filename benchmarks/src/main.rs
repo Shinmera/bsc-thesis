@@ -80,12 +80,27 @@ test                    Run the benchmarks.
   --report BOOL           Whether to report connection progress.
 
 generate                Generate benchmark workloads.
-  --data-dir DIR          The directory for the benchmark data files.
-  --partitions NUM        The number of dataset partitions to create.
-  --campaigns NUM         (YSB) How many campaign IDs to generate.
-  --ads NUM               (YSB) How many ads per campaign to generate.
-  --seconds NUM           (YSB) How many seconds to generate events for.
-  --events-per-second NUM (YSN) How many events to produce per second.
+  --data-dir DIR           The directory for the benchmark data files.
+  --partitions NUM         The number of dataset partitions to create.
+  --campaigns NUM          (YSB) How many campaign IDs to generate.
+  --ads NUM                (YSB) How many ads per campaign to generate.
+  --seconds NUM            (YSB) How many seconds to generate events for.
+  --events-per-second NUM  (YSN) How many events to produce per second.
+  --rate-shape SINE/SQUARE (NEX) In what shape to generate delays between events.
+  --first-event-rate NUM   (NEX) 
+  --next-event-rate NUM    (NEX)
+  --rate NUM               (NEX)
+  --event-generators NUM   (NEX)
+  --rate-period NUM        (NEX)
+  --active-people NUM      (NEX)
+  --in-flight-auctions NUM (NEX)
+  --out-of-order-group-size NUM (NEX)
+  --hot-seller-ratio NUM   (NEX)
+  --hot-auction-ratio NUM  (NEX)
+  --hot-bidder-ratio NUM   (NEX)
+  --first-event-id NUM     (NEX)
+  --first-event-number NUM (NEX)
+  --base-time NUM          (NEX)
 
 help                    Show this documentation.
 ");
