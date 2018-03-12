@@ -210,7 +210,7 @@ unsafe_abomonate!(Person : id, name, email_address, credit_card, city, state, da
 impl Person {
     fn new(id: usize, time: Date, rng: &mut StdRng) -> Self {
         Person {
-            id: Self::last_id(id),
+            id: Self::last_id(id) + FIRST_PERSON_ID,
             name: format!("{} {}", *rng.choose(&FIRST_NAMES).unwrap(), *rng.choose(&LAST_NAMES).unwrap()),
             email_address: format!("{}@{}.com", rng.gen_string(7), rng.gen_string(5)),
             credit_card: (0..4).map(|_| format!("{:04}", rng.gen_range(0, 10000))).collect::<Vec<String>>().join(" "),
@@ -223,14 +223,14 @@ impl Person {
     fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMark) -> Id {
         let people = Self::last_id(id) + 1;
         let active = min(people, nex.active_people);
-        people - active + rng.gen_range(0, active + PERSON_ID_LEAD) + FIRST_PERSON_ID
+        people - active + rng.gen_range(0, active + PERSON_ID_LEAD)
     }
 
     fn last_id(id: usize) -> Id {
         let epoch = id / PROPORTION_DENOMINATOR;
         let mut offset = id % PROPORTION_DENOMINATOR;
         if offset >= PERSON_PROPORTION { offset = PERSON_PROPORTION - 1; }
-        epoch * PERSON_PROPORTION + offset + FIRST_PERSON_ID
+        epoch * PERSON_PROPORTION + offset
     }
 }
 
@@ -257,22 +257,22 @@ impl Auction {
             Person::next_id(id, rng, nex)
         };
         Auction {
-            id: Self::last_id(id),
+            id: Self::last_id(id) + FIRST_AUCTION_ID,
             item_name: rng.gen_string(20),
             description: rng.gen_string(100),
             initial_bid: initial_bid,
             reserve: initial_bid + rng.gen_price(),
             date_time: time,
             expires: time + Self::next_length(events_so_far, rng, time, nex),
-            seller: seller,
+            seller: seller + FIRST_PERSON_ID,
             category: FIRST_CATEGORY_ID + rng.gen_range(0, NUM_CATEGORIES),
         }
     }
 
     fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMark) -> Id {
         let max_auction = Self::last_id(id);
-        let min_auction = max(0, max_auction - nex.in_flight_auctions);
-        min_auction + rng.gen_range(0, max_auction - min_auction + 1 + AUCTION_ID_LEAD) + FIRST_AUCTION_ID
+        let min_auction = if max_auction < nex.in_flight_auctions { 0 } else { max_auction - nex.in_flight_auctions };
+        min_auction + rng.gen_range(0, max_auction - min_auction + 1 + AUCTION_ID_LEAD)
     }
 
     fn last_id(id: usize) -> Id {
@@ -286,7 +286,7 @@ impl Auction {
         } else {
             offset = offset - PERSON_PROPORTION;
         }
-        epoch * AUCTION_PROPORTION + offset + FIRST_AUCTION_ID
+        epoch * AUCTION_PROPORTION + offset
     }
 
     fn next_length(events_so_far: usize, rng: &mut StdRng, time: Date, nex: &NEXMark) -> Date {
@@ -321,8 +321,8 @@ impl Bid {
             Person::next_id(id, rng, nex)
         };
         Bid {
-            auction: auction,
-            bidder: bidder,
+            auction: auction + FIRST_AUCTION_ID,
+            bidder: bidder + FIRST_PERSON_ID,
             price: rng.gen_price(),
             date_time: time,
         }
