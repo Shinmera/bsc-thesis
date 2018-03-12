@@ -151,8 +151,8 @@ impl NEXMark {
                 let offset_in_cycle = event_i * inter_event_delay;
                 return self.base_time + epoch * self.epoch_period + offset_in_epoch + offset_in_cycle / 1000;
             }
-            event_i = event_i - num_events_for_this_cycle;
-            offset_in_epoch = offset_in_epoch + (num_events_for_this_cycle * inter_event_delay) / 1000;
+            event_i -= num_events_for_this_cycle;
+            offset_in_epoch += (num_events_for_this_cycle * inter_event_delay) / 1000;
         }
         return 0
     }
@@ -229,7 +229,7 @@ impl Person {
     fn last_id(id: usize) -> Id {
         let epoch = id / PROPORTION_DENOMINATOR;
         let mut offset = id % PROPORTION_DENOMINATOR;
-        if offset >= PERSON_PROPORTION { offset = PERSON_PROPORTION - 1; }
+        if PERSON_PROPORTION <= offset { offset = PERSON_PROPORTION - 1; }
         epoch * PERSON_PROPORTION + offset
     }
 }
@@ -279,12 +279,12 @@ impl Auction {
         let mut epoch = id / PROPORTION_DENOMINATOR;
         let mut offset = id % PROPORTION_DENOMINATOR;
         if offset < PERSON_PROPORTION {
-            epoch = epoch - 1;
+            epoch -= 1;
             offset = AUCTION_PROPORTION - 1;
         } else if PERSON_PROPORTION + AUCTION_PROPORTION <= offset {
             offset = AUCTION_PROPORTION - 1;
         } else {
-            offset = offset - PERSON_PROPORTION;
+            offset -= PERSON_PROPORTION;
         }
         epoch * AUCTION_PROPORTION + offset
     }
