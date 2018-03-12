@@ -50,11 +50,17 @@ impl<T: Display> Reportable for Result<T> {
 
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
-    let mode = config.get_or("1", "help");
     let mut tests = Vec::new();
     tests.append(&mut hibench(&config));
     tests.append(&mut ysb(&config));
     tests.append(&mut nexmark(&config));
+    
+    let to_run = config.get("tests")
+        .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
+        .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
+    tests.retain(|t| to_run.contains(&String::from(t.name())));
+    
+    let mode = config.get_or("1", "help");
     if mode == "test" {
         for test in tests {
             println!("> Running test {}", test.name());
@@ -78,8 +84,10 @@ test                    Run the benchmarks.
   --processes NUM         Number of processes.
   --hostfile FILE         Process address host file.
   --report BOOL           Whether to report connection progress.
+  --tests STRING          A comma-separated list of test names to run.
 
 generate                Generate benchmark workloads.
+  --tests STRING           A comma-separated list of test names to run.
   --data-dir DIR           The directory for the benchmark data files.
   --partitions NUM         The number of dataset partitions to create.
   --campaigns NUM          (YSB) How many campaign IDs to generate.
