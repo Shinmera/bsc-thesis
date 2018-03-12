@@ -1,3 +1,4 @@
+extern crate serde_json;
 use abomonation::Abomonation;
 use timely::dataflow::operators::Input;
 use timely::dataflow::scopes::{Root, Child};
@@ -9,8 +10,9 @@ use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
 use std::f64::consts::PI;
+use std::fs::File;
 use std::fs;
-use std::io::{Result};
+use std::io::{Result, Write};
 
 type Id = usize;
 type Date = usize;
@@ -162,8 +164,15 @@ impl NEXMark {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct EventCarrier {
+    time: Date,
+    event: Event,
+}
+
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Abomonation)]
-enum Event{
+#[serde(tag = "type")]
+enum Event {
     Person(Person),
     Auction(Auction),
     Bid(Bid),
@@ -347,11 +356,19 @@ impl TestImpl for Query0 {
     fn generate_data(&self) -> Result<()> {
         fs::create_dir_all(&self.data_dir)?;
         let mut nex = NEXMark::new(&self.config);
-        for events_so_far in 0..10 {
-            // let time = nex.event_timestamp(nex.next_event(events_so_far));
-            // let wall = wall_base + (time - nex.base_time);
-            // let watermark = nex.event_timestamp(nex.next_event_for_watermark(events_so_far));
-            Event::new(events_so_far, &mut nex);
+        let seconds = self.config.get_as_or("seconds", 60);
+        let wall_base = 0;
+        let mut file = File::create(format!("{}/events.json", &self.data_dir))?;
+        
+        for events_so_far in 0.. {
+            let time = nex.event_timestamp(nex.first_event_id + events_so_far);
+            let wall = wall_base + (time - nex.base_time);
+            let event = Event::new(events_so_far, &mut nex);
+            let carrier = EventCarrier{ time: wall, event: event };
+            serde_json::to_writer(&file, &carrier)?;
+            file.write(b"\n")?;
+            
+            if seconds < (wall / 1000) { break; }
         }
         Ok(())
     }
