@@ -18,9 +18,16 @@ The dataflow used in the benchmark is illustrated in \autoref{figure:ysb}. Its p
 The dataflow proceeds as follows: the first operator parses the JSON string into an internal object. Irrelevant events are then filtered out, and only ones with an \code{event_type} of ``view'' are retained. Next, all fields except for \code{ad_id} and \code{event_time} are dropped. Then, a lookup in a table mapping \code{ad_id}s to \code{campaign_id}s is done to retrieve the relevant \code{campaign_id}. Yahoo describes this step as a join, which is inaccurate, as only one end of this ``join'' is streamed, whereas the other is present as a table stored in Redis. Next the events are put through a ten seconds large hopping window. The number of occurrences of each \code{campaign_id} within each window are finally counted and stored back into Redis.
 
 \subsection{Implementation}
+\subsubsection{Data Generation}
+As the data used in YSB is fairly straight forward, we created our own data generator. The generator creates random \code{user_id}s, \code{page_id}s, and \code{ip_address}es. Since those fields aren't actually touched by the query, the precise data should not make any difference. The \code{ad_type} and \code{event_type} are randomly chosen from the specified sets. The \code{ad_id} is chosen from a randomly generated table of \code{ad_id}s to \code{campaign_id}s. This table consists of 100 campaigns with 10 ads each, as specified by YSB. The most interesting field is the \code{event_time} which is monotonically stepped in milliseconds according to how many events per second should be generated. \\
 
+This is all in line with the implementation of the data generator found in the original YSB repository (\code{data/src/setup/core.clj}). Curiously, their implementation does include parts to skew the time stamps and randomise them, but they are not actually used. Like many other implementations of YSB, we also do not rely on Redis for the \code{ad_id} to \code{campaign_id} lookup, and instead keep this small table in memory of our query. \\
+
+The primary purpose of implementing our own generation for YSB is to find a short path to testing the query. While it is possible to add Kafka as an event source, reading directly from files gives us more precise data about the performance of Timely itself.
+
+\subsubsection{Query}
 \begin{listing}[H]
-  \inputminted[firstline=150,lastline=164]{rust}{benchmarks/src/ysb.rs}
+  \inputminted[firstline=158,lastline=167]{rust}{benchmarks/src/ysb.rs}
   \caption{Dataflow implementation of the YSB benchmark.}
   \label{lst:ysb}
 \end{listing}

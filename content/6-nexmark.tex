@@ -1,6 +1,67 @@
 \section{NEXMark Benchmark\cite{nexmark}}
+NEXMark is an evolution of the XMark benchmark. XMark was initially designed for relational databases and defines a small schema for an online auction house. NEXMark builds on this idea and presents a schema of three concrete tables, and a set of queries to run in a streaming sense. NEXMark attempts to provide a benchmark that is both extensive in its use of operators, and close to a real-world application by being grounded in a well-known problem. The original benchmark proposed by Tucker et al. was adopted and extended by the Apache Foundation for their use in Beam\cite{nexmark-beam}. We will follow the Beam implementation, as it is the most widely adopted one, despite having several differences to the benchmark originally outlined in the paper. See SOME-SECTION for an outline of the differences we found. \\
+
+The benchmark defines the following queries:
+
+\begin{enumerate}
+  \setcounter{enumi}{-1}
+\item \tb{Pass-Through} This is similar to HiBench's Identity query and should just output the received data.
+\item \tb{Currency Conversion} Output bids on auctions, but translate the bid price to Euro.
+\item \tb{Selection} Filter to auctions with a specific set of IDs.
+\item \tb{Local Item Suggestion} Output persons that are outputting auctions in particular states.
+\item \tb{Average Price for a Category} Compute the average auction price in a category for all auctions that haven't expired yet.
+\item \tb{Hot Items} Show the auctions with the most bids over the last hour, updated every minute.
+\item \tb{Average Selling Price by Seller} Compute the average selling price for the last ten closed auctions per auctioner.
+\item \tb{Highest Bid} Output the auction and bid with the highest price in the last minute.
+\item \tb{Monitor New Users} Show persons that have opened an auction in the last 12 hours.
+\item \tb{Winning Bids} Compute the winning bid for an auction. This is used in queries 4 and 6.
+\item \tb{Log to GCS} Output all events to a GCS file, which is supposed to illustrate large side effects.
+\item \tb{Bids in a Session} Show the number of bids a person has made in their session.
+\item \tb{Bids within a Window} Compute the number of bids a user makes within a processing-time constrained window.
+\end{enumerate}
+
+The queries are based on three types of events that can enter the system: \code{Person}, \code{Auction}, and \code{Bid}. Their fields are as follows:
+
+\paragraph{Person}
+\begin{itemize}
+\item \code{id} A person-unique integer ID.
+\item \code{name} A string for the person's full name.
+\item \code{email_address} The person's email address as a string.
+\item \code{credit_card} The credit card number as a 19-letter string.
+\item \code{city} One of several US city names as a string.
+\item \code{state} One of several US states as a two-letter string.
+\item \code{date_time} A millisecond timestamp for the event origin.
+\end{itemize}
+
+\paragraph{Auction}
+\begin{itemize}
+\item \code{id} An auction-unique integer ID.
+\item \code{item_name} The name of the item being auctioned.
+\item \code{description} A short description of the item.
+\item \code{initial_bid} The initial bid price in cents.
+\item \code{reserve} ???
+\item \code{date_time} A millisecond timestamp for the event origin.
+\item \code{expires} A UNIX epoch timestamp for the expiration date of the auction.
+\item \code{seller} The ID of the person that created this auction.
+\item \code{category} The ID of the category this auction belongs to.
+\end{itemize}
+
+\paragraph{Bid}
+\begin{itemize}
+\item \code{auction} The ID of the auction this bid is for.
+\item \code{bidder} The ID of the person that placed this bid.
+\item \code{price} The price in cents that the person bid for.
+\item \code{date_time} A millisecond timestamp for the event origin.
+\end{itemize}
+
+%% FIXME: Split the image, I guess.
+\imagefigure[nexmark]{images/nexmark-graphs.pdf}{Graphs of the queries described by NEXMark.}
 
 \subsection{Implementation}
+\subsubsection{Data Generation}
+In order to be able to run the benchmark outside of the Beam framework, we had to replicate their generator. For this we translated the original Java sources of the generator (\code{sdks/java/nexmark/src/main/java/org/apache/beam/sdk/nexmark/sources/generator}) into Rust. We output generated events to aggregate JSON files, where each line is made up of a single event to feed into the system. \\
+
+\subsubsection{Queries}
 
 \subsection{Evaluation}
 

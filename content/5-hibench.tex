@@ -2,10 +2,10 @@
 HiBench is a benchmarking suite created by Intel in 2012. It proposes a set of microbenchmarks to test Big Data processing systems. It includes implementations of the tests for Spark, Flink, Storm, and Gearpump. For our purposes in testing Strymon, we will focus only on the four tests of the streaming suite:
 
 \begin{itemize}
-\item {\bfseries Identity} This test is supposed to measure the minimum latency of the system, by simply immediately outputting the input data.
-\item {\bfseries Repartition} This tests the distribution of the workload across workers, but just like Identity does not perform any computation on the data. The repartition should be handled through a round-robin scheduler.
-\item {\bfseries Wordcount} This is a basic word count test that simply focuses on counting the occurrences of individual words, regularly outputting the current tally. It is intended to test the performance of stateful operators.
-\item {\bfseries Fixwindow} This test performs a simple hopping window reduction, with each window being ten seconds long.
+\item \tb{Identity} This test is supposed to measure the minimum latency of the system, by simply immediately outputting the input data.
+\item \tb{Repartition} This tests the distribution of the workload across workers, but just like Identity does not perform any computation on the data. The repartition should be handled through a round-robin scheduler.
+\item \tb{Wordcount} This is a basic word count test that simply focuses on counting the occurrences of individual words, regularly outputting the current tally. It is intended to test the performance of stateful operators.
+\item \tb{Fixwindow} This test performs a simple hopping window reduction, with each window being ten seconds long.
 \end{itemize}
 
 The tests are illustrated as data flows in \autoref{figure:hibench}. The data used for the benchmark follows a custom CSV-like format, where each input is composed of an integer timestamp and a comma separated list of the following fields:
@@ -29,7 +29,10 @@ Since the benchmarks focus on very small tests, they can only really give insigh
 \imagefigure[hibench]{images/hibench-graphs.pdf}{Graphs of the four streaming benchmarks that HiBench specifies.}
 
 \subsection{Implementation}
+\subsubsection{Data Generation}
 
+
+\subsubsection{Queries}
 \begin{listing}[H]
   \inputminted[firstline=80,lastline=82]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Identity query.}

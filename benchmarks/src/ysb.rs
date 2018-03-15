@@ -156,19 +156,14 @@ impl TestImpl for YSB {
         let (input, stream) = scope.new_input();
         let table = self.campaign_map.read().unwrap().clone();
         let stream = stream
-            // Filter to view event_type events.
             .filter(|x: &Event| x.event_type == "view")
-            // Transform/Project to ad_id and event_time.
             .map(|x| (x.ad_id, x.event_time))
-            // Join the ad_id into the campaign_id through a table lookup.
             .map(move |(ad_id, _)|
                  match table.get(&ad_id){
                      Some(id) => id.clone(),
                      None => String::from("UNKNOWN AD")
                  })
-            // Aggregate to 10s windows based on 1s epochs.
             .epoch_window(10, 10)
-            // Count each campaign in the window and return as tuples of id + count.
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1);
         (stream, Box::new(input))
     }
