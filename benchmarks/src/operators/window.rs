@@ -1,29 +1,31 @@
 use std::collections::{HashMap,VecDeque};
-use std::ops::DerefMut;
 use std::cmp::min;
 use timely::Data;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Unary;
 use timely::dataflow::{Stream, Scope};
 
-pub trait EpochWindow<G: Scope, D: Data> {
+pub trait Window<G: Scope, D: Data> {
+    fn window<F>(&self, size: usize, slide: usize, time: F) -> Stream<G, D>
+        where F: Fn(&G::Timestamp, &D)->G::Timestamp+'static;
     fn epoch_window(&self, size: usize, slide: usize) -> Stream<G, D>;
 }
 
-impl<G: Scope, D: Data> EpochWindow<G, D> for Stream<G, D> {
-    fn epoch_window(&self, size: usize, slide: usize) -> Stream<G, D> {
+impl<G: Scope, D: Data> Window<G, D> for Stream<G, D> {
+    fn window<F>(&self, size: usize, slide: usize, time: F) -> Stream<G, D>
+    where F: Fn(&G::Timestamp, &D)->G::Timestamp+'static{
         assert!(slide <= size, "The window slide cannot be greater than the window size.");
         let mut window_parts = HashMap::new();
         let mut times = VecDeque::new();
-        self.unary_notify(Pipeline, "EpochWindow", Vec::new(), move |input, output, notificator| {
+        self.unary_notify(Pipeline, "Window", Vec::new(), move |input, output, notificator| {
             input.for_each(|cap, data| {
-                {
-                    let time = cap.time();
+                while let Some(data) = data.pop() {
+                    let time = time(cap.time(), &data);
                     // Push the data onto a partial window for the current time.
                     let part = window_parts.entry(time.clone()).or_insert_with(|| Vec::new());
-                    part.append(data.deref_mut());
+                    part.push(data);
                     // Remember this time for reconstruction of partial windows.
-                    if !times.contains(time) {
+                    if !times.contains(&time) {
                         // FIXME: fix for out of order epoch arrival.
                         times.push_back(time.clone());
                     }
@@ -52,5 +54,9 @@ impl<G: Scope, D: Data> EpochWindow<G, D> for Stream<G, D> {
                 }
             });
         })
+    }
+    
+    fn epoch_window(&self, size: usize, slide: usize) -> Stream<G, D> {
+        self.window(size, slide, |t, _| t.clone())
     }
 }

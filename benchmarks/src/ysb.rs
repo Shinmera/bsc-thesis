@@ -12,7 +12,7 @@ use timely::dataflow::operators::{Input, Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely_communication::allocator::Generic;
-use operators::{EpochWindow, Reduce};
+use operators::{Window, Reduce};
 use test::{Test, TestImpl, InputHandle};
 use config::Config;
 use rand::Rng;
