@@ -1,10 +1,12 @@
 extern crate serde_json;
 use abomonation::Abomonation;
-use timely::dataflow::operators::Input;
+use timely::dataflow::operators::{Input, Filter, Map};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::Stream;
+use timely::Data;
 use timely_communication::allocator::Generic;
 use test::{Test, TestImpl, InputHandle};
+use operators::{Window, Reduce, Join};
 use config::Config;
 use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
@@ -12,7 +14,8 @@ use std::cmp::{max, min};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::fs;
-use std::io::{Result, Write};
+use std::fmt::Debug;
+use std::io::{Result, Error, ErrorKind, Lines, BufRead, BufReader, Write};
 
 type Id = usize;
 type Date = usize;
@@ -77,6 +80,7 @@ struct NEXMark {
     events_per_epoch: usize,
     epoch_period: usize,
     inter_event_delays: Vec<usize>,
+    auction_skip: usize,
 }
 
 impl NEXMark {
@@ -134,6 +138,7 @@ impl NEXMark {
             events_per_epoch: events_per_epoch,
             epoch_period: epoch_period,
             inter_event_delays: inter_event_delays,
+            auction_skip: config.get_as_or("auction-skip", 123),
         }
     }
 
@@ -191,6 +196,33 @@ impl Event {
             Event::Auction(Auction::new(events_so_far, id, timestamp, &mut rng, nex))
         } else {
             Event::Bid(Bid::new(id, timestamp, &mut rng, nex))
+        }
+    }
+}
+
+impl Into<Option<Person>> for Event {
+    fn into(self) -> Option<Person> {
+        match self {
+            Event::Person(p) => Some(p),
+            _ => None
+        }
+    }
+}
+
+impl Into<Option<Auction>> for Event {
+    fn into(self) -> Option<Auction> {
+        match self {
+            Event::Auction(p) => Some(p),
+            _ => None
+        }
+    }
+}
+
+impl Into<Option<Bid>> for Event {
+    fn into(self) -> Option<Bid> {
+        match self {
+            Event::Bid(p) => Some(p),
+            _ => None
         }
     }
 }
@@ -329,27 +361,20 @@ impl Bid {
     }
 }
 
-struct Query0 {
-    data_dir: String,
-    config: Config,
+trait NEXMarkQuery {
+    type DO: Data+Debug;
+
+    fn name(&self) -> &str;
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO>;
 }
 
-impl Query0 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
-    }
-}
-
-impl TestImpl for Query0 {
+impl<I, DO: Data+Debug> TestImpl for I where I: NEXMarkQuery<DO=DO> {
     type D = Event;
-    type DO = Event;
+    type DO = I::DO;
     type T = usize;
-    type G = ();
+    type G = Lines<BufReader<File>>;
 
-    fn name(&self) -> &str { "NEXMark Query 0" }
+    fn name(&self) -> &str { I::name(self) }
 
     fn initial_epoch(&self) -> Self::T { 0 }
 
@@ -373,9 +398,210 @@ impl TestImpl for Query0 {
         Ok(())
     }
 
+    fn prepare(&self, _index: usize, _workers: usize) -> Result<Self::G> {
+        let event_file = File::open(format!("{}/events.json", &self.data_dir))?;
+        Ok(BufReader::new(event_file).lines())
+    }
+
+    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
+        let mut data = Vec::new();
+        for line in stream {
+            let carrier: EventCarrier = serde_json::from_str(&line.unwrap())?;
+            if carrier.time / 1000 > *epoch {
+                data.push(carrier.event);
+                return Ok(data);
+            }
+            data.push(carrier.event);
+        }
+        if data.is_empty(){
+            return Err(Error::new(ErrorKind::Other, "Out of data"));
+        } else {
+            return Ok(data);
+        }
+    }
+
     fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, stream) = scope.new_input();
-        (stream, Box::new(input))
+        let (input, mut stream) = scope.new_input();
+        (I::construct_dataflow(self, &mut stream), Box::new(input))
+    }
+}
+
+struct Query0 {
+    data_dir: String,
+    config: Config,
+}
+
+impl Query0 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl NEXMarkQuery for Query0 {
+    type DO = Event;
+
+    fn name(&self) -> &str { "NEXMark Query 0" }
+
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+        *stream
+    }
+}
+
+struct Query1 {
+    data_dir: String,
+    config: Config,
+}
+
+impl Query1 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl NEXMarkQuery for Query1 {
+    type DO = (Id, Id, usize, Date);
+
+    fn name(&self) -> &str { "NEXMark Query 1" }
+
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+        stream
+            .filter(|e| e.into::<Option<Bid>>().is_some())
+            .map(|e| e.into::<Option<Bid>>().unwrap())
+            .map(|b| (b.auction, b.bidder, (b.price * 89) / 100, b.date_time))
+    }
+}
+
+struct Query2 {
+    data_dir: String,
+    config: Config,
+}
+
+impl Query2 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl NEXMarkQuery for Query2 {
+    type DO = (Id, usize);
+
+    fn name(&self) -> &str { "NEXMark Query 2" }
+
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+        stream
+            .filter(|e| e.into::<Option<Bid>>().is_some())
+            .map(|e| e.into::<Option<Bid>>().unwrap())
+            .filter(|b| b.auction % self.config.auction_skip == 0)
+            .map(|b| (b.auction, b.price))
+    }
+}
+
+struct Query3 {
+    data_dir: String,
+    config: Config,
+}
+
+impl Query3 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl NEXMarkQuery for Query3 {
+    type DO = (String, String, String, Id);
+
+    fn name(&self) -> &str { "NEXMark Query 3" }
+
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+        // FIXME: unbounded windows?
+        let auctions = stream
+            .filter(|e| e.into::<Option<Auction>>().is_some())
+            .map(|e| e.into::<Option<Auction>>().unwrap())
+            .filter(|a| a.category == 10);
+        let persons = stream
+            .filter(|e| e.into::<Option<Person>>().is_some())
+            .map(|e| e.into::<Option<Person>>().unwrap())
+            .filter(|p| p.state == "OR" || p.state == "ID" || p.state == "CA");
+        auctions.join(persons, |a| a.id, |p| p.id, |a, p| (p.name, p.city, p.state, a.id))
+    }
+}
+
+struct Query4 {
+    data_dir: String,
+    config: Config,
+}
+
+impl Query4 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl NEXMarkQuery for Query4 {
+    type DO = (String, String, String, Id);
+
+    fn name(&self) -> &str { "NEXMark Query 4" }
+
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+        // FIXME: unbounded windows?
+        let auctions = stream
+            .filter(|e| e.into::<Option<Auction>>().is_some())
+            .map(|e| e.into::<Option<Auction>>().unwrap())
+            .filter(|a| a.expires <= CURRENT_TIME);
+        let bids = stream
+            .filter(|e| e.into::<Option<Bid>>().is_some())
+            .map(|e| e.into::<Option<Bid>>().unwrap());
+        auctions.join(bids, |a| a.id, |b| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
+            .filter(|(t, e, _, _, _)| t < e)
+            .reduce_by(|(_, _, id, cat, _)| (id, cat), (0, 0), |(_, _, _, cat, price), (_, p)| (cat, max(p, price)))
+            .reduce_by(|_| 0, 0, |(_, price), p| p + price/NUM_CATEGORIES) 
+    }
+}
+
+struct Query5 {
+    data_dir: String,
+    config: Config,
+}
+
+impl Query5 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl NEXMarkQuery for Query5 {
+    type DO = (String, String, String, Id);
+
+    fn name(&self) -> &str { "NEXMark Query 5" }
+
+    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+        let bids = stream
+            .filter(|e| e.into::<Option<Bid>>().is_some())
+            .map(|e| e.into::<Option<Bid>>().unwrap())
+            .epoch_window(60*60, 60);
+        let count = bids.reduce_by(|_| 0, 0, |_, c| c+1);
+        bids.reduce_by(|b| b.auction, (0, 0), |b, (_, c)| (b.auction, c+1))
+            .join(count, |_| 0, |_| 0, |t, (a, c)| (t, a, c))
+            .filter(|(t, _, c)| c >= t)
+            .map(|(_, a, _)| a)
     }
 }
 
