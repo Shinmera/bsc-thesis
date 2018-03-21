@@ -13,19 +13,20 @@ extern crate uuid;
 mod operators;
 mod config;
 mod statistics;
+mod endpoint;
 mod test;
-mod hibench;
+//mod hibench;
 mod ysb;
-mod nexmark;
-mod integrity;
+//mod nexmark;
+//mod integrity;
 
 use std::io::Result;
 use std::fmt::Display;
 use test::{run_test, generate_test};
 use config::Config;
-use hibench::hibench;
+//use hibench::hibench;
 use ysb::ysb;
-use nexmark::nexmark;
+//use nexmark::nexmark;
 
 trait Reportable { fn report(&self); }
 
@@ -51,9 +52,9 @@ impl<T: Display> Reportable for Result<T> {
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
     let mut tests = Vec::new();
-    tests.append(&mut hibench(&config));
+    //tests.append(&mut hibench(&config));
     tests.append(&mut ysb(&config));
-    tests.append(&mut nexmark(&config));
+    //tests.append(&mut nexmark(&config));
     
     let to_run = config.get("tests")
         .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())

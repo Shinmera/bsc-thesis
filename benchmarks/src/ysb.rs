@@ -1,21 +1,24 @@
 extern crate serde_json;
 extern crate rand;
 extern crate uuid;
-use std::io::{Result, Error, ErrorKind, Lines, BufRead, BufReader, Write};
+use abomonation::Abomonation;
+use config::Config;
+use operators::{Window, Reduce};
+use endpoint::{Source, Drain, ToData};
+use rand::Rng;
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
-use std::sync::RwLock;
+use std::io::{Result, Write};
 use std::ops::Deref;
-use abomonation::Abomonation;
-use timely::dataflow::operators::{Input, Map, Filter};
+use std::sync::RwLock;
+use test::{Test, TestImpl};
+use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
+use timely::progress::timestamp::RootTimestamp;
+use timely::progress::nested::product::Product;
 use timely_communication::allocator::Generic;
-use operators::{Window, Reduce};
-use test::{Test, TestImpl, InputHandle};
-use config::Config;
-use rand::Rng;
 use uuid::Uuid;
 
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
@@ -77,7 +80,6 @@ impl TestImpl for YSB {
     type D = Event;
     type DO = (String, usize);
     type T = usize;
-    type G = Lines<BufReader<File>>;
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
@@ -119,43 +121,18 @@ impl TestImpl for YSB {
         Ok(())
     }
 
-    fn initial_epoch(&self) -> Self::T { 0 }
-
-    fn prepare(&self, index: usize, _workers: usize) -> Result<Self::G> {
+    fn create_endpoints(&self, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>{
         let campaign_file = File::open(format!("{}/campaigns.json", &self.data_dir))?;
         let event_file = File::open(format!("{}/events-{}.json", &self.data_dir, index))?;
         let mut map: HashMap<String, String> = serde_json::from_reader(campaign_file)?;
         let mut target = self.campaign_map.write().unwrap();
         for (k, v) in map.drain(){ target.insert(k, v); }
-        Ok(BufReader::new(event_file).lines())
+        Ok((vec!(event_file.into()), ().into()))
     }
 
-    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
-        let mut data = Vec::new();
-        for line in stream {
-            let event: Event = serde_json::from_str(&line.unwrap())?;
-            // We create second epochs to match up with what they do in YSB.
-            if event.event_time / 1000 > *epoch {
-                data.push(event);
-                return Ok(data);
-            }
-            data.push(event);
-        }
-        if data.is_empty(){
-            return Err(Error::new(ErrorKind::Other, "Out of data"));
-        } else {
-            return Ok(data);
-        }
-    }
-
-    fn finish(&self, stream: &mut Self::G) {
-        drop(stream);
-    }
-
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, stream) = scope.new_input();
-        let table = self.campaign_map.read().unwrap().clone();
-        let stream = stream
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let table = self.campaign_map.read().unwrap().clone();;
+        stream
             .filter(|x: &Event| x.event_type == "view")
             .map(|x| (x.ad_id, x.event_time))
             .map(move |(ad_id, _)|
@@ -164,11 +141,17 @@ impl TestImpl for YSB {
                      None => String::from("UNKNOWN AD")
                  })
             .epoch_window(10, 10)
-            .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1);
-        (stream, Box::new(input))
+            .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1)
     }
 }
 
 pub fn ysb(args: &Config) -> Vec<Box<Test>>{
     vec![Box::new(YSB::new(args))]
+}
+
+impl ToData<Product<RootTimestamp, usize>, Event> for String{
+    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, Event)> {
+        serde_json::from_str(&self).ok()
+            .map(|event: Event| (RootTimestamp::new(event.event_time / 1000), event))
+    }
 }
