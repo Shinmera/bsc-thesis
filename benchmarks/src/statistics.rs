@@ -19,14 +19,25 @@ pub struct Statistics{
 }
 
 /// Returns the duration as a double float of seconds.
-pub fn duration_fsecs(d: &Duration) -> f64{
+fn duration_fsecs(d: &Duration) -> f64{
     d.as_secs() as f64 + d.subsec_nanos() as f64 / 1_000_000_000 as f64
 }
 
 impl<'a> From<Vec<(&'a Instant, &'a Instant)>> for Statistics{
     fn from(vec: Vec<(&'a Instant, &'a Instant)>) -> Self{
-        let vec : Vec<f64> = vec.iter().map(|&(s, e)| duration_fsecs(&e.duration_since(*s))).collect();
-        Self::from(vec)
+        // We explicitly recompute min and max for in order to
+        // still get an accurate total for overlapping durations.
+        let now = Instant::now();
+        let mut min = vec.get(0).map(|&(s, _)| s).unwrap_or(&now);
+        let mut max = vec.get(0).map(|&(_, e)| e).unwrap_or(&now);
+        let floats : Vec<f64> = vec.iter().map(|&(s, e)| {
+            min = min.min(s);
+            max = max.max(e);
+            duration_fsecs(&e.duration_since(*s))
+        }).collect();
+        let mut stats = Self::from(floats);
+        stats.total = duration_fsecs(&max.duration_since(*min));
+        stats
     }
 }
 
