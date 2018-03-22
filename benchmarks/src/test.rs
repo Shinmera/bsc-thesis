@@ -53,7 +53,9 @@ pub trait TestImpl : Sync+Send {
         Ok(())
     }
 
-    fn create_endpoints(&self, index: usize, workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>;
+    fn create_endpoints(&self, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        Ok((vec!(().into()), ().into()))
+    }
 
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>;
 
