@@ -1,11 +1,9 @@
-extern crate serde_json;
-extern crate rand;
-extern crate uuid;
 use abomonation::Abomonation;
 use config::Config;
-use operators::{Window, Reduce};
 use endpoint::{Source, Drain, ToData};
-use rand::Rng;
+use operators::{Window, Reduce};
+use rand::{self, Rng};
+use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
@@ -16,8 +14,8 @@ use test::{Test, TestImpl};
 use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::timestamp::RootTimestamp;
 use timely::progress::nested::product::Product;
+use timely::progress::timestamp::RootTimestamp;
 use timely_communication::allocator::Generic;
 use uuid::Uuid;
 
