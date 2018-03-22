@@ -7,18 +7,22 @@ use timely::dataflow::{Stream, Scope};
 
 pub trait Reduce<G: Scope, D: Data> {
     fn reduce_by<H, V, K, R>(&self, key_extractor: K, initial_value: V, reductor: R) -> Stream<G, (H, V)>
-        where H: Hash+Eq+Data+Clone,
-              V: Eq+Data+Clone,
-              K: Fn(&D)->H+'static,
-              R: Fn(&D, V)->V+'static;
+    where H: Hash+Eq+Data+Clone,
+          V: Eq+Data+Clone,
+          K: Fn(&D)->H+'static,
+          R: Fn(&D, V)->V+'static;
+
+    fn reduce_to<V, R>(&self, initial_value: V, reductor: R) -> Stream<G, V>
+    where V: Eq+Data+Clone,
+          R: Fn(&D, V)->V+'static;
 }
 
 impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
     fn reduce_by<H, V, K, R>(&self, key_extractor: K, initial_value: V, reductor: R) -> Stream<G, (H, V)>
-        where H: Hash+Eq+Data+Clone,
-              V: Eq+Data+Clone,
-              K: Fn(&D)->H+'static,
-              R: Fn(&D, V)->V+'static {
+    where H: Hash+Eq+Data+Clone,
+          V: Eq+Data+Clone,
+          K: Fn(&D)->H+'static,
+          R: Fn(&D, V)->V+'static {
         let mut epochs = HashMap::new();
         
         self.unary_notify(Pipeline, "Reduce", Vec::new(), move |input, output, notificator| {
@@ -34,6 +38,28 @@ impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
             notificator.for_each(|time, _, _| {
                 if let Some(mut window) = epochs.remove(&time) {
                     output.session(&time).give_iterator(window.drain());
+                }
+            });
+        })
+    }
+
+    fn reduce_to<V, R>(&self, initial_value: V, reductor: R) -> Stream<G, V>
+    where V: Eq+Data+Clone,
+          R: Fn(&D, V)->V+'static {
+        let mut epochs = HashMap::new();
+        
+        self.unary_notify(Pipeline, "Reduce", Vec::new(), move |input, output, notificator| {
+            input.for_each(|time, data| {
+                let mut reduced = epochs.remove(&time).unwrap_or_else(|| initial_value.clone());
+                while let Some(dat) = data.pop() {
+                    reduced = reductor(&dat, reduced);
+                }
+                epochs.insert(time.clone(), reduced);
+                notificator.notify_at(time);
+            });
+            notificator.for_each(|time, _, _| {
+                if let Some(reduced) = epochs.remove(&time) {
+                    output.session(&time).give(reduced);
                 }
             });
         })
