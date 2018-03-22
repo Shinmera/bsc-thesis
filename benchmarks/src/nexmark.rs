@@ -1,21 +1,22 @@
-extern crate serde_json;
+use serde_json;
 use abomonation::Abomonation;
-use timely::dataflow::operators::{Input, Filter, Map};
-use timely::dataflow::scopes::{Root, Child};
-use timely::dataflow::Stream;
-use timely::Data;
-use timely_communication::allocator::Generic;
-use test::{Test, TestImpl, InputHandle};
-use operators::{Window, Reduce, Join};
 use config::Config;
+use endpoint::ToData;
+use operators::{Window, Reduce, Join};
 use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
 use std::f64::consts::PI;
 use std::fs::File;
 use std::fs;
-use std::fmt::Debug;
-use std::io::{Result, Error, ErrorKind, Lines, BufRead, BufReader, Write};
+use std::io::{Result, Write};
+use test::{Test, TestImpl};
+use timely::dataflow::Stream;
+use timely::dataflow::operators::{Filter, Map};
+use timely::dataflow::scopes::{Root, Child};
+use timely::progress::nested::product::Product;
+use timely::progress::timestamp::RootTimestamp;
+use timely_communication::allocator::Generic;
 
 type Id = usize;
 type Date = usize;
@@ -40,6 +41,7 @@ const US_STATES: [&str; 6] = ["AZ","CA","ID","OR","WA","WY"];
 const US_CITIES: [&str; 10] = ["Phoenix", "Los Angeles", "San Francisco", "Boise", "Portland", "Bend", "Redmond", "Seattle", "Kent", "Cheyenne"];
 const FIRST_NAMES: [&str; 11] = ["Peter", "Paul", "Luke", "John", "Saul", "Vicky", "Kate", "Julie", "Sarah", "Deiter", "Walter"];
 const LAST_NAMES: [&str; 9] = ["Shultz", "Abrams", "Spencer", "White", "Bartels", "Walton", "Smith", "Jones", "Noris"];
+const CURRENT_TIME: usize = 0;
 
 trait NEXMarkRng {
     fn gen_string(&mut self, usize) -> String;
@@ -80,7 +82,6 @@ struct NEXMark {
     events_per_epoch: usize,
     epoch_period: usize,
     inter_event_delays: Vec<usize>,
-    auction_skip: usize,
 }
 
 impl NEXMark {
@@ -138,7 +139,6 @@ impl NEXMark {
             events_per_epoch: events_per_epoch,
             epoch_period: epoch_period,
             inter_event_delays: inter_event_delays,
-            auction_skip: config.get_as_or("auction-skip", 123),
         }
     }
 
@@ -198,6 +198,27 @@ impl Event {
             Event::Bid(Bid::new(id, timestamp, &mut rng, nex))
         }
     }
+
+    fn is_person(&self) -> bool {
+        match self {
+            &Event::Person(_) => true,
+            _ => false
+        }
+    }
+
+    fn is_auction(&self) -> bool {
+        match self {
+            &Event::Auction(_) => true,
+            _ => false
+        }
+    }
+
+    fn is_bid(&self) -> bool {
+        match self {
+            &Event::Bid(_) => true,
+            _ => false
+        }
+    }
 }
 
 impl Into<Option<Person>> for Event {
@@ -224,6 +245,13 @@ impl Into<Option<Bid>> for Event {
             Event::Bid(p) => Some(p),
             _ => None
         }
+    }
+}
+
+impl ToData<Product<RootTimestamp, usize>, Event> for String{
+    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, Event)> {
+        serde_json::from_str(&self).ok()
+            .map(|carrier: EventCarrier| (RootTimestamp::new(carrier.time / 1000), carrier.event))
     }
 }
 
@@ -361,22 +389,26 @@ impl Bid {
     }
 }
 
-trait NEXMarkQuery {
-    type DO: Data+Debug;
-
-    fn name(&self) -> &str;
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO>;
+struct Query0 {
+    data_dir: String,
+    config: Config,
 }
 
-impl<I, DO: Data+Debug> TestImpl for I where I: NEXMarkQuery<DO=DO> {
+impl Query0 {
+    fn new(config: &Config) -> Self {
+        Query0 {
+            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
+            config: config.clone()
+        }
+    }
+}
+
+impl TestImpl for Query0 {
+    type T = Date;
     type D = Event;
-    type DO = I::DO;
-    type T = usize;
-    type G = Lines<BufReader<File>>;
+    type DO = Event;
 
-    fn name(&self) -> &str { I::name(self) }
-
-    fn initial_epoch(&self) -> Self::T { 0 }
+    fn name(&self) -> &str { "NEXMark Query 0" }
 
     fn generate_data(&self) -> Result<()> {
         fs::create_dir_all(&self.data_dir)?;
@@ -398,213 +430,156 @@ impl<I, DO: Data+Debug> TestImpl for I where I: NEXMarkQuery<DO=DO> {
         Ok(())
     }
 
-    fn prepare(&self, _index: usize, _workers: usize) -> Result<Self::G> {
-        let event_file = File::open(format!("{}/events.json", &self.data_dir))?;
-        Ok(BufReader::new(event_file).lines())
-    }
-
-    fn epoch_data(&self, stream: &mut Self::G, epoch: &Self::T) -> Result<Vec<Self::D>> {
-        let mut data = Vec::new();
-        for line in stream {
-            let carrier: EventCarrier = serde_json::from_str(&line.unwrap())?;
-            if carrier.time / 1000 > *epoch {
-                data.push(carrier.event);
-                return Ok(data);
-            }
-            data.push(carrier.event);
-        }
-        if data.is_empty(){
-            return Err(Error::new(ErrorKind::Other, "Out of data"));
-        } else {
-            return Ok(data);
-        }
-    }
-
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, mut stream) = scope.new_input();
-        (I::construct_dataflow(self, &mut stream), Box::new(input))
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream.map(|e| e)
     }
 }
 
-struct Query0 {
-    data_dir: String,
-    config: Config,
-}
-
-impl Query0 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
-    }
-}
-
-impl NEXMarkQuery for Query0 {
-    type DO = Event;
-
-    fn name(&self) -> &str { "NEXMark Query 0" }
-
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
-        *stream
-    }
-}
-
-struct Query1 {
-    data_dir: String,
-    config: Config,
-}
+struct Query1 {}
 
 impl Query1 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
+    fn new(_config: &Config) -> Self {
+        Query1 {}
     }
 }
 
-impl NEXMarkQuery for Query1 {
+impl TestImpl for Query1 {
+    type T = Date;
+    type D = Event;
     type DO = (Id, Id, usize, Date);
 
     fn name(&self) -> &str { "NEXMark Query 1" }
 
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
-            .filter(|e| e.into::<Option<Bid>>().is_some())
-            .map(|e| e.into::<Option<Bid>>().unwrap())
+            .filter(|e| e.is_bid())
+            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()})
             .map(|b| (b.auction, b.bidder, (b.price * 89) / 100, b.date_time))
     }
 }
 
 struct Query2 {
-    data_dir: String,
-    config: Config,
+    auction_skip: usize
 }
 
 impl Query2 {
     fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
+        Query2 { auction_skip: config.get_as_or("auction-skip", 123) }
     }
 }
 
-impl NEXMarkQuery for Query2 {
+impl TestImpl for Query2 {
+    type T = Date;
+    type D = Event;
     type DO = (Id, usize);
 
     fn name(&self) -> &str { "NEXMark Query 2" }
 
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let auction_skip = self.auction_skip;
         stream
-            .filter(|e| e.into::<Option<Bid>>().is_some())
-            .map(|e| e.into::<Option<Bid>>().unwrap())
-            .filter(|b| b.auction % self.config.auction_skip == 0)
+            .filter(|e| e.is_bid())
+            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()})
+            .filter(move |b| b.auction % auction_skip == 0)
             .map(|b| (b.auction, b.price))
     }
 }
 
-struct Query3 {
-    data_dir: String,
-    config: Config,
-}
+struct Query3 {}
 
 impl Query3 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
+    fn new(_config: &Config) -> Self {
+        Query3 {}
     }
 }
 
-impl NEXMarkQuery for Query3 {
+impl TestImpl for Query3 {
+    type T = Date;
+    type D = Event;
     type DO = (String, String, String, Id);
 
     fn name(&self) -> &str { "NEXMark Query 3" }
 
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // FIXME: unbounded windows?
         let auctions = stream
-            .filter(|e| e.into::<Option<Auction>>().is_some())
-            .map(|e| e.into::<Option<Auction>>().unwrap())
+            .filter(|e| e.is_auction())
+            .map(|b| {let o: Option<Auction> = b.into(); o.unwrap()})
             .filter(|a| a.category == 10);
         let persons = stream
-            .filter(|e| e.into::<Option<Person>>().is_some())
-            .map(|e| e.into::<Option<Person>>().unwrap())
+            .filter(|e| e.is_person())
+            .map(|b| {let o: Option<Person> = b.into(); o.unwrap()})
             .filter(|p| p.state == "OR" || p.state == "ID" || p.state == "CA");
-        auctions.join(persons, |a| a.id, |p| p.id, |a, p| (p.name, p.city, p.state, a.id))
+        auctions.join(&persons, |a| a.id, |p| p.id, |a, p| (p.name, p.city, p.state, a.id))
     }
 }
 
-struct Query4 {
-    data_dir: String,
-    config: Config,
-}
+struct Query4 {}
 
 impl Query4 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
+    fn new(_config: &Config) -> Self {
+        Query4 { }
     }
 }
 
-impl NEXMarkQuery for Query4 {
-    type DO = (String, String, String, Id);
+impl TestImpl for Query4 {
+    type T = Date;
+    type D = Event;
+    type DO = (usize, usize);
 
     fn name(&self) -> &str { "NEXMark Query 4" }
 
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // FIXME: unbounded windows?
         let auctions = stream
-            .filter(|e| e.into::<Option<Auction>>().is_some())
-            .map(|e| e.into::<Option<Auction>>().unwrap())
+            .filter(|e| e.is_auction())
+            .map(|b| {let o: Option<Auction> = b.into(); o.unwrap()})
             .filter(|a| a.expires <= CURRENT_TIME);
         let bids = stream
-            .filter(|e| e.into::<Option<Bid>>().is_some())
-            .map(|e| e.into::<Option<Bid>>().unwrap());
-        auctions.join(bids, |a| a.id, |b| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
-            .filter(|(t, e, _, _, _)| t < e)
-            .reduce_by(|(_, _, id, cat, _)| (id, cat), (0, 0), |(_, _, _, cat, price), (_, p)| (cat, max(p, price)))
-            .reduce_by(|_| 0, 0, |(_, price), p| p + price/NUM_CATEGORIES) 
+            .filter(|e| e.is_bid())
+            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()});
+        auctions.join(&bids, |a| a.id, |b| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
+            .filter(|&(t, e, _, _, _)| t < e)
+            .reduce_by(|&(_, _, id, cat, _)| (id, cat), 0,
+                       |&(_, _, _, _, price), p| max(p, price))
+            .reduce_by(|&((_, cat), _)| cat, 0,
+                       |&(_, price), p| p + price/NUM_CATEGORIES)
     }
 }
 
-struct Query5 {
-    data_dir: String,
-    config: Config,
-}
+struct Query5 {}
 
 impl Query5 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
+    fn new(_config: &Config) -> Self {
+        Query5 {}
     }
 }
 
-impl NEXMarkQuery for Query5 {
-    type DO = (String, String, String, Id);
+impl TestImpl for Query5 {
+    type T = Date;
+    type D = Event;
+    type DO = Id;
 
     fn name(&self) -> &str { "NEXMark Query 5" }
 
-    fn construct_dataflow<'scope>(&self, stream: &mut Child<'scope, Root<Generic>, usize>) -> Stream<Child<'scope, Root<Generic>, usize>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let bids = stream
-            .filter(|e| e.into::<Option<Bid>>().is_some())
-            .map(|e| e.into::<Option<Bid>>().unwrap())
+            .filter(|e| e.is_bid())
+            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()})
             .epoch_window(60*60, 60);
-        let count = bids.reduce_by(|_| 0, 0, |_, c| c+1);
-        bids.reduce_by(|b| b.auction, (0, 0), |b, (_, c)| (b.auction, c+1))
-            .join(count, |_| 0, |_| 0, |t, (a, c)| (t, a, c))
-            .filter(|(t, _, c)| c >= t)
+        let count = bids.reduce_to(0, |_, c| c+1);
+        bids.reduce_by(|b| b.auction, 0, |_, c| c+1)
+            .join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
+            .filter(|&(t, _, c)| c >= t)
             .map(|(_, a, _)| a)
     }
 }
 
 pub fn nexmark(args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(Query0::new(args))]
+    vec![Box::new(Query0::new(args)),
+         Box::new(Query1::new(args)),
+         Box::new(Query2::new(args)),
+         Box::new(Query3::new(args)),
+         Box::new(Query4::new(args)),
+         Box::new(Query5::new(args))]
 }

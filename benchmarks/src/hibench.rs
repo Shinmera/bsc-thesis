@@ -1,30 +1,23 @@
-extern crate rdkafka;
-extern crate kafkaesque;
-extern crate rand;
-
-use std::hash::{Hash, Hasher};
+use config::Config;
+use operators::{Window, RollingCount};
+use rand::{self, Rng};
+use std::cmp;
 use std::collections::hash_map::DefaultHasher;
-use timely::dataflow::operators::{Operator, Input, Map, Exchange};
-use timely::dataflow::operators::aggregation::Aggregate;
+use std::fs::File;
+use std::fs;
+use std::hash::{Hash, Hasher};
+use std::io::{Result, Write};
+use std::str::FromStr;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
+use test::{Test, TestImpl};
 use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::operators::Unary;
+use timely::dataflow::operators::aggregation::Aggregate;
+use timely::dataflow::operators::{Map, Exchange};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely_communication::allocator::Generic;
-use operators::{Window, RollingCount};
-use test::{Test, TestImpl, InputHandle};
-use std::cmp;
-use std::str::FromStr;
-use std::io::{Result, Write};
-use std::fs::File;
-use std::fs;
-use rand::Rng;
-use config::Config;
-use self::kafkaesque::EventProducer;
-use self::rdkafka::config::ClientConfig;
-use timely::dataflow::operators::Capture;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-use timely::dataflow::operators::Unary;
 
 // Hasher used for data shuffling
 fn hasher(x: &String) -> u64 {
@@ -76,9 +69,8 @@ impl Identity {
 
 impl TestImpl for Identity {
     type D = (String,String);
-    type DO = (String,String);
+    type DO = (u64,u64);
     type T = usize;
-    type G = ();
     
     fn name(&self) -> &str { "HiBench Identity" }
 
@@ -109,35 +101,19 @@ impl TestImpl for Identity {
         Ok(())
     }
 
-    fn initial_epoch(&self) -> Self::T { 0 }
-
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, stream) = scope.new_input();
-        let topic = "1".to_string();
-        let count = 1;
-        let brokers = "localhost:9092";
-
-        // Create Kafka stuff.
-        let mut producer_config = ClientConfig::new();
-        producer_config
-            .set("produce.offset.report", "true")
-            .set("bootstrap.servers", &brokers);
-
-        let producer = EventProducer::new(producer_config, topic);
-        // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream.map(|(ts,_):(String,_)| 
             (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."), SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs()))
-            .capture_into(producer);
-
-        (stream, Box::new(input))
     }
 }
 
-struct Repartition {}
+struct Repartition {
+    peers: usize
+}
 
 impl Repartition {
-    fn new(_config: &Config) -> Self {
-        Repartition{}
+    fn new(config: &Config) -> Self {
+        Repartition{peers: config.get_as_or("workers", 1)}
     }
 }
 
@@ -145,17 +121,13 @@ impl TestImpl for Repartition {
     type D = String;
     type DO = String;
     type T = usize;
-    type G = ();
     
     fn name(&self) -> &str { "HiBench Repartition" }
-
-    fn initial_epoch(&self) -> Self::T { 0 }
     
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, stream) = scope.new_input();
-        let peers = scope.peers() as u64;   // Total number of workers executing the dataflow
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let peers = self.peers as u64;
         // Simulate a RoundRobin shuffling
-        let stream = stream.unary_stream(Pipeline, "RoundRobin", move |input, output| {
+        stream.unary_stream(Pipeline, "RoundRobin", move |input, output| {
                 let mut counter = 0u64;
                 input.for_each(|time, data| {
                     for record in data.drain(..) {
@@ -168,10 +140,7 @@ impl TestImpl for Repartition {
             })
             // Exchange on worker id (worker ids are in [0,peers)
             .exchange(|&(worker_id,_)| worker_id)
-            .map(|(_,record)| record);
-        // TODO (john): For each tuple in the input stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
-        stream.sink(Pipeline,"Sink",|_| ());
-        (stream, Box::new(input))
+            .map(|(_,record)| record)
     }
 }
 
@@ -187,21 +156,14 @@ impl TestImpl for Wordcount {
     type D = (String,String);
     type DO = (String, String, usize);
     type T = usize;
-    type G = ();
     
     fn name(&self) -> &str { "HiBench Wordcount" }
 
-    fn initial_epoch(&self) -> Self::T { 0 }
-
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, stream) = scope.new_input();
-        let stream = stream
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream
             .map(|(ts,b)| (get_ip(&b),ts))
             .exchange(|&(ref ip,_)| hasher(&ip))
-            .rolling_count(|&(ref ip,ref ts):&(String,String)| (ip.clone(),ts.clone()));
-        // TODO (john): For each tuple in the output stream, the sinc operator must report a tuple of the form (ts,system_time) to Kafka
-        stream.sink(Pipeline,"Sink",|_| ());
-        (stream, Box::new(input))
+            .rolling_count(|&(ref ip,ref ts):&(String,String)| (ip.clone(),ts.clone()))
     }
 }
 
@@ -217,15 +179,11 @@ impl TestImpl for Fixwindow {
     type D = (String,String);
     type DO = (String,u64,u32);
     type T = usize;
-    type G = ();
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
 
-    fn initial_epoch(&self) -> Self::T { 0 }
-
-    fn construct_dataflow<'scope>(&self, scope: &mut Child<'scope, Root<Generic>, Self::T>) -> (Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>, Box<InputHandle<Self::T, Self::D>>) {
-        let (input, stream) = scope.new_input();
-        let stream = stream
+    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream
             .map(|(ts,b):Self::D| (get_ip(&b),u64::from_str(&ts).expect("FixWindow: Cannot parse event timestamp.")))
             // TODO (john): Check if timestamps in the input stream correspond to seconds
             // A tumbling window of 10 epochs
@@ -239,10 +197,7 @@ impl TestImpl for Fixwindow {
                 },
                |ip, agg| (ip, agg.0,agg.1),
                |ip| hasher(ip)
-            );
-        // TODO (john): For each tuple in the output stream, the sinc operator must report agg.1 tuples of the form (agg.0,system_time) to Kafka
-        stream.sink(Pipeline,"Sink",|_| ());
-        (stream, Box::new(input))
+            )
     }
 }
 
