@@ -2,7 +2,7 @@ use serde_json;
 use abomonation::Abomonation;
 use config::Config;
 use endpoint::ToData;
-use operators::{Window, Reduce, Join};
+use operators::{Window, Reduce, Join, FilterMap};
 use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
@@ -196,27 +196,6 @@ impl Event {
             Event::Auction(Auction::new(events_so_far, id, timestamp, &mut rng, nex))
         } else {
             Event::Bid(Bid::new(id, timestamp, &mut rng, nex))
-        }
-    }
-
-    fn is_person(&self) -> bool {
-        match self {
-            &Event::Person(_) => true,
-            _ => false
-        }
-    }
-
-    fn is_auction(&self) -> bool {
-        match self {
-            &Event::Auction(_) => true,
-            _ => false
-        }
-    }
-
-    fn is_bid(&self) -> bool {
-        match self {
-            &Event::Bid(_) => true,
-            _ => false
         }
     }
 }
@@ -452,9 +431,8 @@ impl TestImpl for Query1 {
 
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
-            .filter(|e| e.is_bid())
-            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()})
-            .map(|b| (b.auction, b.bidder, (b.price * 89) / 100, b.date_time))
+            .filter_map(|e| e.into())
+            .map(|b: Bid| (b.auction, b.bidder, (b.price * 89) / 100, b.date_time))
     }
 }
 
@@ -478,9 +456,8 @@ impl TestImpl for Query2 {
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auction_skip = self.auction_skip;
         stream
-            .filter(|e| e.is_bid())
-            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()})
-            .filter(move |b| b.auction % auction_skip == 0)
+            .filter_map(|e| e.into())
+            .filter(move |b: &Bid| b.auction % auction_skip == 0)
             .map(|b| (b.auction, b.price))
     }
 }
@@ -503,13 +480,11 @@ impl TestImpl for Query3 {
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // FIXME: unbounded windows?
         let auctions = stream
-            .filter(|e| e.is_auction())
-            .map(|b| {let o: Option<Auction> = b.into(); o.unwrap()})
-            .filter(|a| a.category == 10);
+            .filter_map(|e| e.into())
+            .filter(|a: &Auction| a.category == 10);
         let persons = stream
-            .filter(|e| e.is_person())
-            .map(|b| {let o: Option<Person> = b.into(); o.unwrap()})
-            .filter(|p| p.state == "OR" || p.state == "ID" || p.state == "CA");
+            .filter_map(|e| e.into())
+            .filter(|p: &Person| p.state == "OR" || p.state == "ID" || p.state == "CA");
         auctions.join(&persons, |a| a.id, |p| p.id, |a, p| (p.name, p.city, p.state, a.id))
     }
 }
@@ -532,13 +507,11 @@ impl TestImpl for Query4 {
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // FIXME: unbounded windows?
         let auctions = stream
-            .filter(|e| e.is_auction())
-            .map(|b| {let o: Option<Auction> = b.into(); o.unwrap()})
-            .filter(|a| a.expires <= CURRENT_TIME);
+            .filter_map(|e| e.into())
+            .filter(|a: &Auction| a.expires <= CURRENT_TIME);
         let bids = stream
-            .filter(|e| e.is_bid())
-            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()});
-        auctions.join(&bids, |a| a.id, |b| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
+            .filter_map(|e| e.into());
+        auctions.join(&bids, |a| a.id, |b: &Bid| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
             .filter(|&(t, e, _, _, _)| t < e)
             .reduce_by(|&(_, _, id, cat, _)| (id, cat), 0,
                        |&(_, _, _, _, price), p| max(p, price))
@@ -564,11 +537,10 @@ impl TestImpl for Query5 {
 
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let bids = stream
-            .filter(|e| e.is_bid())
-            .map(|b| {let o: Option<Bid> = b.into(); o.unwrap()})
+            .filter_map(|e| e.into())
             .epoch_window(60*60, 60);
         let count = bids.reduce_to(0, |_, c| c+1);
-        bids.reduce_by(|b| b.auction, 0, |_, c| c+1)
+        bids.reduce_by(|b: &Bid| b.auction, 0, |_, c| c+1)
             .join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
             .filter(|&(t, _, c)| c >= t)
             .map(|(_, a, _)| a)
