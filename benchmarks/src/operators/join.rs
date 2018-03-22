@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::cmp::min;
 use timely::Data;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::generic::Binary;
@@ -12,7 +11,7 @@ pub trait Join<G: Scope, D1: Data> {
               D2: Data, D3: Data,
               K1: Fn(&D1)->H+'static,
               K2: Fn(&D2)->H+'static,
-              J: Fn(&D1, &D2)->D3+'static;
+              J: Fn(D1, D2)->D3+'static;
 }
 
 impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
@@ -21,7 +20,7 @@ impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
               D2: Data, D3: Data,
               K1: Fn(&D1)->H+'static,
               K2: Fn(&D2)->H+'static,
-              J: Fn(&D1, &D2)->D3+'static{
+              J: Fn(D1, D2)->D3+'static{
         let mut epoch1 = HashMap::new();
         let mut epoch2 = HashMap::new();
         
@@ -48,13 +47,13 @@ impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
             
             notificator.for_each(|time, _, _|{
                 if let Some(k1) = epoch1.remove(&time) {
-                    if let Some(k2) = epoch2.remove(&time) {
+                    if let Some(mut k2) = epoch2.remove(&time) {
                         let mut out = output.session(&time);
-                        for (key, data1) in k1{
-                            if let Some(data2) = k2.get(&key) {
-                                for i in 0..min(data1.len(), data2.len()){
-                                    out.give(joiner(&data1[i], &data2[i]));
-                                }
+                        for (key, mut data1) in k1{
+                            if let Some(mut data2) = k2.remove(&key) {
+                                data1.drain(..).zip(data2.drain(..)).for_each(|(data1, data2)|{
+                                    out.give(joiner(data1, data2));
+                                });
                             }
                         }
                     }
