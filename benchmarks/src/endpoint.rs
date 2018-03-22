@@ -175,8 +175,7 @@ where Stdin: Into<Source<T, D>>,
                 Ok(io::stdin().into())
             },
             "file" => {
-                let file = File::open(self.get_or("input-file", "input.log"))?;
-                Ok(file.into())
+                Ok(File::open(self.get_or("input-file", "input.log"))?.into())
             },
             "kafka" => {
                 let mut config = ClientConfig::new();
@@ -233,8 +232,7 @@ impl<T: Timestamp+Display, D: Data+Display> Into<Result<Drain<T, D>>> for Config
                 Ok(io::stdout().into())
             },
             "file" => {
-                let file = File::create(self.get_or("output-file", "output.log"))?;
-                Ok(file.into())
+                Ok(File::create(self.get_or("output-file", "output.log"))?.into())
             },
             "kafka" => {
                 let mut config = ClientConfig::new();
