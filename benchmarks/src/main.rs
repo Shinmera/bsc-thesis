@@ -82,12 +82,12 @@ Usage: MODE [MODE-OPTIONS]
 The following modes and respective options are available:
 
 test                    Run the benchmarks.
+  --tests STRING          A comma-separated list of test names to run.
   --threads NUM           Number of workers per process.
   --process IDX           The identity of this process.
   --processes NUM         Number of processes.
   --hostfile FILE         Process address host file.
   --report BOOL           Whether to report connection progress.
-  --tests STRING          A comma-separated list of test names to run.
 
 generate                Generate benchmark workloads.
   --tests STRING           A comma-separated list of test names to run.

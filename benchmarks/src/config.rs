@@ -31,7 +31,7 @@ impl Config {
     }
 
     #[allow(dead_code)]
-    pub fn insert<T>(&mut self, key: &str, value: String) {
+    pub fn insert(&mut self, key: &str, value: String) {
         self.args.insert(String::from(key), value);
     }
 
