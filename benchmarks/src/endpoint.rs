@@ -100,11 +100,18 @@ impl<T: Timestamp, D> FileInput<T, D> {
 impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToData<T, D> {
     fn next(&mut self) -> Option<&Event<T, D>> {
         let ref mut stream = self.stream;
-        self.next = to_message(||{
+        let next = to_message(||{
             stream.next()
                 .and_then(|n| n.ok())
                 .and_then(|l| l.to_data())
         });
+        if next.is_some() {
+            self.next = next;
+        } else if let Some(Event::Messages(t, _)) = self.next.take() {
+            self.next = Some(Event::Progress(vec!((t, 0))));
+        } else {
+            self.next = None;
+        }
         self.next.as_ref()
     }
 }
