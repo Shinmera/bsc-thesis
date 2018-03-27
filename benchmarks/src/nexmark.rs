@@ -1,9 +1,9 @@
 use serde_json;
 use abomonation::Abomonation;
 use config::Config;
-use endpoint::ToData;
+use endpoint::{Source, Drain, ToData};
 use operators::{Window, Reduce, Join, FilterMap};
-use rand::{Rng, StdRng, SeedableRng};
+use rand::{self, Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
 use std::f64::consts::PI;
@@ -92,7 +92,7 @@ impl NEXMark {
         let first_rate = config.get_as_or("first-event-rate", 10000);
         let next_rate = config.get_as_or("next-event-rate", 10000);
         let rate = config.get_as_or("rate", 1_000_000); // Rate is in μs
-        let generators = config.get_as_or("event-generators", 100);
+        let generators = config.get_as_or("event-generators", 1);
         let rate_to_period = |r| (rate + r / 2) / r;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
@@ -393,20 +393,36 @@ impl TestImpl for Query0 {
         fs::create_dir_all(&self.data_dir)?;
         let mut nex = NEXMark::new(&self.config);
         let seconds = self.config.get_as_or("seconds", 60);
+        let partitions = self.config.get_as_or("partitions", 1);
+
+        println!("Generating events for {}s over {} partitions.", seconds, partitions);
+        
         let wall_base = 0;
-        let mut file = File::create(format!("{}/events.json", &self.data_dir))?;
+        let mut rng = rand::thread_rng();
+        let mut event_files = Vec::new();
+        for p in 0..partitions {
+            event_files.push(File::create(format!("{}/events-{}.json", &self.data_dir, p))?);
+        }
         
         for events_so_far in 0.. {
             let time = nex.event_timestamp(nex.first_event_id + events_so_far);
             let wall = wall_base + (time - nex.base_time);
             let event = Event::new(events_so_far, &mut nex);
             let carrier = EventCarrier{ time: wall, event: event };
-            serde_json::to_writer(&file, &carrier)?;
+
+            let mut file = rng.choose(&event_files).unwrap();
+            serde_json::to_writer(file, &carrier)?;
             file.write(b"\n")?;
             
             if seconds < (wall / 1000) { break; }
         }
         Ok(())
+    }
+
+    fn create_endpoints(&self, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let event_file = File::open(format!("{}/events-{}.json", &self.data_dir, index))?;
+        //self.config.insert("input-file", format!("{}/events.json", &self.data_dir));
+        Ok((vec!(event_file.into()), ().into()))
     }
 
     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
