@@ -130,6 +130,43 @@ impl<T: Timestamp+Display, D: Display> EventPusher<T, D> for FileOutput {
     }
 }
 
+pub struct VectorInput<T: Timestamp, D> {
+    vector: Vec<Event<T, D>>,
+    index: usize
+}
+
+impl<T: Timestamp, D> VectorInput<T, D> {
+    pub fn new(mut v: Vec<(T, Vec<D>)>) -> Self {
+        VectorInput{vector: v.drain(..).map(|(t, d)|Event::Messages(t, d)).collect(), index: 0}
+    }
+}
+
+impl<T: Timestamp, D> EventIterator<T, D> for VectorInput<T, D> {
+    fn next(&mut self) -> Option<&Event<T, D>> {
+        let event = self.vector.get(self.index);
+        self.index += 1;
+        event
+    }
+}
+
+pub struct VectorOutput<T: Timestamp, D> {
+    vector: Vec<(T, Vec<D>)>
+}
+
+impl<T: Timestamp, D> VectorOutput<T, D> {
+    pub fn new() -> Self {
+        VectorOutput{vector: Vec::new()}
+    }
+}
+
+impl<T: Timestamp, D> EventPusher<T, D> for VectorOutput<T, D> {
+    fn push(&mut self, event: Event<T, D>) {
+        if let Event::Messages(t, d) = event {
+            self.vector.push((t, d));
+        }
+    }
+}
+
 pub struct Source<T, D>(Box<EventIterator<T, D>>);
 
 impl<T: Timestamp, D> Source<T, D> {
@@ -162,6 +199,13 @@ impl<T: Timestamp, D: Data> Into<Source<T, D>> for File where String: ToData<T, 
         Source::new(Box::new(FileInput::new(self)))
     }
 }
+
+/// God damnit rust.
+// impl<T: Timestamp, D> Into<Source<T, D>> for Vec<(T, Vec<D>)> {
+//     fn into(self) -> Source<T, D> {
+//         Source::new(Box::new(VectorInput::new(self)));
+//     }
+// }
 
 impl<T: Timestamp+Display, D: Data+Display> Into<Result<Source<T, D>>> for Config
 where Stdin: Into<Source<T, D>>,
@@ -221,6 +265,13 @@ impl<T: Timestamp+Display, D: Data+Display> Into<Drain<T, D>> for File {
         Drain::new(Box::new(FileOutput::new(self)))
     }
 }
+
+/// God damnit rust.
+// impl<T: Timestamp, D> Into<Drain<T, D>> for Vec<(T, Vec<D>)> {
+//     fn into(self) -> Drain<T, D> {
+//         Drain::new(Box::new(VectorOutput::new()));
+//     }
+// }
 
 impl<T: Timestamp+Display, D: Data+Display> Into<Result<Drain<T, D>>> for Config {
     fn into(self) -> Result<Drain<T, D>> {
