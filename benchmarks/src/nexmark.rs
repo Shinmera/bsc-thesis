@@ -6,6 +6,7 @@ use operators::{Window, Reduce, Join, FilterMap};
 use rand::{self, Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
+use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::fs::File;
 use std::fs;
@@ -571,3 +572,56 @@ pub fn nexmark(args: &Config) -> Vec<Box<Test>>{
          Box::new(Query4::new(args)),
          Box::new(Query5::new(args))]
 }
+
+struct Query9 {}
+
+impl Query9 {
+    fn new(_config: &Config) -> Self {
+        Query9 {}
+    }
+}
+
+// impl TestImpl for Query9 {
+//     type T = Date;
+//     type D = Event;
+//     type DO = (Auction, usize);
+
+//     fn name(&self) -> &str { "NEXMark Query 9" }
+
+//     // SELECT MAX(B.price), A FROM Auction A, Bid B WHERE A.id=B.auction AND B.datetime < A.expires AND A.expires < CURRENT_TIME GROUP BY A.id
+//     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+//         let auction_map = HashMap::new();
+//         let bid_map: HashMap<usize, Bid> = HashMap::new();
+//         let auctions = stream
+//             .filter_map(|e| e.into())
+//             .filter(|a: &Auction| a.expires < CURRENT_TIME)
+//             .filter_map(|a| {
+//                 // Check for early bids
+//                 if let Some(b) = bid_map.remove(&a.id) {
+//                     if b.date_time < a.expires {
+//                         return Some((a, b.price));
+//                     }
+//                 }
+//                 auction_map.insert(a.id, a);
+//                 None
+//             });
+//         let bids = stream
+//             .filter_map(|e| e.into())
+//             .filter_map(|b: Bid|{
+//                 if let Some(a) = auction_map.get(&b.auction) {
+//                     if b.date_time < a.expires && a.expires < CURRENT_TIME {
+//                         return Some((a.clone(), b.price));
+//                     } else { // We're late, drop.
+//                         auction_map.remove(&a.id);
+//                     }
+//                 } else if b.date_time <= CURRENT_TIME { // We're early, cache.
+//                     bid_map.insert(b.auction, b);
+//                 }
+//                 None
+//             });
+//         // Fuse the streams somehow?
+//         auctions.replay_into(bids)
+//             .reduce_by(|&(a, _)| a, 0,
+//                        |&(_, price), p| max(p, price))
+//     }
+// }
