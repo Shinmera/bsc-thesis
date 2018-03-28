@@ -13,11 +13,12 @@ use std::fs;
 use std::io::{Result, Write};
 use test::{Test, TestImpl};
 use timely::dataflow::Stream;
-use timely::dataflow::operators::{Filter, Map};
+use timely::dataflow::operators::{Filter, Map, Binary};
 use timely::dataflow::scopes::{Root, Child};
 use timely::progress::nested::product::Product;
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
+use timely::dataflow::channels::pact::Pipeline;
 
 type Id = usize;
 type Date = usize;
@@ -504,7 +505,7 @@ impl TestImpl for Query3 {
         let persons = stream
             .filter_map(|e| e.into())
             .filter(|p: &Person| p.state == "OR" || p.state == "ID" || p.state == "CA");
-        auctions.join(&persons, |a| a.id, |p| p.id, |a, p| (p.name, p.city, p.state, a.id))
+        persons.left_join(&auctions, |p| p.id, |a| a.seller, |p, a| (p.name, p.city, p.state, a.id))
     }
 }
 
@@ -530,7 +531,7 @@ impl TestImpl for Query4 {
             .filter(|a: &Auction| a.expires <= CURRENT_TIME);
         let bids = stream
             .filter_map(|e| e.into());
-        auctions.join(&bids, |a| a.id, |b: &Bid| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
+        auctions.epoch_join(&bids, |a| a.id, |b: &Bid| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
             .filter(|&(t, e, _, _, _)| t < e)
             .reduce_by(|&(_, _, id, cat, _)| (id, cat), 0,
                        |&(_, _, _, _, price), p| max(p, price))
@@ -560,19 +561,10 @@ impl TestImpl for Query5 {
             .epoch_window(60*60, 60);
         let count = bids.reduce_to(0, |_, c| c+1);
         bids.reduce_by(|b: &Bid| b.auction, 0, |_, c| c+1)
-            .join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
+            .epoch_join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
             .filter(|&(t, _, c)| c >= t)
             .map(|(_, a, _)| a)
     }
-}
-
-pub fn nexmark() -> Vec<Box<Test>>{
-    vec![Box::new(Query0::new()),
-         Box::new(Query1::new()),
-         Box::new(Query2::new()),
-         Box::new(Query3::new()),
-         Box::new(Query4::new()),
-         Box::new(Query5::new())]
 }
 
 struct Query9 {}
@@ -583,47 +575,63 @@ impl Query9 {
     }
 }
 
-// impl TestImpl for Query9 {
-//     type T = Date;
-//     type D = Event;
-//     type DO = (Auction, usize);
+impl TestImpl for Query9 {
+    type T = Date;
+    type D = Event;
+    type DO = (usize, Auction);
 
-//     fn name(&self) -> &str { "NEXMark Query 9" }
+    fn name(&self) -> &str { "NEXMark Query 9" }
 
-//     // SELECT MAX(B.price), A FROM Auction A, Bid B WHERE A.id=B.auction AND B.datetime < A.expires AND A.expires < CURRENT_TIME GROUP BY A.id
-//     fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-//         let auction_map = HashMap::new();
-//         let bid_map: HashMap<usize, Bid> = HashMap::new();
-//         let auctions = stream
-//             .filter_map(|e| e.into())
-//             .filter(|a: &Auction| a.expires < CURRENT_TIME)
-//             .filter_map(|a| {
-//                 // Check for early bids
-//                 if let Some(b) = bid_map.remove(&a.id) {
-//                     if b.date_time < a.expires {
-//                         return Some((a, b.price));
-//                     }
-//                 }
-//                 auction_map.insert(a.id, a);
-//                 None
-//             });
-//         let bids = stream
-//             .filter_map(|e| e.into())
-//             .filter_map(|b: Bid|{
-//                 if let Some(a) = auction_map.get(&b.auction) {
-//                     if b.date_time < a.expires && a.expires < CURRENT_TIME {
-//                         return Some((a.clone(), b.price));
-//                     } else { // We're late, drop.
-//                         auction_map.remove(&a.id);
-//                     }
-//                 } else if b.date_time <= CURRENT_TIME { // We're early, cache.
-//                     bid_map.insert(b.auction, b);
-//                 }
-//                 None
-//             });
-//         // Fuse the streams somehow?
-//         auctions.replay_into(bids)
-//             .reduce_by(|&(a, _)| a, 0,
-//                        |&(_, price), p| max(p, price))
-//     }
-// }
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let bids = stream.filter_map(|e| {let b: Option<Bid> = e.into(); b});
+        let auctions = stream.filter_map(|e| {let a: Option<Auction> = e.into(); a});
+        auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
+            let mut auctions = HashMap::new();
+            let mut bid_prices: HashMap<Id, usize> = HashMap::new();
+            
+            input1.for_each(|time, data|{
+                data.drain(..).for_each(|a: Auction|{
+                    let future = a.expires; // FIXME: Translate to epoch time.
+                    let auctions = auctions.entry(future).or_insert_with(||Vec::new());
+                    auctions.push(a);
+                    notificator.notify_at(time.delayed(&RootTimestamp::new(future)));
+                });
+            });
+
+            input2.for_each(|_, data|{
+                data.drain(..).for_each(|b: Bid|{
+                    // FIXME: Check if the bid is valid (B.date_time < A.expires)
+                    if let Some(other) = bid_prices.remove(&b.auction) {
+                        bid_prices.insert(b.auction, max(other, b.price));
+                    } else {
+                        bid_prices.insert(b.auction, b.price);
+                    }
+                });
+            });
+
+            notificator.for_each(|cap, _, _|{
+                if let Some(mut auctions) = auctions.remove(&cap.time().inner) {
+                    auctions.drain(..).for_each(|a|{
+                        if let Some(price) = bid_prices.remove(&a.id) {
+                            output.session(&cap).give((price, a));
+                        }
+                    });
+                }
+            });
+        })
+    }
+}
+
+pub fn nexmark() -> Vec<Box<Test>>{
+    vec![Box::new(Query0::new()),
+         Box::new(Query1::new()),
+         Box::new(Query2::new()),
+         Box::new(Query3::new()),
+         Box::new(Query4::new()),
+         Box::new(Query5::new()),
+         Box::new(Query9::new())]
+}
+
+// SELECT MAX(B.price), A FROM Auction A, Bid B
+// WHERE A.id=B.auction AND B.datetime < A.expires AND A.expires < CURRENT_TIME
+// GROUP BY A.id
