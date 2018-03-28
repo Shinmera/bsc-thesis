@@ -24,10 +24,10 @@ pub trait Test : Sync+Send {
     /// This function is used to generate a workload or data set
     /// for use during testing. It will write it out to a configured
     /// file, which is then read back when the test is actually run.
-    fn generate_data(&self) -> Result<()>;
+    fn generate_data(&self, config: &Config) -> Result<()>;
     
     /// This function handles the actual running of the test.
-    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>;
+    fn run(&self, config: &Config, worker: &mut Root<Generic>) -> Result<Statistics>;
 }
 
 pub trait Constructor<G: Scope, D: Data, D2: Data> {
@@ -49,21 +49,21 @@ pub trait TestImpl : Sync+Send {
 
     fn name(&self) -> &str;
 
-    fn generate_data(&self) -> Result<()>{
+    fn generate_data(&self, _config: &Config) -> Result<()>{
         Ok(())
     }
 
-    fn create_endpoints(&self, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, _config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
         Ok((vec!(().into()), ().into()))
     }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>;
+    fn construct_dataflow<'scope>(&self, _config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>;
 
-    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{
+    fn run(&self, config: &Config, worker: &mut Root<Generic>) -> Result<Statistics>{
         // Construct the full flow.
         let starts = Arc::new(Mutex::new(HashMap::new()));
         let ends = Arc::new(Mutex::new(HashMap::new()));
-        let (ins, out) = self.create_endpoints(worker.index(), worker.peers())?;
+        let (ins, out) = self.create_endpoints(config, worker.index(), worker.peers())?;
         worker.dataflow(|scope| {
             let ends = ends.clone();
             let starts = starts.clone();
@@ -71,7 +71,7 @@ pub trait TestImpl : Sync+Send {
                 .inspect_batch(move |t, _|{
                     let mut starts = starts.lock().unwrap();
                     starts.entry(t.inner.clone()).or_insert(Instant::now());})
-                .construct_dataflow(|s| self.construct_dataflow(s))
+                .construct_dataflow(|s| self.construct_dataflow(config, s))
                 .inspect_batch(move |t, _|{
                     let mut ends = ends.lock().unwrap();
                     ends.entry(t.inner.clone()).or_insert(Instant::now());})
@@ -89,8 +89,8 @@ pub trait TestImpl : Sync+Send {
 
 impl<I, T: Timestamp, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
-    fn generate_data(&self) -> Result<()>{ I::generate_data(self) }
-    fn run(&self, worker: &mut Root<Generic>) -> Result<Statistics>{ I::run(self, worker) }
+    fn generate_data(&self, config: &Config) -> Result<()>{ I::generate_data(self, config) }
+    fn run(&self, config: &Config, worker: &mut Root<Generic>) -> Result<Statistics>{ I::run(self, config, worker) }
 }
 
 /// This function extracts the timely_communication
@@ -130,15 +130,16 @@ fn timely_configuration(config: &Config) -> Configuration {
 }
 
 /// Wraps the timely parts to execute a test from a configuration.
-pub fn run_test(config: &Config, test: Box<Test>) -> Result<Statistics> {
-    let configuration = timely_configuration(config);
+pub fn run_test(test: Box<Test>, config: &Config) -> Result<Statistics> {
+    let config = config.clone();
+    let configuration = timely_configuration(&config);
     timely::execute(configuration, move |worker| {
-        test.run(worker)
+        test.run(&config, worker)
     }).and_then(|x| x.join().pop().unwrap())
         .map_err(|x| Error::new(ErrorKind::Other, x))
         .and_then(|x| x)
 }
 
-pub fn generate_test(test: Box<Test>) -> Result<()> {
-    test.generate_data()
+pub fn generate_test(test: Box<Test>, config: &Config) -> Result<()> {
+    test.generate_data(config)
 }

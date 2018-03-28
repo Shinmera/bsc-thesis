@@ -369,17 +369,11 @@ impl Bid {
     }
 }
 
-struct Query0 {
-    data_dir: String,
-    config: Config,
-}
+struct Query0 {}
 
 impl Query0 {
-    fn new(config: &Config) -> Self {
-        Query0 {
-            data_dir: format!("{}/nexmark",config.get_or("data-dir", "data")),
-            config: config.clone()
-        }
+    fn new() -> Self {
+        Query0 {}
     }
 }
 
@@ -390,11 +384,12 @@ impl TestImpl for Query0 {
 
     fn name(&self) -> &str { "NEXMark Query 0" }
 
-    fn generate_data(&self) -> Result<()> {
-        fs::create_dir_all(&self.data_dir)?;
-        let mut nex = NEXMark::new(&self.config);
-        let seconds = self.config.get_as_or("seconds", 60);
-        let partitions = self.config.get_as_or("partitions", 1);
+    fn generate_data(&self, config: &Config) -> Result<()> {
+        let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
+        fs::create_dir_all(&data_dir)?;
+        let mut nex = NEXMark::new(&config);
+        let seconds = config.get_as_or("seconds", 60);
+        let partitions = config.get_as_or("partitions", 1);
 
         println!("Generating events for {}s over {} partitions.", seconds, partitions);
         
@@ -402,7 +397,7 @@ impl TestImpl for Query0 {
         let mut rng = rand::thread_rng();
         let mut event_files = Vec::new();
         for p in 0..partitions {
-            event_files.push(File::create(format!("{}/events-{}.json", &self.data_dir, p))?);
+            event_files.push(File::create(format!("{}/events-{}.json", &data_dir, p))?);
         }
         
         for events_so_far in 0.. {
@@ -420,13 +415,14 @@ impl TestImpl for Query0 {
         Ok(())
     }
 
-    fn create_endpoints(&self, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
-        let event_file = File::open(format!("{}/events-{}.json", &self.data_dir, index))?;
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
+        let event_file = File::open(format!("{}/events-{}.json", &data_dir, index))?;
         //self.config.insert("input-file", format!("{}/events.json", &self.data_dir));
         Ok((vec!(event_file.into()), ().into()))
     }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream.map(|e| e)
     }
 }
@@ -434,7 +430,7 @@ impl TestImpl for Query0 {
 struct Query1 {}
 
 impl Query1 {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Query1 {}
     }
 }
@@ -446,20 +442,18 @@ impl TestImpl for Query1 {
 
     fn name(&self) -> &str { "NEXMark Query 1" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .filter_map(|e| e.into())
             .map(|b: Bid| (b.auction, b.bidder, (b.price * 89) / 100, b.date_time))
     }
 }
 
-struct Query2 {
-    auction_skip: usize
-}
+struct Query2 {}
 
 impl Query2 {
-    fn new(config: &Config) -> Self {
-        Query2 { auction_skip: config.get_as_or("auction-skip", 123) }
+    fn new() -> Self {
+        Query2 { }
     }
 }
 
@@ -470,8 +464,8 @@ impl TestImpl for Query2 {
 
     fn name(&self) -> &str { "NEXMark Query 2" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let auction_skip = self.auction_skip;
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let auction_skip = config.get_as_or("auction-skip", 123);
         stream
             .filter_map(|e| e.into())
             .filter(move |b: &Bid| b.auction % auction_skip == 0)
@@ -482,7 +476,7 @@ impl TestImpl for Query2 {
 struct Query3 {}
 
 impl Query3 {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Query3 {}
     }
 }
@@ -494,7 +488,7 @@ impl TestImpl for Query3 {
 
     fn name(&self) -> &str { "NEXMark Query 3" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // FIXME: unbounded windows?
         let auctions = stream
             .filter_map(|e| e.into())
@@ -509,7 +503,7 @@ impl TestImpl for Query3 {
 struct Query4 {}
 
 impl Query4 {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Query4 { }
     }
 }
@@ -521,7 +515,7 @@ impl TestImpl for Query4 {
 
     fn name(&self) -> &str { "NEXMark Query 4" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // FIXME: unbounded windows?
         let auctions = stream
             .filter_map(|e| e.into())
@@ -540,7 +534,7 @@ impl TestImpl for Query4 {
 struct Query5 {}
 
 impl Query5 {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Query5 {}
     }
 }
@@ -552,7 +546,7 @@ impl TestImpl for Query5 {
 
     fn name(&self) -> &str { "NEXMark Query 5" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let bids = stream
             .filter_map(|e| e.into())
             .epoch_window(60*60, 60);
@@ -564,19 +558,19 @@ impl TestImpl for Query5 {
     }
 }
 
-pub fn nexmark(args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(Query0::new(args)),
-         Box::new(Query1::new(args)),
-         Box::new(Query2::new(args)),
-         Box::new(Query3::new(args)),
-         Box::new(Query4::new(args)),
-         Box::new(Query5::new(args))]
+pub fn nexmark() -> Vec<Box<Test>>{
+    vec![Box::new(Query0::new()),
+         Box::new(Query1::new()),
+         Box::new(Query2::new()),
+         Box::new(Query3::new()),
+         Box::new(Query4::new()),
+         Box::new(Query5::new())]
 }
 
 struct Query9 {}
 
 impl Query9 {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Query9 {}
     }
 }

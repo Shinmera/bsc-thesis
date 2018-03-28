@@ -17,13 +17,30 @@ use timely::dataflow::operators::aggregation::Aggregate;
 use timely::dataflow::operators::{Map, Exchange};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
+use timely::progress::nested::product::Product;
+use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
+use endpoint::{Drain, Source, FromData, ToData};
 
 // Hasher used for data shuffling
 fn hasher(x: &String) -> u64 {
     let mut s = DefaultHasher::new();
     x.hash(&mut s);
     s.finish()
+}
+
+impl ToData<Product<RootTimestamp, usize>, (String, String)> for String{
+    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, (String, String))> {
+        if let Some(t) = self.get(0..4){
+            let t = t.trim_left();
+            if let Some(d) = self.get(5..) {
+                if let Ok(tt) = usize::from_str(t) {
+                    return Some((RootTimestamp::new(tt), (String::from(t), String::from(d))));
+                }
+            }
+        }
+        None
+    }
 }
 
 // Function used for extracting the IP address from HiBench records with the following text format:
@@ -50,20 +67,11 @@ fn random_date() -> String {
 }
 
 struct Identity {
-    data_dir: String,
-    seconds: usize,
-    events_per_second: usize,
-    ips: usize,
 }
 
 impl Identity {
-    fn new(config: &Config) -> Self {
-        Identity{
-            data_dir: format!("{}/hibench", config.get_or("data-dir", "data")),
-            seconds: config.get_as_or("seconds", 60),
-            events_per_second: config.get_as_or("events-per-second", 100_000),
-            ips: config.get_as_or("ips", 100),
-        }
+    fn new() -> Self {
+        Identity{}
     }
 }
 
@@ -74,17 +82,26 @@ impl TestImpl for Identity {
     
     fn name(&self) -> &str { "HiBench Identity" }
 
-    fn generate_data(&self) -> Result<()> {
-        fs::create_dir_all(&self.data_dir)?;
+    fn generate_data(&self, config: &Config) -> Result<()> {
+        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
+        let partitions = config.get_as_or("partitions", 10);
+        let seconds = config.get_as_or("seconds", 60);
+        let events_per_second = config.get_as_or("events-per-second", 100_000);
+        let ips = config.get_as_or("ips", 100);
+        fs::create_dir_all(&data_dir)?;
 
-        println!("Generating {} events/s for {}s for {} ips.",
-                 self.events_per_second, self.seconds, self.ips);
+        println!("Generating {} events/s for {}s over {} partitions for {} ips.",
+                 events_per_second, seconds, partitions, ips);
 
         let mut rng = rand::thread_rng();
-        let mut file = File::create(format!("{}/data.csv", &self.data_dir))?;
-        let ips: Vec<_> = (0..self.ips).map(|_| random_ip()).collect();
-        for t in 0..self.seconds {
-            for _ in 0..self.events_per_second {
+        let mut event_files = Vec::new();
+        for p in 0..partitions {
+            event_files.push(File::create(format!("{}/events-{}.csv", &data_dir, p))?);
+        }
+        let ips: Vec<_> = (0..ips).map(|_| random_ip()).collect();
+        for t in 0..seconds {
+            for _ in 0..events_per_second {
+                let mut file = rng.choose(&event_files).unwrap();
                 let ip = rng.choose(&ips).unwrap().clone();
                 let session: String = rng.gen_ascii_chars().take(54).collect();
                 let date = random_date();
@@ -101,31 +118,52 @@ impl TestImpl for Identity {
         Ok(())
     }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|(ts,_):(String,_)| 
-            (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."), SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs()))
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let mut config = config.clone();
+        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
+    }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream.map(|(ts,_):(String,_)| {
+            (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."),
+             SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs())
+        })
     }
 }
 
-struct Repartition {
-    peers: usize
+impl<T: Timestamp> FromData<T> for (u64,u64) {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
+    }
 }
 
+struct Repartition {}
+
 impl Repartition {
-    fn new(config: &Config) -> Self {
-        Repartition{peers: config.get_as_or("workers", 1)}
+    fn new() -> Self {
+        Repartition{}
     }
 }
 
 impl TestImpl for Repartition {
-    type D = String;
-    type DO = String;
+    type D = (String,String);
+    type DO = (String,String);
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Repartition" }
+
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
+    }
     
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let peers = self.peers as u64;
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let peers = config.get_as_or("workers", 1) as u64;
         // Simulate a RoundRobin shuffling
         stream.unary_stream(Pipeline, "RoundRobin", move |input, output| {
                 let mut counter = 0u64;
@@ -144,10 +182,16 @@ impl TestImpl for Repartition {
     }
 }
 
+impl<T: Timestamp> FromData<T> for (String, String) {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
+    }
+}
+
 struct Wordcount {}
 
 impl Wordcount {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Wordcount{}
     }
 }
@@ -159,7 +203,13 @@ impl TestImpl for Wordcount {
     
     fn name(&self) -> &str { "HiBench Wordcount" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
+    }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .map(|(ts,b)| (get_ip(&b),ts))
             .exchange(|&(ref ip,_)| hasher(&ip))
@@ -167,10 +217,16 @@ impl TestImpl for Wordcount {
     }
 }
 
+impl<T: Timestamp> FromData<T> for (String, String, usize) {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
+    }
+}
+
 struct Fixwindow {}
 
 impl Fixwindow {
-    fn new(_config: &Config) -> Self {
+    fn new() -> Self {
         Fixwindow{}
     }
 }
@@ -182,7 +238,13 @@ impl TestImpl for Fixwindow {
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
+    }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .map(|(ts,b):Self::D| (get_ip(&b),u64::from_str(&ts).expect("FixWindow: Cannot parse event timestamp.")))
             // TODO (john): Check if timestamps in the input stream correspond to seconds
@@ -201,11 +263,17 @@ impl TestImpl for Fixwindow {
     }
 }
 
-pub fn hibench(args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(Identity::new(args)),
-         Box::new(Repartition::new(args)),
-         Box::new(Wordcount::new(args)),
-         Box::new(Fixwindow::new(args))]
+impl<T: Timestamp> FromData<T> for (String, u64, u32) {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
+    }
+}
+
+pub fn hibench() -> Vec<Box<Test>>{
+    vec![Box::new(Identity::new()),
+         Box::new(Repartition::new()),
+         Box::new(Wordcount::new()),
+         Box::new(Fixwindow::new())]
 }
 
 #[cfg(test)]

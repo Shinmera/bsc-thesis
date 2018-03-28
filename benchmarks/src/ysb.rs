@@ -1,13 +1,13 @@
 use abomonation::Abomonation;
 use config::Config;
-use endpoint::{Source, Drain, ToData};
+use endpoint::{Source, Drain, ToData, FromData};
 use operators::{Window, Reduce};
 use rand::{self, Rng};
 use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
-use std::io::{Result, Write};
+use std::io::{self, Result, Write};
 use std::ops::Deref;
 use std::sync::RwLock;
 use test::{Test, TestImpl};
@@ -15,11 +15,11 @@ use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely::progress::nested::product::Product;
-use timely::progress::timestamp::RootTimestamp;
+use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
 use uuid::Uuid;
 
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
 struct Event {
     user_id: String,
     page_id: String,
@@ -34,26 +34,27 @@ struct Event {
 
 unsafe_abomonate!(Event : user_id, page_id, ad_id, ad_type, event_type, event_time, ip_address);
 
+impl ToData<Product<RootTimestamp, usize>, Event> for String{
+    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, Event)> {
+        serde_json::from_str(&self).ok()
+            .map(|event: Event| (RootTimestamp::new(event.event_time / 1000), event))
+    }
+}
+
+impl<T: Timestamp> FromData<T> for (String, usize) {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
+    }
+}
+
 struct YSB {
-    campaign_map: RwLock<HashMap<String, String>>,
-    data_dir: String,
-    partitions: usize,
-    campaigns: usize,
-    ads: usize,
-    seconds: usize,
-    events_per_second: usize,
+    campaign_map: RwLock<HashMap<String, String>>
 }
 
 impl YSB {
-    fn new(config: &Config) -> Self {
+    fn new() -> Self {
         YSB{
-            campaign_map: RwLock::new(HashMap::new()),
-            data_dir: format!("{}/ysb",config.get_or("data-dir", "data")),
-            partitions: config.get_as_or("partitions", 10), 
-            campaigns: config.get_as_or("campaigns", 100),
-            ads: config.get_as_or("ads", 10),
-            seconds: config.get_as_or("seconds", 60),
-            events_per_second: config.get_as_or("events-per-second", 100_000),
+            campaign_map: RwLock::new(HashMap::new())
         }
     }
 
@@ -81,36 +82,42 @@ impl TestImpl for YSB {
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
-    fn generate_data(&self) -> Result<()> {
-        fs::create_dir_all(&self.data_dir)?;
+    fn generate_data(&self, config: &Config) -> Result<()> {
+        let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
+        let partitions = config.get_as_or("partitions", 10);
+        let campaigns = config.get_as_or("campaigns", 100);
+        let ads = config.get_as_or("ads", 10);
+        let seconds = config.get_as_or("seconds", 60);
+        let events_per_second = config.get_as_or("events-per-second", 100_000);
+        fs::create_dir_all(&data_dir)?;
 
         println!("Generating {} events/s for {}s over {} partitions for {} campaigns with {} ads each.",
-                 self.events_per_second, self.seconds, self.partitions, self.campaigns, self.ads);
+                 events_per_second, seconds, partitions, campaigns, ads);
         
         // Generate campaigns map
         {
             let mut map = self.campaign_map.write().unwrap();
-            for _ in 0..self.campaigns {
+            for _ in 0..campaigns {
                 let campaign_id = format!("{}", Uuid::new_v4());
-                for _ in 0..self.ads {
+                for _ in 0..ads {
                     let ad_id = format!("{}", Uuid::new_v4());
                     map.insert(ad_id, campaign_id.clone());
                 }
             }
         }
-        let campaign_file = File::create(format!("{}/campaigns.json", &self.data_dir))?;
+        let campaign_file = File::create(format!("{}/campaigns.json", &data_dir))?;
         let map = self.campaign_map.read().unwrap();
         serde_json::to_writer(campaign_file, map.deref())?;
         
         // Generate events
         let mut rng = rand::thread_rng();
         let mut event_files = Vec::new();
-        for p in 0..self.partitions {
-            event_files.push(File::create(format!("{}/events-{}.json", &self.data_dir, p))?);
+        for p in 0..partitions {
+            event_files.push(File::create(format!("{}/events-{}.json", &data_dir, p))?);
         }
-        let timestep = 1000.0 / self.events_per_second as f64;
+        let timestep = 1000.0 / events_per_second as f64;
         let mut time: f64 = 1.0;
-        for _ in 0..(self.seconds*self.events_per_second) {
+        for _ in 0..(seconds*events_per_second) {
             let mut file = rng.choose(&event_files).unwrap();
             serde_json::to_writer(file, &self.generate_event(time as usize))?;
             file.write(b"\n")?;
@@ -119,16 +126,20 @@ impl TestImpl for YSB {
         Ok(())
     }
 
-    fn create_endpoints(&self, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>{
-        let campaign_file = File::open(format!("{}/campaigns.json", &self.data_dir))?;
-        let event_file = File::open(format!("{}/events-{}.json", &self.data_dir, index))?;
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>{
+        let mut config = config.clone();
+        let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
+        let campaign_file = File::open(format!("{}/campaigns.json", &data_dir))?;
         let mut map: HashMap<String, String> = serde_json::from_reader(campaign_file)?;
         let mut target = self.campaign_map.write().unwrap();
         for (k, v) in map.drain(){ target.insert(k, v); }
-        Ok((vec!(event_file.into()), ().into()))
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
     }
 
-    fn construct_dataflow<'scope>(&self, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let table = self.campaign_map.read().unwrap().clone();;
         stream
             .filter(|x: &Event| x.event_type == "view")
@@ -143,13 +154,6 @@ impl TestImpl for YSB {
     }
 }
 
-pub fn ysb(args: &Config) -> Vec<Box<Test>>{
-    vec![Box::new(YSB::new(args))]
-}
-
-impl ToData<Product<RootTimestamp, usize>, Event> for String{
-    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, Event)> {
-        serde_json::from_str(&self).ok()
-            .map(|event: Event| (RootTimestamp::new(event.event_time / 1000), event))
-    }
+pub fn ysb() -> Vec<Box<Test>>{
+    vec![Box::new(YSB::new())]
 }

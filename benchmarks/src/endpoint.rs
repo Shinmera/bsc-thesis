@@ -1,7 +1,8 @@
 use config::Config;
 use std::io::{self, Result, Error, ErrorKind, Write, Stdout, Stdin, Lines, BufReader, BufRead, BufWriter};
 use std::fs::File;
-use std::fmt::Display;
+use std::fmt::Debug;
+use std::mem;
 use timely::dataflow::operators::capture::event::{Event, EventIterator, EventPusher};
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely::progress::nested::product::Product;
@@ -21,7 +22,17 @@ impl ToData<Product<RootTimestamp, usize>, String> for String{
     }
 }
 
-fn to_message<T: Timestamp, D, F>(mut next: F) -> Option<Event<T, D>>
+pub trait FromData<T: Timestamp> {
+    fn from_data(&self, t: &T) -> String;
+}
+
+impl<T: Timestamp> FromData<T> for String {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {}", t, self)
+    }
+}
+
+fn to_message<T: Timestamp, D, F>(mut next: F) -> Option<(T, Vec<D>)>
 where F: FnMut()->Option<(T, D)> {
     let mut data = Vec::new();
 
@@ -32,7 +43,7 @@ where F: FnMut()->Option<(T, D)> {
             data.push(d);
             if t != t2 { break; }
         }
-        return Some(Event::Messages(t, data));
+        return Some((t, data));
     }
     None
 }
@@ -51,36 +62,60 @@ impl<T: Timestamp, D> EventPusher<T, D> for Null {
     fn push(&mut self, _: Event<T, D>) {}
 }
 
-pub struct Console<T: Timestamp, D>{
-    stdin: Stdin,
-    stdout: Stdout,
-    next: Option<Event<T, D>>,
+pub struct ConsoleInput<T: Timestamp, D> {
+    stream: Stdin,
+    queue: Vec<Event<T, D>>,
+    last_time: T
 }
 
-impl<T: Timestamp, D> Console<T, D> {
+impl<T: Timestamp, D> ConsoleInput<T, D> {
     pub fn new() -> Self {
-        Console{stdin: io::stdin(), stdout: io::stdout(), next: None}
+        ConsoleInput{
+            stream: io::stdin(),
+            queue: Vec::new(),
+            last_time: Default::default()
+        }
     }
 }
 
-impl<T: Timestamp, D> EventIterator<T, D> for Console<T, D> where String: ToData<T, D>{
+impl<T: Timestamp, D> EventIterator<T, D> for ConsoleInput<T, D> where String: ToData<T, D>{
     fn next(&mut self) -> Option<&Event<T, D>> {
-        let ref mut stdin = self.stdin;
-        self.next = to_message(||{
-            let mut line = String::new();
-            stdin.read_line(&mut line).ok()
-                .and_then(|_| line.to_data())
-        });
-        self.next.as_ref()
+        let ref mut stream = self.stream;
+        if !self.queue.is_empty() { self.queue.pop(); }
+        if self.queue.is_empty() {
+            if let Some((t, d)) = to_message(||{ let mut line = String::new();
+                                                 stream.read_line(&mut line).ok()
+                                                 .and_then(|_| line.to_data()) }) {
+                let mut p = mem::replace(&mut self.last_time, t.clone());
+                self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
+                self.queue.push(Event::Messages(t, d));
+            } else if self.last_time != Default::default() {
+                let mut p = mem::replace(&mut self.last_time, Default::default());
+                self.queue.push(Event::Progress(vec!((p, -1))));
+            }
+        }
+        self.queue.last()
     }
 }
 
-impl<T: Timestamp+Display, D: Display> EventPusher<T, D> for Console<T, D> {
+pub struct ConsoleOutput {
+    stream: Stdout
+}
+
+impl ConsoleOutput {
+    pub fn new() -> Self {
+        ConsoleOutput{ stream: io::stdout() }
+    }
+}
+
+impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for ConsoleOutput {
     fn push(&mut self, event: Event<T, D>) {
-        let ref mut stdout = self.stdout;
+        let ref mut stream = self.stream;
         if let Event::Messages(t, d) = event {
             for e in d {
-                stdout.write_fmt(format_args!("{} {}\n", t, e)).unwrap();
+                stream.write_all(e.from_data(&t).as_bytes()).unwrap();
+                stream.write(b"\n").unwrap();
+                stream.flush().unwrap();
             }
         }
     }
@@ -88,31 +123,37 @@ impl<T: Timestamp+Display, D: Display> EventPusher<T, D> for Console<T, D> {
 
 pub struct FileInput<T: Timestamp, D> {
     stream: Lines<BufReader<File>>,
-    next: Option<Event<T, D>>
+    queue: Vec<Event<T, D>>,
+    last_time: T
 }
 
 impl<T: Timestamp, D> FileInput<T, D> {
     pub fn new(f: File) -> Self {
-        FileInput{stream: BufReader::new(f).lines(), next: None}
+        FileInput{
+            stream: BufReader::new(f).lines(),
+            queue: Vec::new(),
+            last_time: Default::default()
+        }
     }
 }
 
 impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToData<T, D> {
     fn next(&mut self) -> Option<&Event<T, D>> {
         let ref mut stream = self.stream;
-        let next = to_message(||{
-            stream.next()
-                .and_then(|n| n.ok())
-                .and_then(|l| l.to_data())
-        });
-        if next.is_some() {
-            self.next = next;
-        } else if let Some(Event::Messages(t, _)) = self.next.take() {
-            self.next = Some(Event::Progress(vec!((t, 0))));
-        } else {
-            self.next = None;
+        if !self.queue.is_empty() { self.queue.pop(); }
+        if self.queue.is_empty() {
+            if let Some((t, d)) = to_message(||{ stream.next()
+                                                 .and_then(|n| n.ok())
+                                                 .and_then(|l| l.to_data()) }) {
+                let mut p = mem::replace(&mut self.last_time, t.clone());
+                self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
+                self.queue.push(Event::Messages(t, d));
+            } else if self.last_time != Default::default() {
+                let mut p = mem::replace(&mut self.last_time, Default::default());
+                self.queue.push(Event::Progress(vec!((p, -1))));
+            }
         }
-        self.next.as_ref()
+        self.queue.last()
     }
 }
 
@@ -126,12 +167,14 @@ impl FileOutput {
     }
 }
 
-impl<T: Timestamp+Display, D: Display> EventPusher<T, D> for FileOutput {
+impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for FileOutput {
     fn push(&mut self, event: Event<T, D>) {
         let ref mut stream = self.stream;
         if let Event::Messages(t, d) = event {
             for e in d {
-                stream.write_fmt(format_args!("{} {}\n", t, e)).unwrap();
+                stream.write_all(e.from_data(&t).as_bytes()).unwrap();
+                stream.write(b"\n").unwrap();
+                stream.flush().unwrap();
             }
         }
     }
@@ -197,7 +240,7 @@ impl<T: Timestamp, D> Into<Source<T, D>> for () {
 
 impl<T: Timestamp, D: Data> Into<Source<T, D>> for Stdin where String: ToData<T, D> {
     fn into(self) -> Source<T, D> {
-        Source::new(Box::new(Console::new()))
+        Source::new(Box::new(ConsoleInput::new()))
     }
 }
 
@@ -214,11 +257,11 @@ impl<T: Timestamp, D: Data> Into<Source<T, D>> for File where String: ToData<T, 
 //     }
 // }
 
-impl<T: Timestamp+Display, D: Data+Display> Into<Result<Source<T, D>>> for Config
+impl<T: Timestamp, D: Data> Into<Result<Source<T, D>>> for Config
 where Stdin: Into<Source<T, D>>,
       File: Into<Source<T, D>> {
     fn into(self) -> Result<Source<T, D>> {
-        match self.get_or("input", "console").as_ref() {
+        match self.get_or("input", "file").as_ref() {
             "null" => {
                 Ok(().into())
             },
@@ -261,13 +304,13 @@ impl<T: Timestamp, D> Into<Drain<T, D>> for () {
     }
 }
 
-impl<T: Timestamp+Display, D: Data+Display> Into<Drain<T, D>> for Stdout {
+impl<T: Timestamp, D: Data+FromData<T>> Into<Drain<T, D>> for Stdout {
     fn into(self) -> Drain<T, D> {
-        Drain::new(Box::new(Console::new()))
+        Drain::new(Box::new(ConsoleOutput::new()))
     }
 }
 
-impl<T: Timestamp+Display, D: Data+Display> Into<Drain<T, D>> for File {
+impl<T: Timestamp, D: Data+FromData<T>> Into<Drain<T, D>> for File {
     fn into(self) -> Drain<T, D> {
         Drain::new(Box::new(FileOutput::new(self)))
     }
@@ -280,9 +323,9 @@ impl<T: Timestamp+Display, D: Data+Display> Into<Drain<T, D>> for File {
 //     }
 // }
 
-impl<T: Timestamp+Display, D: Data+Display> Into<Result<Drain<T, D>>> for Config {
+impl<T: Timestamp, D: Data+FromData<T>> Into<Result<Drain<T, D>>> for Config {
     fn into(self) -> Result<Drain<T, D>> {
-        match self.get_or("output", "console").as_ref() {
+        match self.get_or("output", "null").as_ref() {
             "null" => {
                 Ok(().into())
             },

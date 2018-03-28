@@ -54,9 +54,9 @@ impl<T: Display> Reportable for Result<T> {
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
     let mut tests = Vec::new();
-    tests.append(&mut hibench(&config));
-    tests.append(&mut ysb(&config));
-    tests.append(&mut nexmark(&config));
+    tests.append(&mut hibench());
+    tests.append(&mut ysb());
+    tests.append(&mut nexmark());
     
     let to_run = config.get("tests")
         .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
@@ -67,12 +67,12 @@ fn main() {
     if mode == "test" {
         for test in tests {
             println!("> Running test {}", test.name());
-            run_test(&config, test).report();
+            run_test(test, &config).report();
         }
     }else if mode == "generate" {
         for test in tests {
             println!("> Generating test {}", test.name());
-            generate_test(test).unwrap();
+            generate_test(test, &config).unwrap();
         }
     }else if mode == "help" {
         println!("Timely Benchmarks v0.1
