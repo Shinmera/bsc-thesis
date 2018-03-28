@@ -1,7 +1,6 @@
 use config::Config;
 use std::io::{self, Result, Error, ErrorKind, Write, Stdout, Stdin, Lines, BufReader, BufRead, BufWriter};
 use std::fs::File;
-use std::fmt::Debug;
 use std::mem;
 use timely::dataflow::operators::capture::event::{Event, EventIterator, EventPusher};
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
@@ -9,8 +8,6 @@ use timely::progress::nested::product::Product;
 use timely::Data;
 use kafkaesque::{self};
 use rdkafka::config::ClientConfig;
-
-pub struct Null();
 
 pub trait ToData<T, D> {
     fn to_data(self) -> Option<(T, D)>;
@@ -48,17 +45,32 @@ where F: FnMut()->Option<(T, D)> {
     None
 }
 
-impl Null {
+pub struct NullInput<T: Timestamp, D>{
+    queue: Vec<Event<T, D>>,
+}
+
+impl<T: Timestamp, D> NullInput<T, D> {
     pub fn new() -> Self {
-        Null()
+        NullInput{ queue: vec!(Event::Progress(vec!((Default::default(), -1))), Event::Progress(vec!())) }
     }
 }
 
-impl<T: Timestamp, D> EventIterator<T, D> for Null {
-    fn next(&mut self) -> Option<&Event<T, D>> {None}
+impl<T: Timestamp, D> EventIterator<T, D> for NullInput<T, D> {
+    fn next(&mut self) -> Option<&Event<T, D>> {
+        self.queue.pop();
+        self.queue.last()
+    }
 }
 
-impl<T: Timestamp, D> EventPusher<T, D> for Null {
+pub struct NullOutput();
+
+impl NullOutput {
+    pub fn new() -> Self {
+        NullOutput()
+    }
+}
+
+impl<T: Timestamp, D> EventPusher<T, D> for NullOutput {
     fn push(&mut self, _: Event<T, D>) {}
 }
 
@@ -81,7 +93,7 @@ impl<T: Timestamp, D> ConsoleInput<T, D> {
 impl<T: Timestamp, D> EventIterator<T, D> for ConsoleInput<T, D> where String: ToData<T, D>{
     fn next(&mut self) -> Option<&Event<T, D>> {
         let ref mut stream = self.stream;
-        if !self.queue.is_empty() { self.queue.pop(); }
+        self.queue.pop();
         if self.queue.is_empty() {
             if let Some((t, d)) = to_message(||{ let mut line = String::new();
                                                  stream.read_line(&mut line).ok()
@@ -140,7 +152,7 @@ impl<T: Timestamp, D> FileInput<T, D> {
 impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToData<T, D> {
     fn next(&mut self) -> Option<&Event<T, D>> {
         let ref mut stream = self.stream;
-        if !self.queue.is_empty() { self.queue.pop(); }
+        self.queue.pop();
         if self.queue.is_empty() {
             if let Some((t, d)) = to_message(||{ stream.next()
                                                  .and_then(|n| n.ok())
@@ -232,9 +244,9 @@ impl<T: Timestamp, D> EventIterator<T, D> for Source<T, D> {
     }
 }
 
-impl<T: Timestamp, D> Into<Source<T, D>> for () {
+impl<T: Timestamp, D: 'static> Into<Source<T, D>> for () {
     fn into(self) -> Source<T, D> {
-        Source::new(Box::new(Null::new()))
+        Source::new(Box::new(NullInput::new()))
     }
 }
 
@@ -300,7 +312,7 @@ impl<T: Timestamp, D> EventPusher<T, D> for Drain<T, D> {
 
 impl<T: Timestamp, D> Into<Drain<T, D>> for () {
     fn into(self) -> Drain<T, D> {
-        Drain::new(Box::new(Null::new()))
+        Drain::new(Box::new(NullOutput::new()))
     }
 }
 
