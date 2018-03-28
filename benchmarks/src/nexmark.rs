@@ -1,7 +1,7 @@
 use serde_json;
 use abomonation::Abomonation;
 use config::Config;
-use endpoint::{Source, Drain, ToData};
+use endpoint::{Source, Drain, ToData, FromData};
 use operators::{Window, Reduce, Join, FilterMap};
 use rand::{self, Rng, StdRng, SeedableRng};
 use std::char::from_u32;
@@ -16,7 +16,7 @@ use timely::dataflow::Stream;
 use timely::dataflow::operators::{Filter, Map};
 use timely::dataflow::scopes::{Root, Child};
 use timely::progress::nested::product::Product;
-use timely::progress::timestamp::RootTimestamp;
+use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
 
 type Id = usize;
@@ -235,6 +235,12 @@ impl ToData<Product<RootTimestamp, usize>, Event> for String{
     }
 }
 
+impl<T: Timestamp> FromData<T> for Event {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
+    }
+}
+
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 struct Person{
     id: Id,
@@ -416,10 +422,12 @@ impl TestImpl for Query0 {
     }
 
     fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
-        let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
-        let event_file = File::open(format!("{}/events-{}.json", &data_dir, index))?;
-        //self.config.insert("input-file", format!("{}/events.json", &self.data_dir));
-        Ok((vec!(event_file.into()), ().into()))
+        let mut config = config.clone();
+        let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {

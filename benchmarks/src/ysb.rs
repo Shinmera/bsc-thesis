@@ -7,7 +7,7 @@ use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
-use std::io::{self, Result, Write};
+use std::io::{Result, Write};
 use std::ops::Deref;
 use std::sync::RwLock;
 use test::{Test, TestImpl};
