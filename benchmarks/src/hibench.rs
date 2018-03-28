@@ -52,8 +52,7 @@ fn get_ip(record: &String) -> String {
     // TODO (john): Change this into a regex 
     let end = record.find(',').expect("HiBench: Cannot parse IP.");
     let ip = &record[0..end];
-    let start = ip.rfind(char::is_whitespace).expect("HiBench: Cannot parse IP.");
-    record[start+1..end].to_string()
+    String::from(ip)
 }
 
 fn random_ip() -> String {
@@ -156,7 +155,10 @@ impl TestImpl for Repartition {
     
     fn name(&self) -> &str { "HiBench Repartition" }
 
-    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let mut config = config.clone();
+        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
         Ok((vec!(int?), out?))
@@ -203,7 +205,10 @@ impl TestImpl for Wordcount {
     
     fn name(&self) -> &str { "HiBench Wordcount" }
 
-    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let mut config = config.clone();
+        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
         Ok((vec!(int?), out?))
@@ -238,7 +243,10 @@ impl TestImpl for Fixwindow {
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
 
-    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let mut config = config.clone();
+        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
         Ok((vec!(int?), out?))
