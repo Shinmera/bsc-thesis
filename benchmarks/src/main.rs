@@ -61,7 +61,7 @@ fn main() {
     let to_run = config.get("tests")
         .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
         .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
-    tests.retain(|t| to_run.contains(&String::from(t.name())));
+    tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
     
     let mode = config.get_or("1", "help");
     if mode == "test" {
