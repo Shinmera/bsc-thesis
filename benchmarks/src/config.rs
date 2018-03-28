@@ -30,7 +30,6 @@ impl Config {
         Ok(Config{ args: args })
     }
 
-    #[allow(dead_code)]
     pub fn insert(&mut self, key: &str, value: String) {
         self.args.insert(String::from(key), value);
     }

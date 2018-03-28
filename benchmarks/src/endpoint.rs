@@ -192,12 +192,14 @@ impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for FileOutput {
     }
 }
 
+#[allow(dead_code)]
 pub struct VectorInput<T: Timestamp, D> {
     vector: Vec<Event<T, D>>,
     index: usize
 }
 
 impl<T: Timestamp, D> VectorInput<T, D> {
+    #[allow(dead_code)]
     pub fn new(mut v: Vec<(T, Vec<D>)>) -> Self {
         VectorInput{vector: v.drain(..).map(|(t, d)|Event::Messages(t, d)).collect(), index: 0}
     }
@@ -211,11 +213,13 @@ impl<T: Timestamp, D> EventIterator<T, D> for VectorInput<T, D> {
     }
 }
 
+#[allow(dead_code)]
 pub struct VectorOutput<T: Timestamp, D> {
     vector: Vec<(T, Vec<D>)>
 }
 
 impl<T: Timestamp, D> VectorOutput<T, D> {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         VectorOutput{vector: Vec::new()}
     }
