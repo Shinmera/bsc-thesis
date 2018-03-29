@@ -586,19 +586,28 @@ impl TestImpl for Query9 {
 
     fn name(&self) -> &str { "NEXMark Query 9" }
 
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+        let mut config = config.clone();
+        let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
+    }
+
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let bids = stream.filter_map(|e| {let b: Option<Bid> = e.into(); b});
         let auctions = stream.filter_map(|e| {let a: Option<Auction> = e.into(); a});
+        let mut auction_map = HashMap::new();
+        let mut bid_prices: HashMap<Id, usize> = HashMap::new();
+        
         auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
-            let mut auctions = HashMap::new();
-            let mut bid_prices: HashMap<Id, usize> = HashMap::new();
-            
             input1.for_each(|time, data|{
                 data.drain(..).for_each(|a: Auction|{
-                    let future = a.expires; // FIXME: Translate to epoch time.
-                    let auctions = auctions.entry(future).or_insert_with(||Vec::new());
+                    let future = RootTimestamp::new(a.expires - BASE_TIME);
+                    let auctions = auction_map.entry(future).or_insert_with(||Vec::new());
                     auctions.push(a);
-                    notificator.notify_at(time.delayed(&RootTimestamp::new(future)));
+                    notificator.notify_at(time.delayed(&future));
                 });
             });
 
@@ -614,7 +623,7 @@ impl TestImpl for Query9 {
             });
 
             notificator.for_each(|cap, _, _|{
-                if let Some(mut auctions) = auctions.remove(&cap.time().inner) {
+                if let Some(mut auctions) = auction_map.remove(cap.time()) {
                     auctions.drain(..).for_each(|a|{
                         if let Some(price) = bid_prices.remove(&a.id) {
                             output.session(&cap).give((price, a));
@@ -623,6 +632,12 @@ impl TestImpl for Query9 {
                 }
             });
         })
+    }
+}
+
+impl<T: Timestamp> FromData<T> for (usize, Auction) {
+    fn from_data(&self, t: &T) -> String {
+        format!("{:?} {:?}", t, self)
     }
 }
 
