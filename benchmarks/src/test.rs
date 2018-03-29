@@ -67,6 +67,7 @@ pub trait TestImpl : Sync+Send {
         worker.dataflow(|scope| {
             let ends = ends.clone();
             let starts = starts.clone();
+            // FIXME!! We need a better way to measure when an epoch is completely done.
             ins.replay_into(scope)
                 .inspect_batch(move |t, _|{
                     let mut starts = starts.lock().unwrap();
@@ -82,7 +83,7 @@ pub trait TestImpl : Sync+Send {
         // Collect statistics.
         let starts = starts.lock().unwrap();
         let ends = ends.lock().unwrap();
-        let durations: Vec<_> = ends.iter().map(|(t, i)|(starts.get(t).unwrap(), i)).collect();
+        let durations: Vec<_> = ends.iter().filter_map(|(t, i)|starts.get(t).map(|s|(s, i))).collect();
         return Ok(Statistics::from(durations));
     }
 }
