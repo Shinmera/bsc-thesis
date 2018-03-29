@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::fs;
 use std::io::{Result, Write};
-use std::ops::Deref;
+use std::thread::{self, JoinHandle};
 use std::sync::RwLock;
 use test::{Test, TestImpl};
 use timely::dataflow::operators::{Map, Filter};
@@ -57,22 +57,6 @@ impl YSB {
             campaign_map: RwLock::new(HashMap::new())
         }
     }
-
-    fn generate_event(&self, time: usize) -> Event {
-        let mut rng = rand::thread_rng();
-        let map = self.campaign_map.read().unwrap();
-        const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
-        const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
-        Event {
-            user_id: format!("{}", Uuid::new_v4()),
-            page_id: format!("{}", Uuid::new_v4()),
-            ad_id: map.keys().nth(rng.gen_range(0, map.len())).unwrap().clone(),
-            ad_type: String::from(*rng.choose(&AD_TYPES).unwrap()),
-            event_type: String::from(*rng.choose(&EVENT_TYPES).unwrap()),
-            event_time: time,
-            ip_address: String::from("0.0.0.0"),
-        }
-    }
 }
 
 impl TestImpl for YSB {
@@ -95,33 +79,48 @@ impl TestImpl for YSB {
                  events_per_second, seconds, partitions, campaigns, ads);
         
         // Generate campaigns map
-        {
-            let mut map = self.campaign_map.write().unwrap();
-            for _ in 0..campaigns {
-                let campaign_id = format!("{}", Uuid::new_v4());
-                for _ in 0..ads {
-                    let ad_id = format!("{}", Uuid::new_v4());
-                    map.insert(ad_id, campaign_id.clone());
-                }
+        let mut map = HashMap::new();
+        for _ in 0..campaigns {
+            let campaign_id = format!("{}", Uuid::new_v4());
+            for _ in 0..ads {
+                let ad_id = format!("{}", Uuid::new_v4());
+                map.insert(ad_id, campaign_id.clone());
             }
         }
         let campaign_file = File::create(format!("{}/campaigns.json", &data_dir))?;
-        let map = self.campaign_map.read().unwrap();
-        serde_json::to_writer(campaign_file, map.deref())?;
+        serde_json::to_writer(campaign_file, &map)?;
         
         // Generate events
-        let mut rng = rand::thread_rng();
-        let mut event_files = Vec::new();
+        const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
+        const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
+        let timestep = (1000 * partitions) as f64 / events_per_second as f64;
+        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
         for p in 0..partitions {
-            event_files.push(File::create(format!("{}/events-{}.json", &data_dir, p))?);
+            let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;
+            let map = map.clone();
+            threads.push(thread::spawn(move || {
+                let mut rng = rand::thread_rng();
+                let mut time: f64 = (1 + p) as f64;
+                while time < (1000 * seconds) as f64 {
+                    let event = Event {
+                        user_id: format!("{}", Uuid::new_v4()),
+                        page_id: format!("{}", Uuid::new_v4()),
+                        ad_id: map.keys().nth(rng.gen_range(0, map.len())).unwrap().clone(),
+                        ad_type: String::from(*rng.choose(&AD_TYPES).unwrap()),
+                        event_type: String::from(*rng.choose(&EVENT_TYPES).unwrap()),
+                        event_time: time as usize,
+                        ip_address: String::from("0.0.0.0"),
+                    };
+                    
+                    serde_json::to_writer(&file, &event)?;
+                    file.write(b"\n")?;
+                    time += timestep;
+                }
+                Ok(())
+            }));
         }
-        let timestep = 1000.0 / events_per_second as f64;
-        let mut time: f64 = 1.0;
-        for _ in 0..(seconds*events_per_second) {
-            let mut file = rng.choose(&event_files).unwrap();
-            serde_json::to_writer(file, &self.generate_event(time as usize))?;
-            file.write(b"\n")?;
-            time += timestep;
+        for t in threads.drain(..){
+            t.join().unwrap()?;
         }
         Ok(())
     }

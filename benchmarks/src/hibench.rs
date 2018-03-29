@@ -10,6 +10,7 @@ use std::io::{Result, Write};
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
+use std::thread::{self, JoinHandle};
 use test::{Test, TestImpl};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Unary;
@@ -92,27 +93,33 @@ impl TestImpl for Identity {
         println!("Generating {} events/s for {}s over {} partitions for {} ips.",
                  events_per_second, seconds, partitions, ips);
 
-        let mut rng = rand::thread_rng();
-        let mut event_files = Vec::new();
-        for p in 0..partitions {
-            event_files.push(File::create(format!("{}/events-{}.csv", &data_dir, p))?);
-        }
         let ips: Vec<_> = (0..ips).map(|_| random_ip()).collect();
-        for t in 0..seconds {
-            for _ in 0..events_per_second {
-                let mut file = rng.choose(&event_files).unwrap();
-                let ip = rng.choose(&ips).unwrap().clone();
-                let session: String = rng.gen_ascii_chars().take(54).collect();
-                let date = random_date();
-                let float = 0.0;
-                let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
-                let s = "DOM";
-                let subs = "DOM-ES";
-                let word = "snow";
-                let int = 6;
-                writeln!(&mut file, "{:4} {},{},{},{:.8},{},{},{},{},{}",
-                         t, ip, session, date, float, agent, s, subs, word, int)?;
-            }
+        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
+        for p in 0..partitions {
+            let mut file = File::create(format!("{}/events-{}.csv", &data_dir, p))?;
+            let ips = ips.clone();
+            threads.push(thread::spawn(move || {
+                let mut rng = rand::thread_rng();
+                for t in 0..seconds {
+                    for _ in 0..(events_per_second/partitions) {
+                        let ip = rng.choose(&ips).unwrap().clone();
+                        let session: String = rng.gen_ascii_chars().take(54).collect();
+                        let date = random_date();
+                        let float = 0.0;
+                        let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
+                        let s = "DOM";
+                        let subs = "DOM-ES";
+                        let word = "snow";
+                        let int = 6;
+                        writeln!(&mut file, "{:4} {},{},{},{:.8},{},{},{},{},{}",
+                                 t, ip, session, date, float, agent, s, subs, word, int)?;
+                    }
+                }
+                Ok(())
+            }));
+        }
+        for t in threads.drain(..){
+            t.join().unwrap()?;
         }
         Ok(())
     }

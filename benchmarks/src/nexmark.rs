@@ -3,13 +3,14 @@ use abomonation::Abomonation;
 use config::Config;
 use endpoint::{Source, Drain, ToData, FromData};
 use operators::{Window, Reduce, Join, FilterMap};
-use rand::{self, Rng, StdRng, SeedableRng};
+use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::fs::File;
 use std::fs;
+use std::thread::{self, JoinHandle};
 use std::io::{Result, Write};
 use test::{Test, TestImpl};
 use timely::dataflow::Stream;
@@ -94,7 +95,7 @@ impl NEXMark {
         let first_rate = config.get_as_or("first-event-rate", 10000);
         let next_rate = config.get_as_or("next-event-rate", 10000);
         let rate = config.get_as_or("rate", 1_000_000); // Rate is in μs
-        let generators = config.get_as_or("event-generators", 1);
+        let generators = config.get_as_or("partitions", 10);
         let rate_to_period = |r| (rate + r / 2) / r;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
@@ -394,30 +395,33 @@ impl TestImpl for Query0 {
     fn generate_data(&self, config: &Config) -> Result<()> {
         let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
         fs::create_dir_all(&data_dir)?;
-        let mut nex = NEXMark::new(&config);
         let seconds = config.get_as_or("seconds", 60);
-        let partitions = config.get_as_or("partitions", 1);
+        let partitions = config.get_as_or("partitions", 10);
 
         println!("Generating events for {}s over {} partitions.", seconds, partitions);
-        
-        let wall_base = 0;
-        let mut rng = rand::thread_rng();
-        let mut event_files = Vec::new();
-        for p in 0..partitions {
-            event_files.push(File::create(format!("{}/events-{}.json", &data_dir, p))?);
-        }
-        
-        for events_so_far in 0.. {
-            let time = nex.event_timestamp(nex.first_event_id + events_so_far);
-            let wall = wall_base + (time - nex.base_time);
-            let event = Event::new(events_so_far, &mut nex);
-            let carrier = EventCarrier{ time: wall, event: event };
 
-            let mut file = rng.choose(&event_files).unwrap();
-            serde_json::to_writer(file, &carrier)?;
-            file.write(b"\n")?;
-            
-            if seconds < (wall / 1000) { break; }
+        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
+        for p in 0..partitions {
+            let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;
+            let mut nex = NEXMark::new(&config);
+            threads.push(thread::spawn(move || {
+                let wall_base = 0;
+                for events_so_far in 0.. {
+                    let time = nex.event_timestamp(nex.first_event_id + events_so_far);
+                    let wall = wall_base + (time - nex.base_time);
+                    let event = Event::new(events_so_far, &mut nex);
+                    let carrier = EventCarrier{ time: wall, event: event };
+                    
+                    serde_json::to_writer(&file, &carrier)?;
+                    file.write(b"\n")?;
+                    
+                    if seconds < (wall / 1000) { break; }
+                }
+                Ok(())
+            }));
+        }
+        for t in threads.drain(..){
+            t.join().unwrap()?;
         }
         Ok(())
     }
