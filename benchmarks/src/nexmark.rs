@@ -44,7 +44,6 @@ const US_STATES: [&str; 6] = ["AZ","CA","ID","OR","WA","WY"];
 const US_CITIES: [&str; 10] = ["Phoenix", "Los Angeles", "San Francisco", "Boise", "Portland", "Bend", "Redmond", "Seattle", "Kent", "Cheyenne"];
 const FIRST_NAMES: [&str; 11] = ["Peter", "Paul", "Luke", "John", "Saul", "Vicky", "Kate", "Julie", "Sarah", "Deiter", "Walter"];
 const LAST_NAMES: [&str; 9] = ["Shultz", "Abrams", "Spencer", "White", "Bartels", "Walton", "Smith", "Jones", "Noris"];
-const CURRENT_TIME: usize = 0;
 
 trait NEXMarkRng {
     fn gen_string(&mut self, usize) -> String;
@@ -502,7 +501,6 @@ impl TestImpl for Query3 {
     fn name(&self) -> &str { "NEXMark Query 3" }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        // FIXME: unbounded windows?
         let auctions = stream
             .filter_map(|e| e.into())
             .filter(|a: &Auction| a.category == 10);
@@ -529,18 +527,8 @@ impl TestImpl for Query4 {
     fn name(&self) -> &str { "NEXMark Query 4" }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        // FIXME: unbounded windows?
-        let auctions = stream
-            .filter_map(|e| e.into())
-            .filter(|a: &Auction| a.expires <= CURRENT_TIME);
-        let bids = stream
-            .filter_map(|e| e.into());
-        auctions.epoch_join(&bids, |a| a.id, |b: &Bid| b.auction, |a, b| (b.date_time, a.expires, a.id, a.category, b.price))
-            .filter(|&(t, e, _, _, _)| t < e)
-            .reduce_by(|&(_, _, id, cat, _)| (id, cat), 0,
-                       |&(_, _, _, _, price), p| max(p, price))
-            .reduce_by(|&((_, cat), _)| cat, 0,
-                       |&(_, price), p| p + price/NUM_CATEGORIES)
+        hot_bids(stream)
+            .reduce_by(|&(_, ref a)| a.category, 0, |(p, _), c| c + p/NUM_CATEGORIES)
     }
 }
 
@@ -571,12 +559,121 @@ impl TestImpl for Query5 {
     }
 }
 
+struct Query6 {}
+
+impl Query6 {
+    fn new() -> Self {
+        Query6 {}
+    }
+}
+
+impl TestImpl for Query6 {
+    type T = Date;
+    type D = Event;
+    type DO = (Id, f32);
+
+    fn name(&self) -> &str { "NEXMark Query 6" }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        hot_bids(stream)
+            .average_by(|&(_, ref a)| a.seller, |(p, _)| p)
+    }
+}
+
+struct Query7 {}
+
+impl Query7 {
+    fn new() -> Self {
+        Query7 {}
+    }
+}
+
+impl TestImpl for Query7 {
+    type T = Date;
+    type D = Event;
+    type DO = (Id, usize, Id);
+
+    fn name(&self) -> &str { "NEXMark Query 7" }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream.filter_map(|e| e.into())
+            .epoch_window(60, 60)
+            .reduce(|_| 0, (0, 0, 0), |b: Bid, (a, p, bi)| {
+                if p < b.price { (b.auction, b.price, b.bidder) }
+                else { (a, p, bi) }
+            }, |_, d, _| d)
+    }
+}
+
+struct Query8 {}
+
+impl Query8 {
+    fn new() -> Self {
+        Query8 {}
+    }
+}
+
+impl TestImpl for Query8 {
+    type T = Date;
+    type D = Event;
+    type DO = (Id, String, usize);
+
+    fn name(&self) -> &str { "NEXMark Query 8" }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let auctions = stream.filter_map(|e| e.into())
+            .epoch_window(60*60, 60*60);
+        let persons = stream.filter_map(|e| e.into())
+            .epoch_window(60*60, 60*60);
+        persons.epoch_join(&auctions, |p: &Person| p.id, |a: &Auction| a.seller, |p, a| (p.id, p.name, a.reserve))
+    }
+}
+
 struct Query9 {}
 
 impl Query9 {
     fn new() -> Self {
         Query9 {}
     }
+}
+
+fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (usize, Auction)> {
+    let bids = stream.filter_map(|e| {let b: Option<Bid> = e.into(); b});
+    let auctions = stream.filter_map(|e| {let a: Option<Auction> = e.into(); a});
+    let mut auction_map = HashMap::new();
+    let mut bid_prices: HashMap<Id, usize> = HashMap::new();
+    
+    auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
+        input1.for_each(|time, data|{
+            data.drain(..).for_each(|a: Auction|{
+                let future = RootTimestamp::new(a.expires - BASE_TIME);
+                let auctions = auction_map.entry(future).or_insert_with(||Vec::new());
+                auctions.push(a);
+                notificator.notify_at(time.delayed(&future));
+            });
+        });
+
+        input2.for_each(|_, data|{
+            data.drain(..).for_each(|b: Bid|{
+                // FIXME: Check if the bid is valid (B.date_time < A.expires)
+                if let Some(other) = bid_prices.remove(&b.auction) {
+                    bid_prices.insert(b.auction, max(other, b.price));
+                } else {
+                    bid_prices.insert(b.auction, b.price);
+                }
+            });
+        });
+
+        notificator.for_each(|cap, _, _|{
+            if let Some(mut auctions) = auction_map.remove(cap.time()) {
+                auctions.drain(..).for_each(|a|{
+                    if let Some(price) = bid_prices.remove(&a.id) {
+                        output.session(&cap).give((price, a));
+                    }
+                });
+            }
+        });
+    })
 }
 
 impl TestImpl for Query9 {
@@ -596,42 +693,7 @@ impl TestImpl for Query9 {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let bids = stream.filter_map(|e| {let b: Option<Bid> = e.into(); b});
-        let auctions = stream.filter_map(|e| {let a: Option<Auction> = e.into(); a});
-        let mut auction_map = HashMap::new();
-        let mut bid_prices: HashMap<Id, usize> = HashMap::new();
-        
-        auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
-            input1.for_each(|time, data|{
-                data.drain(..).for_each(|a: Auction|{
-                    let future = RootTimestamp::new(a.expires - BASE_TIME);
-                    let auctions = auction_map.entry(future).or_insert_with(||Vec::new());
-                    auctions.push(a);
-                    notificator.notify_at(time.delayed(&future));
-                });
-            });
-
-            input2.for_each(|_, data|{
-                data.drain(..).for_each(|b: Bid|{
-                    // FIXME: Check if the bid is valid (B.date_time < A.expires)
-                    if let Some(other) = bid_prices.remove(&b.auction) {
-                        bid_prices.insert(b.auction, max(other, b.price));
-                    } else {
-                        bid_prices.insert(b.auction, b.price);
-                    }
-                });
-            });
-
-            notificator.for_each(|cap, _, _|{
-                if let Some(mut auctions) = auction_map.remove(cap.time()) {
-                    auctions.drain(..).for_each(|a|{
-                        if let Some(price) = bid_prices.remove(&a.id) {
-                            output.session(&cap).give((price, a));
-                        }
-                    });
-                }
-            });
-        })
+        hot_bids(stream)
     }
 }
 
@@ -648,9 +710,8 @@ pub fn nexmark() -> Vec<Box<Test>>{
          Box::new(Query3::new()),
          Box::new(Query4::new()),
          Box::new(Query5::new()),
+         Box::new(Query6::new()),
+         Box::new(Query7::new()),
+         Box::new(Query8::new()),
          Box::new(Query9::new())]
 }
-
-// SELECT MAX(B.price), A FROM Auction A, Bid B
-// WHERE A.id=B.auction AND B.datetime < A.expires AND A.expires < CURRENT_TIME
-// GROUP BY A.id
