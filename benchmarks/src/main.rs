@@ -12,6 +12,7 @@ extern crate rand;
 extern crate uuid;
 extern crate rdkafka;
 extern crate kafkaesque;
+extern crate num;
 mod operators;
 mod config;
 mod statistics;

@@ -13,6 +13,7 @@ serde = "*"
 serde_json = "*"
 serde_derive = "*"
 rand = "*"
+num = "*"
 uuid = { version = "*", features = ["v4"] }
 
 [dependencies.kafkaesque]
