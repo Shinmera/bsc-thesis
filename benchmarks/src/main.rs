@@ -25,11 +25,11 @@ mod nexmark;
 
 use std::io::Result;
 use std::fmt::Display;
-use test::{run_test, generate_test};
+use test::{Benchmark, run_test};
 use config::Config;
-use hibench::hibench;
-use ysb::ysb;
-use nexmark::nexmark;
+use hibench::HiBench;
+use ysb::YSB;
+use nexmark::NEXMark;
 
 trait Reportable { fn report(&self); }
 
@@ -52,28 +52,38 @@ impl<T: Display> Reportable for Result<T> {
 //     }
 // }
 
+fn benchmarks() -> Vec<Box<Benchmark>> {
+    vec!(Box::new(HiBench::new()),
+         Box::new(YSB::new()),
+         Box::new(NEXMark::new()))
+}
+
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
-    let mut tests = Vec::new();
-    tests.append(&mut hibench());
-    tests.append(&mut ysb());
-    tests.append(&mut nexmark());
+    let mut benchmarks = benchmarks();
     
-    let to_run = config.get("tests")
+    let to_run = config.get("benchmarks")
         .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
-        .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
-    tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
+        .unwrap_or(benchmarks.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
+    benchmarks.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
     
     let mode = config.get_or("1", "help");
     if mode == "test" {
+        let mut tests = Vec::new();
+        benchmarks.iter().for_each(|b| tests.append(&mut b.tests()));
+        
+        let to_run = config.get("tests")
+            .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
+            .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
+        tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
         for test in tests {
             println!("> Running test {}", test.name());
             run_test(test, &config).report();
         }
     }else if mode == "generate" {
-        for test in tests {
-            println!("> Generating test {}", test.name());
-            generate_test(test, &config).unwrap();
+        for bench in benchmarks {
+            println!("> Generating benchmark {}", bench.name());
+            bench.generate_data(&config).unwrap();
         }
     }else if mode == "help" {
         println!("Timely Benchmarks v0.1
@@ -91,7 +101,7 @@ test                    Run the benchmarks.
   --report BOOL           Whether to report connection progress.
 
 generate                Generate benchmark workloads.
-  --tests STRING           A comma-separated list of test names to run.
+  --benchmarks STRING      A comma-separated list of benchmark names to generate.
   --data-dir DIR           The directory for the benchmark data files.
   --partitions NUM         The number of dataset partitions to create.
   --campaigns NUM          (YSB) How many campaign IDs to generate.

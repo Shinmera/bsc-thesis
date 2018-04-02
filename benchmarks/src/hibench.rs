@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use std::thread::{self, JoinHandle};
-use test::{Test, TestImpl};
+use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Unary;
 use timely::dataflow::operators::aggregation::Aggregate;
@@ -81,48 +81,6 @@ impl TestImpl for Identity {
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Identity" }
-
-    fn generate_data(&self, config: &Config) -> Result<()> {
-        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        let partitions = config.get_as_or("partitions", 10);
-        let seconds = config.get_as_or("seconds", 60);
-        let events_per_second = config.get_as_or("events-per-second", 100_000);
-        let ips = config.get_as_or("ips", 100);
-        fs::create_dir_all(&data_dir)?;
-
-        println!("Generating {} events/s for {}s over {} partitions for {} ips.",
-                 events_per_second, seconds, partitions, ips);
-
-        let ips: Vec<_> = (0..ips).map(|_| random_ip()).collect();
-        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
-        for p in 0..partitions {
-            let mut file = File::create(format!("{}/events-{}.csv", &data_dir, p))?;
-            let ips = ips.clone();
-            threads.push(thread::spawn(move || {
-                let mut rng = rand::thread_rng();
-                for t in 0..seconds {
-                    for _ in 0..(events_per_second/partitions) {
-                        let ip = rng.choose(&ips).unwrap().clone();
-                        let session: String = rng.gen_ascii_chars().take(54).collect();
-                        let date = random_date();
-                        let float = 0.0;
-                        let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
-                        let s = "DOM";
-                        let subs = "DOM-ES";
-                        let word = "snow";
-                        let int = 6;
-                        writeln!(&mut file, "{:4} {},{},{},{:.8},{},{},{},{},{}",
-                                 t, ip, session, date, float, agent, s, subs, word, int)?;
-                    }
-                }
-                Ok(())
-            }));
-        }
-        for t in threads.drain(..){
-            t.join().unwrap()?;
-        }
-        Ok(())
-    }
 
     fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
         let mut config = config.clone();
@@ -284,11 +242,63 @@ impl<T: Timestamp> FromData<T> for (String, u64, u32) {
     }
 }
 
-pub fn hibench() -> Vec<Box<Test>>{
-    vec![Box::new(Identity::new()),
-         Box::new(Repartition::new()),
-         Box::new(Wordcount::new()),
-         Box::new(Fixwindow::new())]
+pub struct HiBench {}
+
+impl HiBench {
+    pub fn new() -> Self { HiBench{} }
+}
+
+impl Benchmark for HiBench {
+    fn name(&self) -> &str { "HiBench" }
+
+    fn generate_data(&self, config: &Config) -> Result<()> {
+        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
+        let partitions = config.get_as_or("partitions", 10);
+        let seconds = config.get_as_or("seconds", 60);
+        let events_per_second = config.get_as_or("events-per-second", 100_000);
+        let ips = config.get_as_or("ips", 100);
+        fs::create_dir_all(&data_dir)?;
+
+        println!("Generating {} events/s for {}s over {} partitions for {} ips.",
+                 events_per_second, seconds, partitions, ips);
+
+        let ips: Vec<_> = (0..ips).map(|_| random_ip()).collect();
+        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
+        for p in 0..partitions {
+            let mut file = File::create(format!("{}/events-{}.csv", &data_dir, p))?;
+            let ips = ips.clone();
+            threads.push(thread::spawn(move || {
+                let mut rng = rand::thread_rng();
+                for t in 0..seconds {
+                    for _ in 0..(events_per_second/partitions) {
+                        let ip = rng.choose(&ips).unwrap().clone();
+                        let session: String = rng.gen_ascii_chars().take(54).collect();
+                        let date = random_date();
+                        let float = 0.0;
+                        let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
+                        let s = "DOM";
+                        let subs = "DOM-ES";
+                        let word = "snow";
+                        let int = 6;
+                        writeln!(&mut file, "{:4} {},{},{},{:.8},{},{},{},{},{}",
+                                 t, ip, session, date, float, agent, s, subs, word, int)?;
+                    }
+                }
+                Ok(())
+            }));
+        }
+        for t in threads.drain(..){
+            t.join().unwrap()?;
+        }
+        Ok(())
+    }
+
+    fn tests(&self) -> Vec<Box<Test>> {
+        vec![Box::new(Identity::new()),
+             Box::new(Repartition::new()),
+             Box::new(Wordcount::new()),
+             Box::new(Fixwindow::new())]
+    }
 }
 
 #[cfg(test)]

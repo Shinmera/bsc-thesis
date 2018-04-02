@@ -10,7 +10,7 @@ use std::fs;
 use std::io::{Result, Write};
 use std::thread::{self, JoinHandle};
 use std::sync::RwLock;
-use test::{Test, TestImpl};
+use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
@@ -47,22 +47,60 @@ impl<T: Timestamp> FromData<T> for (String, usize) {
     }
 }
 
-struct YSB {
+struct Query {
     campaign_map: RwLock<HashMap<String, String>>
 }
 
-impl YSB {
+impl Query {
     fn new() -> Self {
-        YSB{
+        Query {
             campaign_map: RwLock::new(HashMap::new())
         }
     }
 }
 
-impl TestImpl for YSB {
+impl TestImpl for Query {
     type D = Event;
     type DO = (String, usize);
     type T = usize;
+
+    fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
+
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>{
+        let mut config = config.clone();
+        let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
+        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
+        let campaign_file = File::open(format!("{}/campaigns.json", &data_dir))?;
+        let mut map: HashMap<String, String> = serde_json::from_reader(campaign_file)?;
+        let mut target = self.campaign_map.write().unwrap();
+        for (k, v) in map.drain(){ target.insert(k, v); }
+        let int: Result<_> = config.clone().into();
+        let out: Result<_> = config.clone().into();
+        Ok((vec!(int?), out?))
+    }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let table = self.campaign_map.read().unwrap().clone();;
+        stream
+            .filter(|x: &Event| x.event_type == "view")
+            .map(|x| (x.ad_id, x.event_time))
+            .map(move |(ad_id, _)|
+                 match table.get(&ad_id){
+                     Some(id) => id.clone(),
+                     None => String::from("UNKNOWN AD")
+                 })
+            .epoch_window(10, 10)
+            .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1)
+    }
+}
+
+pub struct YSB {}
+
+impl YSB {
+    pub fn new() -> Self { YSB{} }
+}
+
+impl Benchmark for YSB {
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
@@ -125,34 +163,7 @@ impl TestImpl for YSB {
         Ok(())
     }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>{
-        let mut config = config.clone();
-        let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
-        let campaign_file = File::open(format!("{}/campaigns.json", &data_dir))?;
-        let mut map: HashMap<String, String> = serde_json::from_reader(campaign_file)?;
-        let mut target = self.campaign_map.write().unwrap();
-        for (k, v) in map.drain(){ target.insert(k, v); }
-        let int: Result<_> = config.clone().into();
-        let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+    fn tests(&self) -> Vec<Box<Test>> {
+        vec![Box::new(Query::new())]
     }
-
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let table = self.campaign_map.read().unwrap().clone();;
-        stream
-            .filter(|x: &Event| x.event_type == "view")
-            .map(|x| (x.ad_id, x.event_time))
-            .map(move |(ad_id, _)|
-                 match table.get(&ad_id){
-                     Some(id) => id.clone(),
-                     None => String::from("UNKNOWN AD")
-                 })
-            .epoch_window(10, 10)
-            .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1)
-    }
-}
-
-pub fn ysb() -> Vec<Box<Test>>{
-    vec![Box::new(YSB::new())]
 }

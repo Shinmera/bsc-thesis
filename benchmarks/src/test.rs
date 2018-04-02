@@ -16,15 +16,24 @@ use timely::{Data, Configuration};
 use timely;
 use timely_communication::allocator::Generic;
 
+/// This presents the public interface for a test collection.
+pub trait Benchmark {
+    /// The name of this test suite / benchmark.
+    fn name(&self) -> &str;
+    
+    /// This function is used to generate a workload or data set
+    /// for use during testing. It will write it out to files, which
+    /// can then be used to feed the tests.
+    fn generate_data(&self, config: &Config) -> Result<()>;
+
+    /// Returns a fresh vector of test instances for this benchmark.
+    fn tests(&self) -> Vec<Box<Test>>;
+}
+
 /// This presents the public interface for a test.
 pub trait Test : Sync+Send {
     /// The name of the test as a human readable string.
     fn name(&self) -> &str;
-    
-    /// This function is used to generate a workload or data set
-    /// for use during testing. It will write it out to a configured
-    /// file, which is then read back when the test is actually run.
-    fn generate_data(&self, config: &Config) -> Result<()>;
     
     /// This function handles the actual running of the test.
     fn run(&self, config: &Config, worker: &mut Root<Generic>) -> Result<Statistics>;
@@ -48,10 +57,6 @@ pub trait TestImpl : Sync+Send {
     type T: Timestamp;
 
     fn name(&self) -> &str;
-
-    fn generate_data(&self, _config: &Config) -> Result<()>{
-        Ok(())
-    }
 
     fn create_endpoints(&self, _config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
         Ok((vec!(().into()), ().into()))
@@ -90,7 +95,6 @@ pub trait TestImpl : Sync+Send {
 
 impl<I, T: Timestamp, D: Data, DO: Data> Test for I where I: TestImpl<T=T,D=D,DO=DO> {
     fn name(&self) -> &str { I::name(self) }
-    fn generate_data(&self, config: &Config) -> Result<()>{ I::generate_data(self, config) }
     fn run(&self, config: &Config, worker: &mut Root<Generic>) -> Result<Statistics>{ I::run(self, config, worker) }
 }
 
@@ -139,8 +143,4 @@ pub fn run_test(test: Box<Test>, config: &Config) -> Result<Statistics> {
     }).and_then(|x| x.join().pop().unwrap())
         .map_err(|x| Error::new(ErrorKind::Other, x))
         .and_then(|x| x)
-}
-
-pub fn generate_test(test: Box<Test>, config: &Config) -> Result<()> {
-    test.generate_data(config)
 }

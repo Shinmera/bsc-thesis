@@ -12,7 +12,7 @@ use std::fs::File;
 use std::fs;
 use std::thread::{self, JoinHandle};
 use std::io::{Result, Write};
-use test::{Test, TestImpl};
+use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::Stream;
 use timely::dataflow::operators::{Filter, Map, Binary};
 use timely::dataflow::scopes::{Root, Child};
@@ -70,7 +70,7 @@ enum RateShape {
     Sine,
 }
 
-struct NEXMark {
+struct NEXMarkConfig {
     active_people: usize,
     in_flight_auctions: usize,
     out_of_order_group_size: usize,
@@ -86,7 +86,7 @@ struct NEXMark {
     inter_event_delays: Vec<usize>,
 }
 
-impl NEXMark {
+impl NEXMarkConfig {
     fn new(config: &Config) -> Self{
         let rate_shape = if config.get_or("rate-shape", "sine") == "sine"{ RateShape::Sine }else{ RateShape::Square };
         // Calculate inter event delays array.
@@ -127,7 +127,7 @@ impl NEXMark {
                 epoch_period += (num_events_for_this_cycle * inter_event_delay) / 1000;
             }
         }
-        NEXMark {
+        NEXMarkConfig {
             active_people: config.get_as_or("active-people", 1000),
             in_flight_auctions: config.get_as_or("in-flight-auctions", 100),
             out_of_order_group_size: config.get_as_or("out-of-order-group-size", 11),
@@ -186,7 +186,7 @@ enum Event {
 }
 
 impl Event {
-    fn new(events_so_far: usize, nex: &mut NEXMark) -> Self {
+    fn new(events_so_far: usize, nex: &mut NEXMarkConfig) -> Self {
         let rem = nex.next_adjusted_event(events_so_far) % PROPORTION_DENOMINATOR;
         let timestamp = nex.event_timestamp(nex.next_adjusted_event(events_so_far));
         let id = nex.first_event_id + nex.next_adjusted_event(events_so_far);
@@ -267,7 +267,7 @@ impl Person {
         }
     }
 
-    fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMark) -> Id {
+    fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMarkConfig) -> Id {
         let people = Self::last_id(id) + 1;
         let active = min(people, nex.active_people);
         people - active + rng.gen_range(0, active + PERSON_ID_LEAD)
@@ -296,7 +296,7 @@ struct Auction{
 unsafe_abomonate!(Auction : id, item_name, description, initial_bid, reserve, date_time, expires, seller, category);
 
 impl Auction {
-    fn new(events_so_far: usize, id: usize, time: Date, rng: &mut StdRng, nex: &NEXMark) -> Self {
+    fn new(events_so_far: usize, id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         let initial_bid = rng.gen_price();
         let seller = if rng.gen_range(0, nex.hot_seller_ratio) > 0 {
             (Person::last_id(id) / HOT_SELLER_RATIO) * HOT_SELLER_RATIO
@@ -316,7 +316,7 @@ impl Auction {
         }
     }
 
-    fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMark) -> Id {
+    fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMarkConfig) -> Id {
         let max_auction = Self::last_id(id);
         let min_auction = if max_auction < nex.in_flight_auctions { 0 } else { max_auction - nex.in_flight_auctions };
         min_auction + rng.gen_range(0, max_auction - min_auction + 1 + AUCTION_ID_LEAD)
@@ -336,7 +336,7 @@ impl Auction {
         epoch * AUCTION_PROPORTION + offset
     }
 
-    fn next_length(events_so_far: usize, rng: &mut StdRng, time: Date, nex: &NEXMark) -> Date {
+    fn next_length(events_so_far: usize, rng: &mut StdRng, time: Date, nex: &NEXMarkConfig) -> Date {
         let current_event = nex.next_adjusted_event(events_so_far);
         let events_for_auctions = (nex.in_flight_auctions * PROPORTION_DENOMINATOR) / AUCTION_PROPORTION;
         let future_auction = nex.event_timestamp(current_event+events_for_auctions);
@@ -356,7 +356,7 @@ struct Bid{
 unsafe_abomonate!(Bid : auction, bidder, price, date_time);
 
 impl Bid {
-    fn new(id: usize, time: Date, rng: &mut StdRng, nex: &NEXMark) -> Self {
+    fn new(id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         let auction = if rng.gen_range(0, nex.hot_auction_ratio) > 0 {
             (Auction::last_id(id) / HOT_AUCTION_RATIO) * HOT_AUCTION_RATIO
         } else {
@@ -389,42 +389,8 @@ impl TestImpl for Query0 {
     type D = Event;
     type DO = Event;
 
-    fn name(&self) -> &str { "NEXMark Query 0" }
-
-    fn generate_data(&self, config: &Config) -> Result<()> {
-        let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
-        fs::create_dir_all(&data_dir)?;
-        let seconds = config.get_as_or("seconds", 60);
-        let partitions = config.get_as_or("partitions", 10);
-
-        println!("Generating events for {}s over {} partitions.", seconds, partitions);
-
-        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
-        for p in 0..partitions {
-            let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;
-            let mut nex = NEXMark::new(&config);
-            threads.push(thread::spawn(move || {
-                let wall_base = 0;
-                for events_so_far in 0.. {
-                    let time = nex.event_timestamp(nex.first_event_id + events_so_far);
-                    let wall = wall_base + (time - nex.base_time);
-                    let event = Event::new(events_so_far, &mut nex);
-                    let carrier = EventCarrier{ time: wall, event: event };
-                    
-                    serde_json::to_writer(&file, &carrier)?;
-                    file.write(b"\n")?;
-                    
-                    if seconds < (wall / 1000) { break; }
-                }
-                Ok(())
-            }));
-        }
-        for t in threads.drain(..){
-            t.join().unwrap()?;
-        }
-        Ok(())
-    }
-
+    fn name(&self) -> &str { "NEXMarkConfig Query 0" }
+    
     fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
@@ -703,15 +669,61 @@ impl<T: Timestamp> FromData<T> for (usize, Auction) {
     }
 }
 
-pub fn nexmark() -> Vec<Box<Test>>{
-    vec![Box::new(Query0::new()),
-         Box::new(Query1::new()),
-         Box::new(Query2::new()),
-         Box::new(Query3::new()),
-         Box::new(Query4::new()),
-         Box::new(Query5::new()),
-         Box::new(Query6::new()),
-         Box::new(Query7::new()),
-         Box::new(Query8::new()),
-         Box::new(Query9::new())]
+pub struct NEXMark {}
+
+impl NEXMark {
+    pub fn new() -> Self { NEXMark {} }
+}
+
+impl Benchmark for NEXMark {
+
+    fn name(&self) -> &str { "NEXMark" }
+
+    fn generate_data(&self, config: &Config) -> Result<()> {
+        let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
+        fs::create_dir_all(&data_dir)?;
+        let seconds = config.get_as_or("seconds", 60);
+        let partitions = config.get_as_or("partitions", 10);
+
+        println!("Generating events for {}s over {} partitions.", seconds, partitions);
+
+        let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
+        for p in 0..partitions {
+            let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;
+            let mut nex = NEXMarkConfig::new(&config);
+            threads.push(thread::spawn(move || {
+                let wall_base = 0;
+                for events_so_far in 0.. {
+                    let time = nex.event_timestamp(nex.first_event_id + events_so_far);
+                    let wall = wall_base + (time - nex.base_time);
+                    let event = Event::new(events_so_far, &mut nex);
+                    let carrier = EventCarrier{ time: wall, event: event };
+                    
+                    serde_json::to_writer(&file, &carrier)?;
+                    file.write(b"\n")?;
+                    
+                    if seconds < (wall / 1000) { break; }
+                }
+                Ok(())
+            }));
+        }
+        for t in threads.drain(..){
+            t.join().unwrap()?;
+        }
+        Ok(())
+    }
+
+    fn tests(&self) -> Vec<Box<Test>>{
+        vec![Box::new(Query0::new()),
+             Box::new(Query1::new()),
+             Box::new(Query2::new()),
+             Box::new(Query3::new()),
+             Box::new(Query4::new()),
+             Box::new(Query5::new()),
+             Box::new(Query6::new()),
+             Box::new(Query7::new()),
+             Box::new(Query8::new()),
+             Box::new(Query9::new())]
+    }
+
 }
