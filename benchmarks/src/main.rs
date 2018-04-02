@@ -21,7 +21,6 @@ mod test;
 mod hibench;
 mod ysb;
 mod nexmark;
-//mod integrity;
 
 use std::io::Result;
 use std::fmt::Display;
@@ -31,6 +30,7 @@ use hibench::HiBench;
 use ysb::YSB;
 use nexmark::NEXMark;
 
+/// Shorthand trait to easily report results.
 trait Reportable { fn report(&self); }
 
 impl<T: Display> Reportable for Result<T> {
@@ -52,6 +52,7 @@ impl<T: Display> Reportable for Result<T> {
 //     }
 // }
 
+/// This function returns a fresh vector of all known Benchmarks.
 fn benchmarks() -> Vec<Box<Benchmark>> {
     vec!(Box::new(HiBench::new()),
          Box::new(YSB::new()),

@@ -9,7 +9,12 @@ use timely::Data;
 use kafkaesque::{self};
 use rdkafka::config::ClientConfig;
 
+/// This trait is responsible for converting an opaque input type into a timestamp and data object for use in a data source.
 pub trait ToData<T, D> {
+    /// Convert the object into a timestamp and data instance.
+    ///
+    /// The timestamp should correspond to the epoch on which the data should be fed into the dataflow.
+    /// If a parsing failure or other unexpected circumstances occur, this function should return None.
     fn to_data(self) -> Option<(T, D)>;
 }
 
@@ -19,7 +24,12 @@ impl ToData<Product<RootTimestamp, usize>, String> for String{
     }
 }
 
+/// This trait is responsible for converting an opaque data type and timestamp into a string for use in a data drain.
 pub trait FromData<T: Timestamp> {
+    /// Convert the object and timestamp into a string.
+    ///
+    /// This string should be either in an expected format in an external file, or readable by humans.
+    /// The exact behaviour is up to the implementation of the trait.
     fn from_data(&self, t: &T) -> String;
 }
 
@@ -29,6 +39,12 @@ impl<T: Timestamp> FromData<T> for String {
     }
 }
 
+/// A shorthand to read a complete epoch from a data source closure.
+///
+/// Returns the timestamp for the epoch and a vector of data instances. The data is converted from the
+/// closure's return value via the ToData trait. If the closure ever returns None, the data is assumed
+/// to have been exhausted. If any data was already accumulated in this call to to_message, then the
+/// current data vector is returned. Otherwise, None is returned.
 fn to_message<T: Timestamp, D, F>(mut next: F) -> Option<(T, Vec<D>)>
 where F: FnMut()->Option<(T, D)> {
     let mut data = Vec::new();
@@ -45,6 +61,10 @@ where F: FnMut()->Option<(T, D)> {
     None
 }
 
+/// This input does not provide any data and simply immediately ends the epoch.
+///
+/// Its primary use is as a default source and as a way to test whether dataflow construction
+/// succeeds properly.
 pub struct NullInput<T: Timestamp, D>{
     queue: Vec<Event<T, D>>,
 }
@@ -62,6 +82,10 @@ impl<T: Timestamp, D> EventIterator<T, D> for NullInput<T, D> {
     }
 }
 
+/// This output does not do anything with the data and simply discards it.
+///
+/// Its primary use is to measure the performance of the dataflow when the actual results of
+/// the computation aren't of consequence.
 pub struct NullOutput();
 
 impl NullOutput {
@@ -74,6 +98,11 @@ impl<T: Timestamp, D> EventPusher<T, D> for NullOutput {
     fn push(&mut self, _: Event<T, D>) {}
 }
 
+/// This input reads line by line from the standard input.
+///
+/// With this you can pipe data into the dataflow from an external file or other kind of on-the-fly
+/// data source. Note that each event /must/ fit onto a single line, and the ToData trait /must/
+/// be implemented for the String type.
 pub struct ConsoleInput<T: Timestamp, D> {
     stream: Stdin,
     queue: Vec<Event<T, D>>,
@@ -110,6 +139,11 @@ impl<T: Timestamp, D> EventIterator<T, D> for ConsoleInput<T, D> where String: T
     }
 }
 
+/// This output simply prints all the data to the standard output.
+///
+/// This is mostly useful for short test runs and debugging sessions, in order to be able to
+/// watch the data as it comes out of the dataflow. Note that the FromData trait /must/ be
+/// implemented in order for this to work.
 pub struct ConsoleOutput {
     stream: Stdout
 }
@@ -133,6 +167,10 @@ impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for ConsoleOutput {
     }
 }
 
+/// This input reads lines from a file and converts them into data to feed into the dataflow.
+///
+/// In order for this to work, every event must fit onto a single line in the file, and the
+/// appropriate ToData conversion trait /must/ be implemented for the String type.
 pub struct FileInput<T: Timestamp, D> {
     stream: Lines<BufReader<File>>,
     queue: Vec<Event<T, D>>,
@@ -169,6 +207,9 @@ impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToDa
     }
 }
 
+/// This output writes everything to a file.
+///
+/// In order for this to work, the FromData trait /must/ be implemented for the data type.
 pub struct FileOutput {
     stream: BufWriter<File>
 }
@@ -192,6 +233,11 @@ impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for FileOutput {
     }
 }
 
+/// This input reads data elements from a vector.
+///
+/// This is mostly useful for setting up short test runs in-source. The vector
+/// should have a type of Vec<(T, Vec<D>)> where each tuple contains all data for a
+/// specific epoch. The epochs should be ordered.
 #[allow(dead_code)]
 pub struct VectorInput<T: Timestamp, D> {
     vector: Vec<Event<T, D>>,
@@ -213,6 +259,11 @@ impl<T: Timestamp, D> EventIterator<T, D> for VectorInput<T, D> {
     }
 }
 
+/// This output writes data elemetns to a vector.
+///
+/// This is mostly useful for writing unit tests to ensure the proper behaviour
+/// of a dataflow, as the vector can then be compared against expected results for
+/// a test run.
 #[allow(dead_code)]
 pub struct VectorOutput<T: Timestamp, D> {
     vector: Vec<(T, Vec<D>)>
@@ -233,6 +284,11 @@ impl<T: Timestamp, D> EventPusher<T, D> for VectorOutput<T, D> {
     }
 }
 
+/// This struct acts as an opaque event source for a dataflow.
+///
+/// It is merely a container to bypass Rust's restriction on materialised traits.
+/// You should be able to use the Source::from method to convert a usable type into
+/// a source that can be attached to a dataflow.
 pub struct Source<T, D>(Box<EventIterator<T, D>>);
 
 impl<T: Timestamp, D> Source<T, D> {
@@ -299,6 +355,11 @@ where Stdin: Into<Source<T, D>>,
     }
 }
 
+/// This struct acts as an opaque event drain for a dataflow.
+///
+/// It is merely a container to bypass Rust's restriction on materialised traits.
+/// You should be able to use the Drain::from method to convert a usable type into
+/// a drain that can be attached to a dataflow.
 pub struct Drain<T, D>(Box<EventPusher<T, D>>);
 
 impl<T: Timestamp, D> Drain<T, D> {
