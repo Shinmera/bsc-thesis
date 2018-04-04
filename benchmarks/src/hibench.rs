@@ -1,7 +1,7 @@
 use config::Config;
-use operators::{Window, RollingCount};
+use operators::{Window, RollingCount, Reduce};
 use rand::{self, Rng};
-use std::cmp;
+use std::cmp::min;
 use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
 use std::fs;
@@ -14,7 +14,6 @@ use std::thread::{self, JoinHandle};
 use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::Unary;
-use timely::dataflow::operators::aggregation::Aggregate;
 use timely::dataflow::operators::{Map, Exchange};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
@@ -92,10 +91,9 @@ impl TestImpl for Identity {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|(ts,_):(String,_)| {
-            (u64::from_str(&ts).expect("Identity: Cannot parse event timestamp."),
-             SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs())
-        })
+        stream.map(|(ts, _)|
+            (u64::from_str(&ts).unwrap(),
+             SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()))
     }
 }
 
@@ -144,8 +142,8 @@ impl TestImpl for Repartition {
                 });
             })
             // Exchange on worker id (worker ids are in [0,peers)
-            .exchange(|&(worker_id,_)| worker_id)
-            .map(|(_,record)| record)
+            .exchange(|&(worker_id, _)| worker_id)
+            .map(|(_, record)| record)
     }
 }
 
@@ -181,9 +179,9 @@ impl TestImpl for Wordcount {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
-            .map(|(ts,b)| (get_ip(&b),ts))
+            .map(|(ts,b)| (get_ip(&b), ts))
             .exchange(|&(ref ip,_)| hasher(&ip))
-            .rolling_count(|&(ref ip,ref ts):&(String,String)| (ip.clone(),ts.clone()))
+            .rolling_count(|&(ref ip,ref ts)| (ip.clone(), ts.clone()))
     }
 }
 
@@ -203,7 +201,7 @@ impl Fixwindow {
 
 impl TestImpl for Fixwindow {
     type D = (String,String);
-    type DO = (String,u64,u32);
+    type DO = (String,(u64,u32));
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
@@ -218,25 +216,16 @@ impl TestImpl for Fixwindow {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        // TODO (john): Check if timestamps in the input stream correspond to seconds
         stream
-            .map(|(ts,b):Self::D| (get_ip(&b),u64::from_str(&ts).expect("FixWindow: Cannot parse event timestamp.")))
-            // TODO (john): Check if timestamps in the input stream correspond to seconds
-            // A tumbling window of 10 epochs
+            .map(|(ts, b)| (get_ip(&b), u64::from_str(&ts).unwrap()))
             .epoch_window(10, 10)
-            // Group by ip and report the minimum observed timestamp and the total number of records per group
-            .aggregate::<_,(u64,u32),_,_,_>(
-               |_ip, ts, agg| 
-                { 
-                    agg.0 = cmp::min(agg.0,ts); 
-                    agg.1 += 1;
-                },
-               |ip, agg| (ip, agg.0,agg.1),
-               |ip| hasher(ip)
-            )
+            .reduce_by(|&(ref ip, _)| ip.clone(),
+                       (0, 0), |(_, t), (m, c)| (min(m, t), c+1))
     }
 }
 
-impl<T: Timestamp> FromData<T> for (String, u64, u32) {
+impl<T: Timestamp> FromData<T> for (String, (u64, u32)) {
     fn from_data(&self, t: &T) -> String {
         format!("{:?} {:?}", t, self)
     }
