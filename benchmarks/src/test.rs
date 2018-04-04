@@ -2,11 +2,10 @@ use config::Config;
 use statistics::Statistics;
 use endpoint::{Source, Drain};
 use std::collections::{HashMap};
+use operators::Timer;
 use std::io::{BufRead, Result, Error, ErrorKind};
 use std::sync::{Mutex,Arc};
-use std::time::Instant;
 use timely::dataflow::operators::capture::{Capture, Replay};
-use timely::dataflow::operators::Inspect;
 use timely::dataflow::scopes::{Child, Root};
 use timely::dataflow::{Stream, Scope};
 use timely::progress::Timestamp;
@@ -138,15 +137,10 @@ pub trait TestImpl : Sync+Send {
         worker.dataflow(|scope| {
             let ends = ends.clone();
             let starts = starts.clone();
-            // FIXME!! We need a better way to measure when an epoch is completely done.
             ins.replay_into(scope)
-                .inspect_batch(move |t, _|{
-                    let mut starts = starts.lock().unwrap();
-                    starts.entry(t.inner.clone()).or_insert(Instant::now());})
+                .time_first(starts)
                 .construct_dataflow(|s| self.construct_dataflow(config, s))
-                .inspect_batch(move |t, _|{
-                    let mut ends = ends.lock().unwrap();
-                    ends.entry(t.inner.clone()).or_insert(Instant::now());})
+                .time_last(ends)
                 .capture_into(out);
         });
         // Step until we're done.
