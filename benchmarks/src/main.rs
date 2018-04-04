@@ -13,6 +13,7 @@ extern crate uuid;
 extern crate rdkafka;
 extern crate kafkaesque;
 extern crate num;
+extern crate fnv;
 mod operators;
 mod config;
 mod statistics;

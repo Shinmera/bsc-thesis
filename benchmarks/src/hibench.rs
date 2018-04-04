@@ -181,7 +181,7 @@ impl TestImpl for Wordcount {
         stream
             .map(|(ts,b)| (get_ip(&b), ts))
             .exchange(|&(ref ip,_)| hasher(&ip))
-            .rolling_count(|&(ref ip,ref ts)| (ip.clone(), ts.clone()))
+            .rolling_count(|&(ref ip, _)| ip.clone(), |(ip, ts), c| (ip, ts, c))
     }
 }
 

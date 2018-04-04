@@ -1,12 +1,13 @@
 use std::collections::HashMap;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 use num::{ToPrimitive, Num};
 use timely::Data;
-use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::operators::generic::Unary;
 use timely::dataflow::{Stream, Scope};
 
-pub trait Reduce<G: Scope, D: Data> {
+pub trait Reduce<G: Scope, D: Data+Send> {
     fn reduce<H, V, K, R, D2, C>(&self, key_extractor: K, initial_value: V, reductor: R, completor: C) -> Stream<G, D2>
     where H: Hash+Eq+Data+Clone,
           V: Eq+Data+Clone,
@@ -32,7 +33,7 @@ pub trait Reduce<G: Scope, D: Data> {
           R: Fn(D, V)->V+'static;
 }
 
-impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
+impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
     fn reduce<H, V, K, R, D2, C>(&self, key_extractor: K, initial_value: V, reductor: R, completor: C) -> Stream<G, D2>
     where H: Hash+Eq+Data+Clone,
           V: Eq+Data+Clone,
@@ -41,12 +42,20 @@ impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
           R: Fn(D, V)->V+'static,
           C: Fn(H, V, usize)->D2+'static{
         let mut epochs = HashMap::new();
-        
-        self.unary_notify(Pipeline, "Reduce", Vec::new(), move |input, output, notificator| {
+
+        let key = Rc::new(key_extractor);
+        let key_ = key.clone();
+        let exchange = Exchange::new(move |d| {
+            let mut h: ::fnv::FnvHasher = Default::default();
+            key_(d).hash(&mut h);
+            h.finish()
+        });
+
+        self.unary_notify(exchange, "Reduce", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
                 let window = epochs.entry(time.clone()).or_insert_with(|| HashMap::new());
                 while let Some(dat) = data.pop() {
-                    let key = key_extractor(&dat);
+                    let key = key(&dat);
                     let (v, c) = window.remove(&key).unwrap_or_else(|| (initial_value.clone(), 0));
                     let value = reductor(dat, v);
                     window.insert(key, (value, c+1));
@@ -82,7 +91,7 @@ impl<G: Scope, D: Data> Reduce<G, D> for Stream<G, D> {
           R: Fn(D, V)->V+'static {
         let mut epochs = HashMap::new();
         
-        self.unary_notify(Pipeline, "Reduce", Vec::new(), move |input, output, notificator| {
+        self.unary_notify(Exchange::new(|_| 0), "Reduce", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
                 let mut reduced = epochs.remove(&time).unwrap_or_else(|| initial_value.clone());
                 while let Some(dat) = data.pop() {

@@ -1,37 +1,54 @@
 use std::collections::HashMap;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 use timely::Data;
-use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::operators::generic::Binary;
 use timely::dataflow::{Stream, Scope};
 
-pub trait Join<G: Scope, D1: Data> {
+pub trait Join<G: Scope, D1: Data+Send> {
     fn epoch_join<H, D2, D3, K1, K2, J>(&self, stream: &Stream<G, D2>, key_1: K1, key_2: K2, joiner: J) -> Stream<G, D3>
     where H: Hash+Eq+Data+Clone,
-          D2: Data, D3: Data,
+          D2: Data+Send, D3: Data,
           K1: Fn(&D1)->H+'static,
           K2: Fn(&D2)->H+'static,
           J: Fn(D1, D2)->D3+'static;
 
     fn left_join<H, D2, D3, K1, K2, J>(&self, stream: &Stream<G, D2>, key_1: K1, key_2: K2, joiner: J) -> Stream<G, D3>
     where H: Hash+Eq+Data+Clone,
-          D2: Data, D3: Data,
+          D2: Data+Send, D3: Data,
           K1: Fn(&D1)->H+'static,
           K2: Fn(&D2)->H+'static,
           J: Fn(D1, D2)->D3+'static;
 }
 
-impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
+impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
     fn epoch_join<H, D2, D3, K1, K2, J>(&self, stream: &Stream<G, D2>, key_1: K1, key_2: K2, joiner: J) -> Stream<G, D3>
     where H: Hash+Eq+Data+Clone,
-          D2: Data, D3: Data,
+          D2: Data+Send, D3: Data,
           K1: Fn(&D1)->H+'static,
           K2: Fn(&D2)->H+'static,
           J: Fn(D1, D2)->D3+'static{
         let mut epoch1 = HashMap::new();
         let mut epoch2 = HashMap::new();
+
+        let key_1 = Rc::new(key_1);
+        let key_1_ = key_1.clone();
+        let exchange_1 = Exchange::new(move |d| {
+            let mut h: ::fnv::FnvHasher = Default::default();
+            key_1_(d).hash(&mut h);
+            h.finish()
+        });
+
+        let key_2 = Rc::new(key_2);
+        let key_2_ = key_2.clone();
+        let exchange_2 = Exchange::new(move |d| {
+            let mut h: ::fnv::FnvHasher = Default::default();
+            key_2_(d).hash(&mut h);
+            h.finish()
+        });
         
-        self.binary_notify(stream, Pipeline, Pipeline, "Join", Vec::new(), move |input1, input2, output, notificator| {
+        self.binary_notify(stream, exchange_1, exchange_2, "Join", Vec::new(), move |input1, input2, output, notificator| {
             input1.for_each(|time, data|{
                 let epoch = epoch1.entry(time.clone()).or_insert_with(||HashMap::new());
                 while let Some(dat) = data.pop(){
@@ -73,14 +90,30 @@ impl<G: Scope, D1: Data> Join<G, D1> for Stream<G, D1> {
 
     fn left_join<H, D2, D3, K1, K2, J>(&self, stream: &Stream<G, D2>, key_1: K1, key_2: K2, joiner: J) -> Stream<G, D3>
     where H: Hash+Eq+Data+Clone,
-          D2: Data, D3: Data,
+          D2: Data+Send, D3: Data,
           K1: Fn(&D1)->H+'static,
           K2: Fn(&D2)->H+'static,
           J: Fn(D1, D2)->D3+'static {
         let mut d1s = HashMap::new();
         let mut d2s = HashMap::new();
 
-        self.binary_notify(stream, Pipeline, Pipeline, "Join", Vec::new(), move |input1, input2, output, _| {
+        let key_1 = Rc::new(key_1);
+        let key_1_ = key_1.clone();
+        let exchange_1 = Exchange::new(move |d| {
+            let mut h: ::fnv::FnvHasher = Default::default();
+            key_1_(d).hash(&mut h);
+            h.finish()
+        });
+
+        let key_2 = Rc::new(key_2);
+        let key_2_ = key_2.clone();
+        let exchange_2 = Exchange::new(move |d| {
+            let mut h: ::fnv::FnvHasher = Default::default();
+            key_2_(d).hash(&mut h);
+            h.finish()
+        });
+
+        self.binary_notify(stream, exchange_1, exchange_2, "Join", Vec::new(), move |input1, input2, output, _| {
             input1.for_each(|time, data|{
                 data.drain(..).for_each(|d1| {
                     let k1 = key_1(&d1);
