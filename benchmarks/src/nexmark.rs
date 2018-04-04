@@ -423,7 +423,7 @@ impl TestImpl for Query1 {
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .filter_map(|e| e.into())
-            .map(|b: Bid| (b.auction, b.bidder, (b.price * 89) / 100, b.date_time))
+            .map(|b: Bid| (b.auction, b.bidder, (b.price*89)/100, b.date_time))
     }
 }
 
@@ -470,10 +470,13 @@ impl TestImpl for Query3 {
         let auctions = stream
             .filter_map(|e| e.into())
             .filter(|a: &Auction| a.category == 10);
+        
         let persons = stream
             .filter_map(|e| e.into())
-            .filter(|p: &Person| p.state == "OR" || p.state == "ID" || p.state == "CA");
-        persons.left_join(&auctions, |p| p.id, |a| a.seller, |p, a| (p.name, p.city, p.state, a.id))
+            .filter(|p: &Person| p.state=="OR" || p.state=="ID" || p.state=="CA");
+        
+        persons.left_join(&auctions, |p| p.id, |a| a.seller,
+                          |p, a| (p.name, p.city, p.state, a.id))
     }
 }
 
@@ -494,7 +497,8 @@ impl TestImpl for Query4 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
-            .reduce_by(|&(_, ref a)| a.category, 0, |(p, _), c| c + p/NUM_CATEGORIES)
+            .reduce_by(|&(_, ref a)| a.category, 0,
+                       |(p, _), c| c + p/NUM_CATEGORIES)
     }
 }
 
@@ -517,7 +521,9 @@ impl TestImpl for Query5 {
         let bids = stream
             .filter_map(|e| e.into())
             .epoch_window(60*60, 60);
+        
         let count = bids.reduce_to(0, |_, c| c+1);
+        
         bids.reduce_by(|b: &Bid| b.auction, 0, |_, c| c+1)
             .epoch_join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
             .filter(|&(t, _, c)| c >= t)
@@ -562,7 +568,8 @@ impl TestImpl for Query7 {
     fn name(&self) -> &str { "NEXMark Query 7" }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.filter_map(|e| e.into())
+        stream
+            .filter_map(|e| e.into())
             .epoch_window(60, 60)
             .reduce(|_| 0, (0, 0, 0), |b: Bid, (a, p, bi)| {
                 if p < b.price { (b.auction, b.price, b.bidder) }
@@ -587,11 +594,16 @@ impl TestImpl for Query8 {
     fn name(&self) -> &str { "NEXMark Query 8" }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let auctions = stream.filter_map(|e| e.into())
+        let auctions = stream
+            .filter_map(|e| e.into())
             .epoch_window(60*60, 60*60);
-        let persons = stream.filter_map(|e| e.into())
+        
+        let persons = stream
+            .filter_map(|e| e.into())
             .epoch_window(60*60, 60*60);
-        persons.epoch_join(&auctions, |p: &Person| p.id, |a: &Auction| a.seller, |p, a| (p.id, p.name, a.reserve))
+        
+        persons.epoch_join(&auctions, |p: &Person| p.id, |a: &Auction| a.seller,
+                           |p, a| (p.id, p.name, a.reserve))
     }
 }
 
@@ -604,8 +616,9 @@ impl Query9 {
 }
 
 fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (usize, Auction)> {
-    let bids = stream.filter_map(|e| {let b: Option<Bid> = e.into(); b});
-    let auctions = stream.filter_map(|e| {let a: Option<Auction> = e.into(); a});
+    let bids = stream.filter_map(|e|{let b: Option<Bid>=e.into(); b});
+    let auctions = stream.filter_map(|e|{let a: Option<Auction>=e.into(); a});
+    
     let mut auction_map = HashMap::new();
     let mut bid_prices: HashMap<Id, usize> = HashMap::new();
     
@@ -621,7 +634,7 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
 
         input2.for_each(|_, data|{
             data.drain(..).for_each(|b: Bid|{
-                // FIXME: Check if the bid is valid (B.date_time < A.expires)
+                // FIXME: Check if (B.date_time < A.expires)
                 if let Some(other) = bid_prices.remove(&b.auction) {
                     bid_prices.insert(b.auction, max(other, b.price));
                 } else {
