@@ -27,13 +27,21 @@ The primary purpose of implementing our own generation for YSB is to find a shor
 
 \subsubsection{Query}
 \begin{listing}[H]
-  \inputminted[firstline=158,lastline=167]{rust}{benchmarks/src/ysb.rs}
+  \inputminted[firstline=84,lastline=93]{rust}{benchmarks/src/ysb.rs}
   \caption{Dataflow implementation of the YSB benchmark.}
   \label{lst:ysb}
 \end{listing}
 
+The implementation of the query is rather straightforward. The only step of the dataflow graph not directly represented here as an operator is the translation of the JSON string into the event object. We skip out on this as the translation is done on the data feeding end in order to use the event's \code{event_time} field to manage the corresponding epoch of the event. Each epoch corresponds to a real-time of one second. \\
+
+The second \code{map} operator is responsible for performing the lookup in the \code{campaign_id} table. Instead of the original Redis query, we use a simple hash-table lookup. A copy of the table is kept locally in memory of each worker. Since we don't make use of any of the remaining event fields after this step, we only emit the \code{campaign_id}, rather than a tuple of the event's fields.
+
 \subsection{Evaluation}
 
+\subsection{Remarks}
+Compared to the queries shown in NEXMark, the Yahoo Streaming Benchmark is exceedingly simple. It also includes some rather odd requirements that were most likely simply specific to Yahoo's internal use-case, rather than born out of consideration for what would make a good benchmark. Most notably the lookup in Redis would present a significant bottleneck for most modern streaming systems, and the required JSON deserialisation step will lead to the benchmark mostly testing the JSON library's speed, rather than the streaming system's actual performance in processing the data. \\
+
+Disregarding the Redis look up and the deserialisation, the only remaining operation the benchmark performs is a windowed reduction, as the projection can be mostly disregarded. This means that the benchmark does not add much complexity over a very basic word count test. Thus we believe it is neither representative of typical streaming systems applications, nor extensive enough in testing the system's expressiveness or capabilities.
 
 %%% Local Variables:
 %%% mode: latex

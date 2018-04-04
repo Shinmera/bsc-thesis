@@ -22,7 +22,7 @@ The benchmark defines the following queries:
 
 The queries are based on three types of events that can enter the system: \code{Person}, \code{Auction}, and \code{Bid}. Their fields are as follows:
 
-\paragraph{Person}
+\paragraph*{Person}
 \begin{itemize}
 \item \code{id} A person-unique integer ID.
 \item \code{name} A string for the person's full name.
@@ -33,7 +33,7 @@ The queries are based on three types of events that can enter the system: \code{
 \item \code{date_time} A millisecond timestamp for the event origin.
 \end{itemize}
 
-\paragraph{Auction}
+\paragraph*{Auction}
 \begin{itemize}
 \item \code{id} An auction-unique integer ID.
 \item \code{item_name} The name of the item being auctioned.
@@ -46,7 +46,7 @@ The queries are based on three types of events that can enter the system: \code{
 \item \code{category} The ID of the category this auction belongs to.
 \end{itemize}
 
-\paragraph{Bid}
+\paragraph*{Bid}
 \begin{itemize}
 \item \code{auction} The ID of the auction this bid is for.
 \item \code{bidder} The ID of the person that placed this bid.
@@ -62,8 +62,100 @@ The queries are based on three types of events that can enter the system: \code{
 In order to be able to run the benchmark outside of the Beam framework, we had to replicate their generator. For this we translated the original Java sources of the generator (\code{sdks/java/nexmark/src/main/java/org/apache/beam/sdk/nexmark/sources/generator}) into Rust. We output generated events to aggregate JSON files, where each line is made up of a single event to feed into the system. \\
 
 \subsubsection{Queries}
+\paragraph{Query 0}
+\begin{listing}[H]
+  \inputminted[firstline=404,lastline=404]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 0}
+  \label{lst:nexmark-query0}
+\end{listing}
+
+\paragraph{Query 1}
+\begin{listing}[H]
+  \inputminted[firstline=424,lastline=426]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 1}
+  \label{lst:nexmark-query1}
+\end{listing}
+
+\paragraph{Query 2}
+\begin{listing}[H]
+  \inputminted[firstline=447,lastline=450]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 2}
+  \label{lst:nexmark-query2}
+\end{listing}
+
+\paragraph{Query 3}
+\begin{listing}[H]
+  \inputminted[firstline=470,lastline=479]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 3}
+  \label{lst:nexmark-query3}
+\end{listing}
+
+\paragraph{Query 4}
+\begin{listing}[H]
+  \inputminted[firstline=499,lastline=501]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 4}
+  \label{lst:nexmark-query4}
+\end{listing}
+
+\paragraph{Query 5}
+\begin{listing}[H]
+  \inputminted[firstline=521,lastline=530]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 5}
+  \label{lst:nexmark-query5}
+\end{listing}
+
+\paragraph{Query 6}
+\begin{listing}[H]
+  \inputminted[firstline=550,lastline=551]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 6}
+  \label{lst:nexmark-query6}
+\end{listing}
+
+\paragraph{Query 7}
+\begin{listing}[H]
+  \inputminted[firstline=571,lastline=577]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 7}
+  \label{lst:nexmark-query7}
+\end{listing}
+
+\paragraph{Query 8}
+\begin{listing}[H]
+  \inputminted[firstline=597,lastline=606]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 8}
+  \label{lst:nexmark-query8}
+\end{listing}
+
+\paragraph{Query 9}
+\begin{listing}[H]
+  \inputminted[firstline=619,lastline=655]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 9}
+  \label{lst:nexmark-query9}
+\end{listing}
+
+\paragraph{Query 10}
+\begin{listing}[H]
+  \inputminted[firstline=0,lastline=1]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 10}
+  \label{lst:nexmark-query10}
+\end{listing}
+
+\paragraph{Query 11}
+\begin{listing}[H]
+  \inputminted[firstline=0,lastline=1]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 11}
+  \label{lst:nexmark-query11}
+\end{listing}
+
+\paragraph{Query 12}
+\begin{listing}[H]
+  \inputminted[firstline=0,lastline=1]{rust}{benchmarks/src/nexmark.rs}
+  \caption{Implementation for NEXMark's Query 12}
+  \label{lst:nexmark-query12}
+\end{listing}
 
 \subsection{Evaluation}
+
+\subsection{Remarks}
 
 
 %%% Local Variables:
