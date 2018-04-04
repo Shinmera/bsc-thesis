@@ -106,7 +106,7 @@ impl<T: Timestamp, D> EventPusher<T, D> for NullOutput {
 pub struct ConsoleInput<T: Timestamp, D> {
     stream: Stdin,
     queue: Vec<Event<T, D>>,
-    last_time: T
+    last_time: Option<T>
 }
 
 impl<T: Timestamp, D> ConsoleInput<T, D> {
@@ -114,7 +114,7 @@ impl<T: Timestamp, D> ConsoleInput<T, D> {
         ConsoleInput{
             stream: io::stdin(),
             queue: Vec::new(),
-            last_time: Default::default()
+            last_time: Some(Default::default())
         }
     }
 }
@@ -127,11 +127,10 @@ impl<T: Timestamp, D> EventIterator<T, D> for ConsoleInput<T, D> where String: T
             if let Some((t, d)) = to_message(||{ let mut line = String::new();
                                                  stream.read_line(&mut line).ok()
                                                  .and_then(|_| line.to_data()) }) {
-                let mut p = mem::replace(&mut self.last_time, t.clone());
+                let mut p = mem::replace(&mut self.last_time, Some(t.clone())).unwrap();
                 self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
                 self.queue.push(Event::Messages(t, d));
-            } else if self.last_time != Default::default() {
-                let mut p = mem::replace(&mut self.last_time, Default::default());
+            } else if let Some(p) = self.last_time.take() {
                 self.queue.push(Event::Progress(vec!((p, -1))));
             }
         }
@@ -174,7 +173,7 @@ impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for ConsoleOutput {
 pub struct FileInput<T: Timestamp, D> {
     stream: Lines<BufReader<File>>,
     queue: Vec<Event<T, D>>,
-    last_time: T
+    last_time: Option<T>
 }
 
 impl<T: Timestamp, D> FileInput<T, D> {
@@ -182,7 +181,7 @@ impl<T: Timestamp, D> FileInput<T, D> {
         FileInput{
             stream: BufReader::new(f).lines(),
             queue: Vec::new(),
-            last_time: Default::default()
+            last_time: Some(Default::default())
         }
     }
 }
@@ -195,11 +194,10 @@ impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToDa
             if let Some((t, d)) = to_message(||{ stream.next()
                                                  .and_then(|n| n.ok())
                                                  .and_then(|l| l.to_data()) }) {
-                let mut p = mem::replace(&mut self.last_time, t.clone());
+                let mut p = mem::replace(&mut self.last_time, Some(t.clone())).unwrap();
                 self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
                 self.queue.push(Event::Messages(t, d));
-            } else if self.last_time != Default::default() {
-                let mut p = mem::replace(&mut self.last_time, Default::default());
+            } else if let Some(p) = self.last_time.take() {
                 self.queue.push(Event::Progress(vec!((p, -1))));
             }
         }
