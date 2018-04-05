@@ -6,8 +6,6 @@ use timely::dataflow::operators::capture::event::{Event, EventIterator, EventPus
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely::progress::nested::product::Product;
 use timely::Data;
-use kafkaesque::{self};
-use rdkafka::config::ClientConfig;
 
 /// This trait is responsible for converting an opaque input type into a timestamp and data object for use in a data source.
 pub trait ToData<T, D> {
@@ -341,13 +339,6 @@ where Stdin: Into<Source<T, D>>,
             "file" => {
                 Ok(File::open(self.get_or("input-file", "input.log"))?.into())
             },
-            "kafka" => {
-                let mut config = ClientConfig::new();
-                config
-                    .set("produce.offset.report", "true")
-                    .set("bootstrap.servers", &self.get_or("kafka-server", "localhost:9092"));
-                Ok(Source::new(Box::new(kafkaesque::EventConsumer::new(config, self.get_or("kafka-topic", "1")))))
-            },
             _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
         }
     }
@@ -409,13 +400,6 @@ impl<T: Timestamp, D: Data+FromData<T>> Into<Result<Drain<T, D>>> for Config {
             },
             "file" => {
                 Ok(File::create(self.get_or("output-file", "output.log"))?.into())
-            },
-            "kafka" => {
-                let mut config = ClientConfig::new();
-                config
-                    .set("produce.offset.report", "true")
-                    .set("bootstrap.servers", &self.get_or("kafka-server", "localhost:9092"));
-                Ok(Drain::new(Box::new(kafkaesque::EventProducer::new(config, self.get_or("kafka-topic", "1")))))
             },
             _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
         }
