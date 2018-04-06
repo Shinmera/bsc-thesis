@@ -2,6 +2,7 @@ use config::Config;
 use std::io::{self, Result, Error, ErrorKind, Write, Stdout, Stdin, Lines, BufReader, BufRead, BufWriter};
 use std::fs::File;
 use std::mem;
+use std::time::{Instant, Duration};
 use timely::dataflow::operators::capture::event::{Event, EventIterator, EventPusher};
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely::progress::nested::product::Product;
@@ -13,12 +14,12 @@ pub trait ToData<T, D> {
     ///
     /// The timestamp should correspond to the epoch on which the data should be fed into the dataflow.
     /// If a parsing failure or other unexpected circumstances occur, this function should return None.
-    fn to_data(self) -> Option<(T, D)>;
+    fn to_data(self) -> Option<(f64, T, D)>;
 }
 
 impl ToData<Product<RootTimestamp, usize>, String> for String{
-    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, String)> {
-        Some((RootTimestamp::new(0), self))
+    fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, String)> {
+        Some((0_f64, RootTimestamp::new(0), self))
     }
 }
 
@@ -43,18 +44,18 @@ impl<T: Timestamp> FromData<T> for String {
 /// closure's return value via the ToData trait. If the closure ever returns None, the data is assumed
 /// to have been exhausted. If any data was already accumulated in this call to to_message, then the
 /// current data vector is returned. Otherwise, None is returned.
-fn to_message<T: Timestamp, D, F>(mut next: F) -> Option<(T, Vec<D>)>
-where F: FnMut()->Option<(T, D)> {
+fn to_message<T: Timestamp, D, F>(mut next: F) -> Option<(f64, T, Vec<D>)>
+where F: FnMut()->Option<(f64, T, D)> {
     let mut data = Vec::new();
 
-    if let Some((t, d)) = next() {
+    if let Some((c, t, d)) = next() {
         data.push(d);
         // BAD: We leak one event into the next epoch.
-        while let Some((t2, d)) = next() {
+        while let Some((c2, _, d)) = next() {
             data.push(d);
-            if t != t2 { break; }
+            if c != c2 { break; }
         }
-        return Some((t, data));
+        return Some((c, t, data));
     }
     None
 }
@@ -121,17 +122,17 @@ impl<T: Timestamp, D> EventIterator<T, D> for ConsoleInput<T, D> where String: T
     fn next(&mut self) -> Option<&Event<T, D>> {
         let ref mut stream = self.stream;
         self.queue.pop();
-        if self.queue.is_empty() {
-            if let Some((t, d)) = to_message(||{ let mut line = String::new();
-                                                 stream.read_line(&mut line).ok()
-                                                 .and_then(|_| line.to_data()) }) {
-                let mut p = mem::replace(&mut self.last_time, Some(t.clone())).unwrap();
-                self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
-                self.queue.push(Event::Messages(t, d));
-            } else if let Some(p) = self.last_time.take() {
-                self.queue.push(Event::Progress(vec!((p, -1))));
-            }
-        }
+        // if self.queue.is_empty() {
+        //     if let Some((t, d)) = to_message(||{ let mut line = String::new();
+        //                                          stream.read_line(&mut line).ok()
+        //                                          .and_then(|_| line.to_data()) }) {
+        //         let mut p = mem::replace(&mut self.last_time, Some(t.clone())).unwrap();
+        //         self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
+        //         self.queue.push(Event::Messages(t, d));
+        //     } else if let Some(p) = self.last_time.take() {
+        //         self.queue.push(Event::Progress(vec!((p, -1))));
+        //     }
+        // }
         self.queue.last()
     }
 }
@@ -171,7 +172,9 @@ impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for ConsoleOutput {
 pub struct FileInput<T: Timestamp, D> {
     stream: Lines<BufReader<File>>,
     queue: Vec<Event<T, D>>,
-    last_time: Option<T>
+    buffer: Option<(f64, T, Vec<D>)>,
+    start_time: Instant,
+    last_epoch: Option<T>
 }
 
 impl<T: Timestamp, D> FileInput<T, D> {
@@ -179,9 +182,15 @@ impl<T: Timestamp, D> FileInput<T, D> {
         FileInput{
             stream: BufReader::new(f).lines(),
             queue: Vec::new(),
-            last_time: Some(Default::default())
+            buffer: None,
+            start_time: Instant::now(),
+            last_epoch: Some(Default::default())
         }
     }
+}
+
+fn duration_fsecs(d: &Duration) -> f64{
+    d.as_secs() as f64 + d.subsec_nanos() as f64 / 1_000_000_000 as f64
 }
 
 impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToData<T, D> {
@@ -189,13 +198,27 @@ impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToDa
         let ref mut stream = self.stream;
         self.queue.pop();
         if self.queue.is_empty() {
-            if let Some((t, d)) = to_message(||{ stream.next()
+            // Compute our current logical time clock.
+            let clock = duration_fsecs(&Instant::now().duration_since(self.start_time));
+            if let Some((c, t, d)) = self.buffer.take() {
+                // We filled the buffer on last run, check if we're already synced.
+                // The 100x factor here is to make things go faster than real-time.
+                if c <= clock*100_f64 {
+                    // Okey, fill the queue
+                    let p = mem::replace(&mut self.last_epoch, Some(t.clone())).unwrap();
+                    self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
+                    self.queue.push(Event::Messages(t, d));
+                } else {
+                    // No, re-schedule the buffer.
+                    self.buffer = Some((c, t, d));
+                }
+            } else if let Some(dat) = to_message(|| stream.next()
                                                  .and_then(|n| n.ok())
-                                                 .and_then(|l| l.to_data()) }) {
-                let mut p = mem::replace(&mut self.last_time, Some(t.clone())).unwrap();
-                self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
-                self.queue.push(Event::Messages(t, d));
-            } else if let Some(p) = self.last_time.take() {
+                                                 .and_then(|l| l.to_data())) {
+                // The buffer is empty, and we read some data successfully, so push it in.
+                self.buffer = Some(dat);
+            } else if let Some(p) = self.last_epoch.take() {
+                // No more data and an empty buffer means we reached the end.
                 self.queue.push(Event::Progress(vec!((p, -1))));
             }
         }
