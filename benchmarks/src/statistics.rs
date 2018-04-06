@@ -11,6 +11,7 @@ use std::fmt;
 /// calculate the relevant fields.
 pub struct Statistics{
     pub total: f64,
+    pub count: usize,
     pub minimum: f64,
     pub maximum: f64,
     pub average: f64,
@@ -60,6 +61,7 @@ impl From<Vec<f64>> for Statistics{
         let mut local = vec.clone();
         local.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
         let total = local.iter().fold(0.0, f64::add);
+        let count = local.len();
         let minimum = local.iter().cloned().fold(0./0., f64::min);
         let maximum = local.iter().cloned().fold(0./0., f64::max);
         let average = total / local.len() as f64;
@@ -67,6 +69,7 @@ impl From<Vec<f64>> for Statistics{
         let median = *local.get(local.len()/2).unwrap_or(&0.0);
         Statistics{
             total: total,
+            count: count,
             minimum: minimum,
             maximum: maximum,
             average: average,
@@ -78,7 +81,7 @@ impl From<Vec<f64>> for Statistics{
 
 impl fmt::Display for Statistics{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Total:     Minimum:   Maximum:   Median:    Average:   Std. Dev:  \n{:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5}",
-               self.total, self.minimum, self.maximum, self.median, self.average, self.deviation)
+        write!(f, "Samples:   Total:     Minimum:   Maximum:   Median:    Average:   Std. Dev:  \n{:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5}",
+               self.count, self.total, self.minimum, self.maximum, self.median, self.average, self.deviation)
     }
 }
