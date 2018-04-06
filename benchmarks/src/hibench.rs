@@ -30,12 +30,12 @@ fn hasher(x: &String) -> u64 {
 }
 
 impl ToData<Product<RootTimestamp, usize>, (String, String)> for String{
-    fn to_data(self) -> Option<(Product<RootTimestamp, usize>, (String, String))> {
+    fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, (String, String))> {
         if let Some(t) = self.get(0..4){
             let t = t.trim_left();
             if let Some(d) = self.get(5..) {
                 if let Ok(tt) = usize::from_str(t) {
-                    return Some((RootTimestamp::new(tt), (String::from(t), String::from(d))));
+                    return Some((tt as f64, RootTimestamp::new(tt), (String::from(t), String::from(d))));
                 }
             }
         }
