@@ -17,22 +17,22 @@ pub trait Timer<G: Scope, D: Data> {
 impl<G: Scope, D: Data> Timer<G, D> for Stream<G, D> {
     fn time_first<T: Timestamp>(&self, time_map: Arc<Mutex<HashMap<T, Instant>>>) -> Stream<G, D>
     where G: ScopeParent<Timestamp=T> {
-        self.unary_notify(Pipeline, "Counter", Vec::new(), move |input, _, _| {
+        self.unary_notify(Pipeline, "Counter", Vec::new(), move |input, output, _| {
             let mut time_map = time_map.lock().unwrap();
-            while let Some((cap, _)) = input.next(){
-                let time = cap.time().clone();
-                time_map.entry(time).or_insert_with(|| Instant::now());
+            while let Some((cap, data)) = input.next(){
+                time_map.entry(cap.time().clone()).or_insert_with(|| Instant::now());
+                output.session(&cap).give_content(data);
             }
         })
     }
     
     fn time_last<T: Timestamp>(&self, time_map: Arc<Mutex<HashMap<T, Instant>>>) -> Stream<G, D>
     where G: ScopeParent<Timestamp=T> {
-        self.unary_notify(Pipeline, "Counter", Vec::new(), move |input, _, _| {
+        self.unary_notify(Pipeline, "Counter", Vec::new(), move |input, output, _| {
             let mut time_map = time_map.lock().unwrap();
-            while let Some((cap, _)) = input.next(){
-                let time = cap.time().clone();
-                time_map.insert(time, Instant::now());
+            while let Some((cap, data)) = input.next(){
+                time_map.insert(cap.time().clone(), Instant::now());
+                output.session(&cap).give_content(data);
             }
         })
     }
