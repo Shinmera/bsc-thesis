@@ -171,6 +171,8 @@ impl<T: Timestamp, D: FromData<T>> EventPusher<T, D> for ConsoleOutput {
 /// appropriate ToData conversion trait /must/ be implemented for the String type.
 pub struct FileInput<T: Timestamp, D> {
     stream: Lines<BufReader<File>>,
+    speedup: f64,
+    allowed_lateness: f64,
     queue: Vec<Event<T, D>>,
     buffer: Option<(f64, T, Vec<D>)>,
     start_time: Instant,
@@ -178,9 +180,11 @@ pub struct FileInput<T: Timestamp, D> {
 }
 
 impl<T: Timestamp, D> FileInput<T, D> {
-    pub fn new(f: File) -> Self {
+    pub fn new(f: File, speedup: f64, allowed_lateness: f64) -> Self {
         FileInput{
             stream: BufReader::new(f).lines(),
+            speedup: speedup,
+            allowed_lateness: allowed_lateness,
             queue: Vec::new(),
             buffer: None,
             start_time: Instant::now(),
@@ -199,18 +203,22 @@ impl<T: Timestamp, D> EventIterator<T, D> for FileInput<T, D> where String: ToDa
         self.queue.pop();
         if self.queue.is_empty() {
             // Compute our current logical time clock.
-            let clock = duration_fsecs(&Instant::now().duration_since(self.start_time));
+            let clock = duration_fsecs(&Instant::now().duration_since(self.start_time)) * self.speedup;
             if let Some((c, t, d)) = self.buffer.take() {
-                // We filled the buffer on last run, check if we're already synced.
-                // The 100x factor here is to make things go faster than real-time.
-                if c <= clock*100_f64 {
-                    // Okey, fill the queue
+                // We filled the buffer on last run, check if we're good.
+                if clock < c {
+                    // We're too early, re-schedule the buffer.
+                    self.buffer = Some((c, t, d));
+                } else {
                     let p = mem::replace(&mut self.last_epoch, Some(t.clone())).unwrap();
                     self.queue.push(Event::Progress(vec!((p, -1), (t.clone(), 1))));
-                    self.queue.push(Event::Messages(t, d));
-                } else {
-                    // No, re-schedule the buffer.
-                    self.buffer = Some((c, t, d));
+                    if c+self.allowed_lateness <= clock {
+                        // We're too late and probably congested. Drop it on the floor.
+                        eprintln!("Dropping records for {} due to lateness by {}", c, clock-c);
+                    } else {
+                        // We're still good, schedule the message.
+                        self.queue.push(Event::Messages(t, d));
+                    }
                 }
             } else if let Some(dat) = to_message(|| stream.next()
                                                  .and_then(|n| n.ok())
@@ -337,7 +345,7 @@ impl<T: Timestamp, D: Data> Into<Source<T, D>> for Stdin where String: ToData<T,
 
 impl<T: Timestamp, D: Data> Into<Source<T, D>> for File where String: ToData<T, D> {
     fn into(self) -> Source<T, D> {
-        Source::new(Box::new(FileInput::new(self)))
+        Source::new(Box::new(FileInput::new(self, 1.0, 10.0)))
     }
 }
 
@@ -349,18 +357,19 @@ impl<T: Timestamp, D: Data> Into<Source<T, D>> for File where String: ToData<T, 
 // }
 
 impl<T: Timestamp, D: Data> Into<Result<Source<T, D>>> for Config
-where Stdin: Into<Source<T, D>>,
-      File: Into<Source<T, D>> {
+where String: ToData<T, D> {
     fn into(self) -> Result<Source<T, D>> {
         match self.get_or("input", "file").as_ref() {
             "null" => {
-                Ok(().into())
+                Ok(Source::new(Box::new(NullInput::new())))
             },
             "console" => {
-                Ok(io::stdin().into())
+                Ok(Source::new(Box::new(ConsoleInput::new())))
             },
             "file" => {
-                Ok(File::open(self.get_or("input-file", "input.log"))?.into())
+                Ok(Source::new(Box::new(FileInput::new(File::open(self.get_or("input-file", "input.log"))?,
+                                                       self.get_as_or("speedup", 1.0),
+                                                       self.get_as_or("allowed_lateness", 10.0)))))
             },
             _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
         }
