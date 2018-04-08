@@ -171,7 +171,7 @@ impl NEXMarkConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Abomonation)]
 struct EventCarrier {
     time: Date,
     event: Event,
@@ -243,7 +243,7 @@ impl<T: Timestamp> FromData<T> for Event {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Abomonation)]
 struct Person{
     id: Id,
     name: String,
@@ -253,7 +253,6 @@ struct Person{
     state: String,
     date_time: Date
 }
-unsafe_abomonate!(Person : id, name, email_address, credit_card, city, state, date_time);
 
 impl Person {
     fn new(id: usize, time: Date, rng: &mut StdRng) -> Self {
