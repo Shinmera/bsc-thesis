@@ -232,7 +232,7 @@ impl Into<Option<Bid>> for Event {
 impl ToData<Product<RootTimestamp, usize>, Event> for String{
     fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, Event)> {
         serde_json::from_str(&self).ok()
-            .map(|carrier: EventCarrier| ((carrier.time/1000) as f64,
+            .map(|carrier: EventCarrier| (carrier.time as f64/1000 as f64,
                                           RootTimestamp::new(carrier.time / 1000), carrier.event))
     }
 }

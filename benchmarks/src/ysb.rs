@@ -37,7 +37,7 @@ unsafe_abomonate!(Event : user_id, page_id, ad_id, ad_type, event_type, event_ti
 impl ToData<Product<RootTimestamp, usize>, Event> for String{
     fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, Event)> {
         serde_json::from_str(&self).ok()
-            .map(|event: Event| ((event.event_time/1000) as f64,
+            .map(|event: Event| (event.event_time as f64/1000 as f64,
                                  RootTimestamp::new(event.event_time / 1000), event))
     }
 }
