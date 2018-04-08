@@ -1,9 +1,9 @@
-use std::collections::{HashMap};
-use std::sync::{Mutex,Arc};
+use std::collections::HashMap;
+use std::sync::{Mutex, Arc};
 use std::time::Instant;
 use timely::Data;
 use timely::dataflow::channels::pact::Pipeline;
-use timely::dataflow::operators::Unary;
+use timely::dataflow::operators::{Operator, Unary};
 use timely::dataflow::{Stream, Scope, ScopeParent};
 use timely::progress::Timestamp;
 
@@ -28,11 +28,16 @@ impl<G: Scope, D: Data> Timer<G, D> for Stream<G, D> {
     
     fn time_last<T: Timestamp>(&self, time_map: Arc<Mutex<HashMap<T, Instant>>>) -> Stream<G, D>
     where G: ScopeParent<Timestamp=T> {
-        self.unary_notify(Pipeline, "Counter", Vec::new(), move |input, output, _| {
-            let mut time_map = time_map.lock().unwrap();
-            while let Some((cap, data)) = input.next(){
-                time_map.insert(cap.time().clone(), Instant::now());
-                output.session(&cap).give_content(data);
+        self.unary_frontier(Pipeline, "Counter", move |_| {
+            move |input, output| {
+                let mut time_map = time_map.lock().unwrap();
+                if let Some(time) = input.frontier().frontier().get(0) {
+                    time_map.insert(time.clone(), Instant::now());
+                }
+
+                input.for_each(|cap, data|{
+                    output.session(&cap).give_content(data);
+                });
             }
         })
     }
