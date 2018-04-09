@@ -1,4 +1,4 @@
-ruse std::collections::HashMap;
+use std::collections::HashMap;
 use std::sync::{Mutex, Arc};
 use std::time::Instant;
 use timely::Data;

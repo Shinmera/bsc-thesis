@@ -6,7 +6,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::{Result, Write};
+use std::io::{Result, Write, Error, ErrorKind};
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -17,8 +17,7 @@ use timely::dataflow::operators::Unary;
 use timely::dataflow::operators::{Map, Exchange};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::nested::product::Product;
-use timely::progress::timestamp::{Timestamp, RootTimestamp};
+use timely::progress::timestamp::Timestamp;
 use timely_communication::allocator::Generic;
 use endpoint::{Drain, Source, FromData, ToData};
 
@@ -29,17 +28,18 @@ fn hasher(x: &String) -> u64 {
     s.finish()
 }
 
-impl ToData<Product<RootTimestamp, usize>, (String, String)> for String{
-    fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, (String, String))> {
+impl ToData<usize, (String, String)> for String{
+    fn to_data(self) -> Result<(usize, (String, String))> {
         if let Some(t) = self.get(0..4){
             let t = t.trim_left();
             if let Some(d) = self.get(5..) {
-                if let Ok(tt) = usize::from_str(t) {
-                    return Some((tt as f64, RootTimestamp::new(tt), (String::from(t), String::from(d))));
+                match usize::from_str(t) {
+                    Ok(tt) => return Ok((tt, (String::from(t), String::from(d)))),
+                    Err(e) => return Err(Error::new(ErrorKind::Other, ::std::error::Error::description(&e)))
                 }
             }
         }
-        None
+        Err(Error::new(ErrorKind::Other, "Failed to parse."))
     }
 }
 
@@ -81,13 +81,13 @@ impl TestImpl for Identity {
     
     fn name(&self) -> &str { "HiBench Identity" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -117,14 +117,14 @@ impl TestImpl for Repartition {
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Repartition" }
-
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
     
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -168,13 +168,13 @@ impl TestImpl for Wordcount {
     
     fn name(&self) -> &str { "HiBench Wordcount" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -206,13 +206,13 @@ impl TestImpl for Fixwindow {
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {

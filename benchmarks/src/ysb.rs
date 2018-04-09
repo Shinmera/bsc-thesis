@@ -13,8 +13,7 @@ use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::nested::product::Product;
-use timely::progress::timestamp::{Timestamp, RootTimestamp};
+use timely::progress::timestamp::Timestamp;
 use timely_communication::allocator::Generic;
 use uuid::Uuid;
 
@@ -31,11 +30,11 @@ struct Event {
     ip_address: String,
 }
 
-impl ToData<Product<RootTimestamp, usize>, Event> for String{
-    fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, Event)> {
-        serde_json::from_str(&self).ok()
-            .map(|event: Event| (event.event_time as f64/1000 as f64,
-                                 RootTimestamp::new(event.event_time / 1000), event))
+impl ToData<usize, Event> for String{
+    fn to_data(self) -> Result<(usize, Event)> {
+        serde_json::from_str(&self)
+            .map(|e: Event| (e.event_time / 1000, e))
+            .map_err(|e| e.into())
     }
 }
 
@@ -64,7 +63,7 @@ impl TestImpl for Query {
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)>{
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
@@ -74,7 +73,7 @@ impl TestImpl for Query {
         for (k, v) in map.drain(){ target.insert(k, v); }
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {

@@ -1,16 +1,17 @@
 use config::Config;
 use statistics::Statistics;
-use endpoint::{Source, Drain};
+use endpoint::{Source, Drain, EventSource, EventDrain};
 use std::collections::{HashMap};
 use operators::Timer;
 use std::io::{BufRead, Result, Error, ErrorKind};
 use std::sync::{Mutex,Arc};
-use timely::dataflow::operators::capture::{Capture, Replay};
+use std::ops::DerefMut;
 use timely::dataflow::scopes::{Child, Root};
-use timely::dataflow::{Stream, Scope};
+use timely::dataflow::operators::probe::Handle;
+use timely::dataflow::operators::{Probe, Unary};
+use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::{Stream, Scope, InputHandle};
 use timely::progress::Timestamp;
-use timely::progress::timestamp::RootTimestamp;
-use timely::progress::nested::product::Product;
 use timely::{Data, Configuration};
 use timely;
 use timely_communication::allocator::Generic;
@@ -109,12 +110,12 @@ pub trait TestImpl : Sync+Send {
     /// You may also use this function in order to perform preparation work for the test run, such as
     /// loading additional cache files and tables in that are not directly available in source, and
     /// are not fed into the dataflow as time based events.
-    fn create_endpoints(&self, _config: &Config, _index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, _config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         // I tried automatically creating endpoints according to the config, but that does not
         // seem to work out in any feasible manner. So, in order to make the imeplementation
         // of tests a bit less annoying we default to null endpoints, which should let you focus
         // on writing the dataflow at first -- the most important part.
-        Ok((vec!(().into()), ().into()))
+        Ok((().into(), ().into()))
     }
 
     /// This is the centrepiece of the test implementation and constructs the core dataflow.
@@ -133,18 +134,31 @@ pub trait TestImpl : Sync+Send {
         // Construct the full flow.
         let starts = Arc::new(Mutex::new(HashMap::new()));
         let ends = Arc::new(Mutex::new(HashMap::new()));
-        let (ins, out) = self.create_endpoints(config, worker.index(), worker.peers())?;
-        worker.dataflow(|scope| {
+        let (mut ins, mut out) = self.create_endpoints(config, worker.index(), worker.peers())?;
+        let mut input = InputHandle::new();
+        let probe = worker.dataflow(|scope| {
             let ends = ends.clone();
             let starts = starts.clone();
-            ins.replay_into(scope)
+            let mut probe = Handle::new();
+            input.to_stream(scope)
                 .time_first(starts)
                 .construct_dataflow(|s| self.construct_dataflow(config, s))
                 .time_last(ends)
-                .capture_into(out);
+                .probe_with(&mut probe)
+                .unary_stream::<(), _, _>(Pipeline, "Output", move |input, output|{
+                    while let Some((time, data)) = input.next() {
+                        out.next(time.time().inner.clone(), data.deref_mut().clone());
+                        output.session(&time);
+                    }
+                });
+            probe
         });
         // Step until we're done.
-        while worker.step() {}
+        while let Ok((t, mut d)) = ins.next() {
+            input.advance_to(t);
+            input.send_batch(&mut d);
+            worker.step_while(|| probe.less_than(input.time()));
+        }
         // Collect statistics.
         let starts = starts.lock().unwrap();
         let ends = ends.lock().unwrap();

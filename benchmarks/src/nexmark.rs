@@ -16,7 +16,6 @@ use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::Stream;
 use timely::dataflow::operators::{Filter, Map, Binary};
 use timely::dataflow::scopes::{Root, Child};
-use timely::progress::nested::product::Product;
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
 use timely::dataflow::channels::pact::Pipeline;
@@ -229,11 +228,11 @@ impl Into<Option<Bid>> for Event {
     }
 }
 
-impl ToData<Product<RootTimestamp, usize>, Event> for String{
-    fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, Event)> {
-        serde_json::from_str(&self).ok()
-            .map(|carrier: EventCarrier| (carrier.time as f64/1000 as f64,
-                                          RootTimestamp::new(carrier.time / 1000), carrier.event))
+impl ToData<usize, Event> for String{
+    fn to_data(self) -> Result<(usize, Event)> {
+        serde_json::from_str(&self)
+            .map(|c: EventCarrier| (c.time / 1000, c.event))
+            .map_err(|e| e.into())
     }
 }
 
@@ -391,13 +390,13 @@ impl TestImpl for Query0 {
 
     fn name(&self) -> &str { "NEXMarkConfig Query 0" }
     
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -662,13 +661,13 @@ impl TestImpl for Query9 {
 
     fn name(&self) -> &str { "NEXMark Query 9" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Vec<Source<Product<RootTimestamp, Self::T>, Self::D>>, Drain<Product<RootTimestamp, Self::T>, Self::DO>)> {
+    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         let mut config = config.clone();
         let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
         config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
         let int: Result<_> = config.clone().into();
         let out: Result<_> = config.clone().into();
-        Ok((vec!(int?), out?))
+        Ok((int?, out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
