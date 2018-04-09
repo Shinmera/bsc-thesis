@@ -268,7 +268,7 @@ where String: ToData<T, D> {
                 Ok(io::stdin().into())
             },
             "file" => {
-                Ok(File::open(self.get_or("output-file", "output.log"))?.into())
+                Ok(File::open(self.get_or("input-file", "input.log"))?.into())
             },
             // "kafka" => {
             //     let mut config = ClientConfig::new();
