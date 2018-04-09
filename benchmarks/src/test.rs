@@ -194,8 +194,7 @@ fn timely_configuration(config: &Config) -> Configuration {
             if addresses.len() < processes {
                 panic!("could only read {} addresses from {}, but -n: {}", addresses.len(), hosts, processes);
             }
-        }
-        else {
+        } else {
             for index in 0..processes {
                 addresses.push(format!("localhost:{}", 2101 + index));
             }
@@ -203,8 +202,7 @@ fn timely_configuration(config: &Config) -> Configuration {
 
         assert!(processes == addresses.len());
         Configuration::Cluster(threads, process, addresses, report)
-    }
-    else {
+    } else {
         if threads > 1 { Configuration::Process(threads) }
         else { Configuration::Thread }
     }

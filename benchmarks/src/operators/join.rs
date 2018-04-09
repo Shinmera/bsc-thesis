@@ -51,21 +51,21 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
         self.binary_notify(stream, exchange_1, exchange_2, "Join", Vec::new(), move |input1, input2, output, notificator| {
             input1.for_each(|time, data|{
                 let epoch = epoch1.entry(time.clone()).or_insert_with(||HashMap::new());
-                while let Some(dat) = data.pop(){
+                data.drain(..).for_each(|dat|{
                     let key = key_1(&dat);
                     let datavec = epoch.entry(key).or_insert_with(||Vec::new());
                     datavec.push(dat);
-                }
+                });
                 notificator.notify_at(time);
             });
             
             input2.for_each(|time, data|{
                 let epoch = epoch2.entry(time.clone()).or_insert_with(||HashMap::new());
-                while let Some(dat) = data.pop(){
+                data.drain(..).for_each(|dat|{
                     let key = key_2(&dat);
                     let datavec = epoch.entry(key).or_insert_with(||Vec::new());
                     datavec.push(dat);
-                }
+                });
                 notificator.notify_at(time);
             });
             

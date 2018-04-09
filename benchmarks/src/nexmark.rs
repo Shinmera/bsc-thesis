@@ -569,7 +569,7 @@ impl TestImpl for Query7 {
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .filter_map(|e| e.into())
-            .epoch_window(60, 60)
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/60)+1)*60))
             .reduce(|_| 0, (0, 0, 0), |b: Bid, (a, p, bi)| {
                 if p < b.price { (b.auction, b.price, b.bidder) }
                 else { (a, p, bi) }
@@ -595,11 +595,11 @@ impl TestImpl for Query8 {
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auctions = stream
             .filter_map(|e| e.into())
-            .epoch_window(60*60, 60*60);
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/3600)+1)*3600));
         
         let persons = stream
             .filter_map(|e| e.into())
-            .epoch_window(60*60, 60*60);
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/3600)+1)*3600));
         
         persons.epoch_join(&auctions, |p: &Person| p.id, |a: &Auction| a.seller,
                            |p, a| (p.id, p.name, a.reserve))

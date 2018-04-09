@@ -13,7 +13,7 @@ use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::timestamp::Timestamp;
+use timely::progress::timestamp::{RootTimestamp, Timestamp};
 use timely_communication::allocator::Generic;
 use uuid::Uuid;
 
@@ -86,7 +86,7 @@ impl TestImpl for Query {
                      Some(id) => id.clone(),
                      None => String::from("UNKNOWN AD")
                  })
-            .epoch_window(10, 10)
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1)
     }
 }

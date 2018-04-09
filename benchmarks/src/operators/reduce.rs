@@ -54,12 +54,12 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
         self.unary_notify(exchange, "Reduce", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
                 let window = epochs.entry(time.clone()).or_insert_with(|| HashMap::new());
-                while let Some(dat) = data.pop() {
+                data.drain(..).for_each(|dat|{
                     let key = key(&dat);
                     let (v, c) = window.remove(&key).unwrap_or_else(|| (initial_value.clone(), 0));
                     let value = reductor(dat, v);
                     window.insert(key, (value, c+1));
-                }
+                });
                 notificator.notify_at(time);
             });
             notificator.for_each(|time, _, _| {
@@ -96,7 +96,7 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
                 let mut reduced = epochs.remove(&time).unwrap_or_else(|| initial_value.clone());
                 while let Some(dat) = data.pop() {
                     reduced = reductor(dat, reduced);
-                }
+                };
                 epochs.insert(time.clone(), reduced);
                 notificator.notify_at(time);
             });
