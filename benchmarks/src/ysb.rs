@@ -1,4 +1,3 @@
-use abomonation::Abomonation;
 use config::Config;
 use endpoint::{Source, Drain, ToData, FromData};
 use operators::{Window, Reduce};
@@ -19,7 +18,7 @@ use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
 use uuid::Uuid;
 
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Abomonation)]
 struct Event {
     user_id: String,
     page_id: String,
@@ -32,12 +31,10 @@ struct Event {
     ip_address: String,
 }
 
-unsafe_abomonate!(Event : user_id, page_id, ad_id, ad_type, event_type, event_time, ip_address);
-
 impl ToData<Product<RootTimestamp, usize>, Event> for String{
     fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, Event)> {
         serde_json::from_str(&self).ok()
-            .map(|event: Event| ((event.event_time/1000) as f64,
+            .map(|event: Event| (event.event_time as f64/1000 as f64,
                                  RootTimestamp::new(event.event_time / 1000), event))
     }
 }

@@ -171,7 +171,7 @@ impl NEXMarkConfig {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Abomonation)]
 struct EventCarrier {
     time: Date,
     event: Event,
@@ -232,7 +232,7 @@ impl Into<Option<Bid>> for Event {
 impl ToData<Product<RootTimestamp, usize>, Event> for String{
     fn to_data(self) -> Option<(f64, Product<RootTimestamp, usize>, Event)> {
         serde_json::from_str(&self).ok()
-            .map(|carrier: EventCarrier| ((carrier.time/1000) as f64,
+            .map(|carrier: EventCarrier| (carrier.time as f64/1000 as f64,
                                           RootTimestamp::new(carrier.time / 1000), carrier.event))
     }
 }
@@ -243,7 +243,7 @@ impl<T: Timestamp> FromData<T> for Event {
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug, Abomonation)]
 struct Person{
     id: Id,
     name: String,
@@ -253,7 +253,6 @@ struct Person{
     state: String,
     date_time: Date
 }
-unsafe_abomonate!(Person : id, name, email_address, credit_card, city, state, date_time);
 
 impl Person {
     fn new(id: usize, time: Date, rng: &mut StdRng) -> Self {
@@ -683,6 +682,60 @@ impl<T: Timestamp> FromData<T> for (usize, Auction) {
     }
 }
 
+struct Query10 {}
+
+impl Query10 {
+    fn new() -> Self { Query10{} }
+}
+
+impl TestImpl for Query10 {
+    type T = Date;
+    type D = Event;
+    type DO = Event;
+
+    fn name(&self) -> &str { "NEXMark Query 10" }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream.map(|e| e)
+    }
+}
+
+struct Query11 {}
+
+impl Query11 {
+    fn new() -> Self { Query11{} }
+}
+
+impl TestImpl for Query11 {
+    type T = Date;
+    type D = Event;
+    type DO = Event;
+
+    fn name(&self) -> &str { "NEXMark Query 11" }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream.map(|e| e)
+    }
+}
+
+struct Query12 {}
+
+impl Query12 {
+    fn new() -> Self { Query12{} }
+}
+
+impl TestImpl for Query12 {
+    type T = Date;
+    type D = Event;
+    type DO = Event;
+
+    fn name(&self) -> &str { "NEXMark Query 12" }
+
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        stream.map(|e| e)
+    }
+}
+
 pub struct NEXMark {}
 
 impl NEXMark {
@@ -737,7 +790,10 @@ impl Benchmark for NEXMark {
              Box::new(Query6::new()),
              Box::new(Query7::new()),
              Box::new(Query8::new()),
-             Box::new(Query9::new())]
+             Box::new(Query9::new()),
+             Box::new(Query10::new()),
+             Box::new(Query11::new()),
+             Box::new(Query12::new())]
     }
 
 }

@@ -6,18 +6,31 @@ The benchmark defines the following queries:
 \begin{enumerate}
   \setcounter{enumi}{-1}
 \item \tb{Pass-Through} This is similar to HiBench's Identity query and should just output the received data.
+  \imagefigure[nexmark-0]{images/nexmark-0.pdf}{NEXMark's Query 0.}
 \item \tb{Currency Conversion} Output bids on auctions, but translate the bid price to Euro.
+  \imagefigure[nexmark-1]{images/nexmark-1.pdf}{NEXMark's Query 1.}
 \item \tb{Selection} Filter to auctions with a specific set of IDs.
+  \imagefigure[nexmark-2]{images/nexmark-2.pdf}{NEXMark's Query 2.}
 \item \tb{Local Item Suggestion} Output persons that are outputting auctions in particular states.
+  \imagefigure[nexmark-3]{images/nexmark-3.pdf}{NEXMark's Query 3.}
 \item \tb{Average Price for a Category} Compute the average auction price in a category for all auctions that haven't expired yet.
+  \imagefigure[nexmark-4]{images/nexmark-4.pdf}{NEXMark's Query 4.}
 \item \tb{Hot Items} Show the auctions with the most bids over the last hour, updated every minute.
+  \imagefigure[nexmark-5]{images/nexmark-5.pdf}{NEXMark's Query 5.}
 \item \tb{Average Selling Price by Seller} Compute the average selling price for the last ten closed auctions per auctioner.
+  \imagefigure[nexmark-6]{images/nexmark-6.pdf}{NEXMark's Query 6.}
 \item \tb{Highest Bid} Output the auction and bid with the highest price in the last minute.
+  \imagefigure[nexmark-7]{images/nexmark-7.pdf}{NEXMark's Query 7.}
 \item \tb{Monitor New Users} Show persons that have opened an auction in the last 12 hours.
+  \imagefigure[nexmark-8]{images/nexmark-8.pdf}{NEXMark's Query 8.}
 \item \tb{Winning Bids} Compute the winning bid for an auction. This is used in queries 4 and 6.
+  \imagefigure[nexmark-9]{images/nexmark-9.pdf}{NEXMark's Query 9.}
 \item \tb{Log to GCS} Output all events to a GCS file, which is supposed to illustrate large side effects.
+  \imagefigure[nexmark-10]{images/nexmark-10.pdf}{NEXMark's Query 10.}
 \item \tb{Bids in a Session} Show the number of bids a person has made in their session.
+  \imagefigure[nexmark-11]{images/nexmark-11.pdf}{NEXMark's Query 11.}
 \item \tb{Bids within a Window} Compute the number of bids a user makes within a processing-time constrained window.
+  \imagefigure[nexmark-12]{images/nexmark-12.pdf}{NEXMark's Query 12.}
 \end{enumerate}
 
 The queries are based on three types of events that can enter the system: \code{Person}, \code{Auction}, and \code{Bid}. Their fields are as follows:
@@ -53,9 +66,6 @@ The queries are based on three types of events that can enter the system: \code{
 \item \code{price} The price in cents that the person bid for.
 \item \code{date_time} A millisecond timestamp for the event origin.
 \end{itemize}
-
-%% FIXME: Split the image, I guess.
-\imagefigure[nexmark]{images/nexmark-graphs.pdf}{Graphs of the queries described by NEXMark.}
 
 \subsection{Implementation}
 \subsubsection{Data Generation}

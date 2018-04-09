@@ -10,8 +10,6 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate rand;
 extern crate uuid;
-extern crate rdkafka;
-extern crate kafkaesque;
 extern crate num;
 extern crate fnv;
 mod operators;

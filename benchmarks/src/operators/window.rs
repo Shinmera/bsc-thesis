@@ -17,6 +17,9 @@ impl<G: Scope, D: Data> Window<G, D> for Stream<G, D> {
         assert!(slide <= size, "The window slide cannot be greater than the window size.");
         let mut window_parts = HashMap::new();
         let mut times = VecDeque::new();
+        // FIXME: Change to use unary_frontier so that we get notified of empty epochs.
+        //        Without this, our windowing operator is going to be wrong for epochs that
+        //        are either naturally empty, or simply empty due to congestion causing drops.
         self.unary_notify(Pipeline, "Window", Vec::new(), move |input, output, notificator| {
             input.for_each(|cap, data| {
                 while let Some(data) = data.pop() {

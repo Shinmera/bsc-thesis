@@ -3,12 +3,16 @@ HiBench is a benchmarking suite created by Intel in 2012. It proposes a set of m
 
 \begin{itemize}
 \item \tb{Identity} This test is supposed to measure the minimum latency of the system, by simply immediately outputting the input data.
+  \imagefigure[hibench-identity]{images/hibench-1.pdf}{HiBench's Identity dataflow graph}
 \item \tb{Repartition} This tests the distribution of the workload across workers, but just like Identity does not perform any computation on the data. The repartition should be handled through a round-robin scheduler.
+  \imagefigure[hibench-repartition]{images/hibench-2.pdf}{HiBench's Repartition dataflow graph}
 \item \tb{Wordcount} This is a basic word count test that simply focuses on counting the occurrences of individual words, regularly outputting the current tally. It is intended to test the performance of stateful operators.
+  \imagefigure[hibench-wordcount]{images/hibench-3.pdf}{HiBench's Wordcount dataflow graph}
 \item \tb{Fixwindow} This test performs a simple hopping window reduction, with each window being ten seconds long.
+  \imagefigure[hibench-fixwindow]{images/hibench-4.pdf}{HiBench's Fixwindow dataflow graph}
 \end{itemize}
 
-The tests are illustrated as data flows in \autoref{figure:hibench}. The data used for the benchmark follows a custom CSV-like format, where each input is composed of an integer timestamp and a comma separated list of the following fields:
+The data used for the benchmark follows a custom CSV-like format, where each input is composed of an integer timestamp and a comma separated list of the following fields:
 
 \begin{itemize}
 \item \code{ip} An IPv4 address, presumably for the event origin.
@@ -26,15 +30,13 @@ As the benchmark does not publicly state the structure of the workload, and the 
 
 Since the benchmarks focus on very small tests, they can only really give insight about the performance of the system for a select few individual operations. This might not translate to the performance of the system for complex data flows with many interacting components. Hibench only focuses on the latency component of the system, measuring how long it takes the system to process data at a fixed input rate. It does not consider other important factors of a streaming system such as fault tolerance, scaling, and load bearing.
 
-\imagefigure[hibench]{images/hibench-graphs.pdf}{Graphs of the four streaming benchmarks that HiBench specifies.}
-
 \subsection{Implementation}
 \subsubsection{Data Generation}
 As the data generation process is not documented explicitly anywhere and the source is rather hard to decode, we opted for a much simpler scheme that should nevertheless follow the overall structure of the data used in HiBench. Our generator produces a fixed-size set of random IPs, by default set to 100. It then generates events at a fixed number of events per second, with the assumption that the timestamps in the data records correspond to seconds. For each event, the \code{ip} is chosen at random from the set, the \code{session_id} is a random 54 character long ASCII string, and the \code{date} is a randomly generated date string in the appropriate format. All of the remaining fields are left the same across all events. \\
 
 Since, as far as we can tell, only the IP and timestamp are actually used by any of the streaming queries, we do not believe that the lack of proper data generation for the remaining fields severely skews our workloads.
 
-\subsubsection{Queries}
+\subsubsection{Queries}\label{section:hibench-queries}
 \paragraph{Identity}
 \begin{listing}[H]
   \inputminted[firstline=94,lastline=96]{rust}{benchmarks/src/hibench.rs}
