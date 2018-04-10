@@ -246,43 +246,42 @@ impl<T: Timestamp, D> EventSource<T, D> for Source<T, D> {
     }
 }
 
-impl<T: Timestamp, D: 'static> Into<Source<T, D>> for () {
-    fn into(self) -> Source<T, D> {
+impl<T: Timestamp, D: Data> From<()> for Source<T, D> {
+    fn from(_: ()) -> Source<T, D> {
         Source::new(Box::new(Null::new()))
     }
 }
 
-impl<T: Timestamp, D: Data> Into<Source<T, D>> for Stdin where String: ToData<T, D> {
-    fn into(self) -> Source<T, D> {
+impl<T: Timestamp, D: Data> From<Stdin> for Source<T, D> where String: ToData<T, D> {
+    fn from(_: Stdin) -> Source<T, D> {
         Source::new(Box::new(Console::new()))
     }
 }
 
-impl<T: Timestamp, D: Data> Into<Source<T, D>> for File where String: ToData<T, D> {
-    fn into(self) -> Source<T, D> {
-        Source::new(Box::new(FileInput::new(self)))
+impl<T: Timestamp, D: Data> From<File> for Source<T, D> where String: ToData<T, D> {
+    fn from(file: File) -> Source<T, D> {
+        Source::new(Box::new(FileInput::new(file)))
     }
 }
 
-/// God damnit rust.
-// impl<T: Timestamp, D> Into<Source<T, D>> for Vec<(T, Vec<D>)> {
-//     fn into(self) -> Source<T, D> {
-//         Source::new(Box::new(VectorInput::new(self)));
-//     }
-// }
+impl<T: Timestamp, D: Data> From<Vec<(T, Vec<D>)>> for Source<T, D> {
+    fn from(vec: Vec<(T, Vec<D>)>) -> Source<T, D> {
+        Source::new(Box::new(VectorEndpoint::new(vec)))
+    }
+}
 
 impl<T: Timestamp, D: Data> Into<Result<Source<T, D>>> for Config
 where String: ToData<T, D> {
     fn into(self) -> Result<Source<T, D>> {
         match self.get_or("input", "file").as_ref() {
             "null" => {
-                Ok(().into())
+                Ok(Source::from(()))
             },
             "console" => {
-                Ok(io::stdin().into())
+                Ok(Source::from(io::stdin()))
             },
             "file" => {
-                Ok(File::open(self.get_or("input-file", "input.log"))?.into())
+                Ok(Source::from(File::open(self.get_or("input-file", "input.log"))?))
             },
             // "kafka" => {
             //     let mut config = ClientConfig::new();
@@ -316,42 +315,41 @@ impl<T: Timestamp, D> EventDrain<T, D> for Drain<T, D> {
     }
 }
 
-impl<T: Timestamp, D> Into<Drain<T, D>> for () {
-    fn into(self) -> Drain<T, D> {
+impl<T: Timestamp, D> From<()> for Drain<T, D> {
+    fn from(_: ()) -> Drain<T, D> {
         Drain::new(Box::new(Null::new()))
     }
 }
 
-impl<T: Timestamp, D: Data+FromData<T>> Into<Drain<T, D>> for Stdout {
-    fn into(self) -> Drain<T, D> {
+impl<T: Timestamp, D: Data+FromData<T>> From<Stdout> for Drain<T, D> {
+    fn from(_: Stdout) -> Drain<T, D> {
         Drain::new(Box::new(Console::new()))
     }
 }
 
-impl<T: Timestamp, D: Data+FromData<T>> Into<Drain<T, D>> for File {
-    fn into(self) -> Drain<T, D> {
-        Drain::new(Box::new(FileOutput::new(self)))
+impl<T: Timestamp, D: Data+FromData<T>> From<File> for Drain<T, D> {
+    fn from(file: File) -> Drain<T, D> {
+        Drain::new(Box::new(FileOutput::new(file)))
     }
 }
 
-/// God damnit rust.
-// impl<T: Timestamp, D> Into<Drain<T, D>> for Vec<(T, Vec<D>)> {
-//     fn into(self) -> Drain<T, D> {
-//         Drain::new(Box::new(VectorOutput::new()));
-//     }
-// }
+impl<T: Timestamp, D: Data> From<Vec<(T, Vec<D>)>> for Drain<T, D> {
+    fn from(vec: Vec<(T, Vec<D>)>) -> Drain<T, D> {
+        Drain::new(Box::new(VectorEndpoint::new(vec)))
+    }
+}
 
 impl<T: Timestamp, D: Data+FromData<T>> Into<Result<Drain<T, D>>> for Config {
     fn into(self) -> Result<Drain<T, D>> {
         match self.get_or("output", "null").as_ref() {
             "null" => {
-                Ok(().into())
+                Ok(Drain::from(()))
             },
             "console" => {
-                Ok(io::stdout().into())
+                Ok(Drain::from(io::stdout()))
             },
             "file" => {
-                Ok(File::create(self.get_or("output-file", "output.log"))?.into())
+                Ok(Drain::from(File::create(self.get_or("output-file", "output.log"))?))
             },
             // "kafka" => {
             //     let mut config = ClientConfig::new();
