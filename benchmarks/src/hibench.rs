@@ -259,7 +259,7 @@ impl EventSource<usize, (String, String)> for HiBenchGenerator {
                 let subs = "DOM-ES";
                 let word = "snow";
                 let int = 6;
-                data.push((format!("{:4}", self.epoch),
+                data.push((format!("{}", self.epoch),
                            format!("{},{},{},{:.8},{},{},{},{},{}",
                                    ip, session, date, float, agent, s, subs, word, int)));
             }
@@ -301,7 +301,7 @@ impl Benchmark for HiBench {
                 loop{
                     let (_, d) = generator.next()?;
                     for (t, e) in d {
-                        writeln!(&mut file, "{} {}", t, e)?;
+                        writeln!(&mut file, "{:4} {}", t, e)?;
                     }
                 }
             }));
