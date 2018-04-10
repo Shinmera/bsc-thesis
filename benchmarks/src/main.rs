@@ -63,7 +63,7 @@ fn benchmarks() -> Vec<Box<Benchmark>> {
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
     let mut benchmarks = benchmarks();
-    
+    // Compute applicable benchmarks
     let to_run = config.get("benchmarks")
         .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
         .unwrap_or(benchmarks.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
@@ -71,6 +71,7 @@ fn main() {
     
     let mode = config.get_or("1", "help");
     if mode == "test" {
+        // Compute applicable tests from benchmarks
         let mut tests = Vec::new();
         benchmarks.iter().for_each(|b| tests.append(&mut b.tests()));
         
@@ -78,17 +79,22 @@ fn main() {
             .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
             .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
         tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
+        
         for test in tests {
-            println!("> Running test {}", test.name());
-            run_test(test, &config).report();
+            let name = String::from(test.name());
+            eprintln!("> Running test {}", name);
+            match run_test(test, &config) {
+                Ok(s) => println!("{:16} {}", name, String::from(&s)),
+                Err(e) => eprintln!("{:16} Failed: {}", name, e)
+            }
         }
     }else if mode == "generate" {
         for bench in benchmarks {
-            println!("> Generating benchmark {}", bench.name());
+            eprintln!("> Generating benchmark {}", bench.name());
             bench.generate_data(&config).unwrap();
         }
     }else if mode == "help" {
-        println!("Timely Benchmarks v0.1
+        eprintln!("Timely Benchmarks v0.1
 
 Usage: MODE [MODE-OPTIONS]
 

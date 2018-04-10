@@ -81,7 +81,13 @@ impl From<Vec<f64>> for Statistics{
 
 impl fmt::Display for Statistics{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Samples:   Total:     Minimum:   Maximum:   Median:    Average:   Std. Dev:  \n{:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5}",
-               self.count, self.total, self.minimum, self.maximum, self.median, self.average, self.deviation)
+        write!(f, "Samples:   Total:     Minimum:   Maximum:   Median:    Average:   Std. Dev:  \n{}", String::from(self))
+    }
+}
+
+impl<'a> From<&'a Statistics> for String{
+    fn from(stats: &'a Statistics) -> Self {
+        format!("{:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5} {:10.5}",
+                stats.count, stats.total, stats.minimum, stats.maximum, stats.median, stats.average, stats.deviation)
     }
 }
