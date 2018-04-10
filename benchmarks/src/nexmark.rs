@@ -91,7 +91,7 @@ impl NEXMarkConfig {
         let rate_shape = if config.get_or("rate-shape", "sine") == "sine"{ RateShape::Sine }else{ RateShape::Square };
         // Calculate inter event delays array.
         let mut inter_event_delays = Vec::new();
-        let first_rate = config.get_as_or("first-event-rate", 10_000);
+        let first_rate = config.get_as_or("first-event-rate", config.get_as_or("events-per-second", 10_000));
         let next_rate = config.get_as_or("next-event-rate", first_rate);
         let rate = config.get_as_or("rate", 1_000_000); // Rate is in μs
         let generators = config.get_as_or("threads", 10);
