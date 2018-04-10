@@ -42,6 +42,7 @@ impl Config {
     /// Inserts the given value for the given key.
     ///
     /// If the key already exists, its value is overwritten.
+    #[allow(dead_code)]
     pub fn insert(&mut self, key: &str, value: String) {
         self.args.insert(String::from(key), value);
     }

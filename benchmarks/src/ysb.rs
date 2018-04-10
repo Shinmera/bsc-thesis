@@ -1,7 +1,7 @@
 use config::Config;
 use endpoint::{self, Source, Drain, ToData, FromData, EventSource};
 use operators::{Window, Reduce};
-use rand::{self, Rng};
+use rand::{self, Rng, SeedableRng};
 use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
@@ -69,17 +69,13 @@ impl TestImpl for Query {
 
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
-        let campaign_file = File::open(format!("{}/campaigns.json", &data_dir))?;
-        let mut map: HashMap<String, String> = serde_json::from_reader(campaign_file)?;
-        let mut target = self.campaign_map.write().unwrap();
-        for (k, v) in map.drain(){ target.insert(k, v); }
-        let int: Result<_> = config.clone().into();
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        let gen = YSBGenerator::new(config);
+        let mut target = self.campaign_map.write().unwrap();
+        for (k, v) in &gen.map { target.insert(k.clone(), v.clone()); }
+        Ok((Source::new(Box::new(gen)), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -138,7 +134,7 @@ impl EventSource<usize, Event> for YSBGenerator {
     fn next(&mut self) -> Result<(usize, Vec<Event>)> {
         const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
         const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::StdRng::from_seed(&[0xDEAD, 0xBEEF, 0xFEED]); // Predictable RNG clutch
         let mut data = Vec::new();
         let epoch = self.time as usize / 1000;
         
