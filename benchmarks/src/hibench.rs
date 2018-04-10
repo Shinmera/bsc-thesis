@@ -81,13 +81,10 @@ impl TestImpl for Identity {
     
     fn name(&self) -> &str { "HiBench Identity" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
-        let int: Result<_> = config.clone().into();
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -118,13 +115,10 @@ impl TestImpl for Repartition {
     
     fn name(&self) -> &str { "HiBench Repartition" }
     
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
-        let int: Result<_> = config.clone().into();
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
     }
     
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -168,13 +162,10 @@ impl TestImpl for Wordcount {
     
     fn name(&self) -> &str { "HiBench Wordcount" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
-        let int: Result<_> = config.clone().into();
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -206,13 +197,10 @@ impl TestImpl for Fixwindow {
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
 
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.csv", &data_dir, index));
-        let int: Result<_> = config.clone().into();
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
