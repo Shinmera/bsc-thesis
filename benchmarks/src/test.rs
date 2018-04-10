@@ -2,10 +2,9 @@ use config::Config;
 use statistics::Statistics;
 use endpoint::{Source, Drain, EventSource, EventDrain};
 use std::collections::{HashMap};
-use operators::Timer;
 use std::io::{BufRead, Result, Error, ErrorKind};
-use std::sync::{Mutex,Arc};
 use std::ops::DerefMut;
+use std::time::Instant;
 use timely::dataflow::scopes::{Child, Root};
 use timely::dataflow::operators::probe::Handle;
 use timely::dataflow::operators::{Probe, Unary};
@@ -132,18 +131,12 @@ pub trait TestImpl : Sync+Send {
     /// to process epochs during the test run.
     fn run(&self, config: &Config, worker: &mut Root<Generic>) -> Result<Statistics>{
         // Construct the full flow.
-        let starts = Arc::new(Mutex::new(HashMap::new()));
-        let ends = Arc::new(Mutex::new(HashMap::new()));
         let (mut ins, mut out) = self.create_endpoints(config, worker.index(), worker.peers())?;
         let mut input = InputHandle::new();
         let probe = worker.dataflow(|scope| {
-            let ends = ends.clone();
-            let starts = starts.clone();
             let mut probe = Handle::new();
             input.to_stream(scope)
-                .time_first(starts)
                 .construct_dataflow(|s| self.construct_dataflow(config, s))
-                .time_last(ends)
                 .probe_with(&mut probe)
                 .unary_stream::<(), _, _>(Pipeline, "Output", move |input, output|{
                     while let Some((time, data)) = input.next() {
@@ -154,14 +147,16 @@ pub trait TestImpl : Sync+Send {
             probe
         });
         // Step until we're done.
+        let mut starts = HashMap::new();
+        let mut ends = HashMap::new();
         while let Ok((t, mut d)) = ins.next() {
-            input.advance_to(t);
+            starts.insert(t.clone(), Instant::now());
+            input.advance_to(t.clone());
             input.send_batch(&mut d);
             worker.step_while(|| probe.less_than(input.time()));
+            ends.insert(t.clone(), Instant::now());
         }
         // Collect statistics.
-        let starts = starts.lock().unwrap();
-        let ends = ends.lock().unwrap();
         let durations: Vec<_> = ends.iter().filter_map(|(t, i)|starts.get(t).map(|s|(s, i))).collect();
         return Ok(Statistics::from(durations));
     }
@@ -217,6 +212,7 @@ pub fn run_test(test: Box<Test>, config: &Config) -> Result<Statistics> {
     let configuration = timely_configuration(&config);
     timely::execute(configuration, move |worker| {
         test.run(&config, worker)
+        // FIXME: Average statistics from all workers
     }).and_then(|x| x.join().pop().unwrap())
         .map_err(|x| Error::new(ErrorKind::Other, x))
         .and_then(|x| x)
