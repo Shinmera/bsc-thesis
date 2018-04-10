@@ -1,10 +1,24 @@
 use config::Config;
 use std::io::{self, Result, Error, ErrorKind, Write, Stdout, Stdin, Lines, BufReader, BufRead, BufWriter};
+use std::error::Error as StdError;
 use std::fs::File;
 use timely::progress::timestamp::Timestamp;
 use timely::Data;
 //use kafkaesque;
 //use rdkafka::config::ClientConfig;
+
+pub const OUT_OF_DATA: &str = "out of data";
+
+pub fn out_of_data<D>() -> Result<D> {
+    Err(Error::new(ErrorKind::Other, OUT_OF_DATA))
+}
+
+pub fn accept_out_of_data<D>(r: Result<D>) -> Result<D>
+where D: Default {
+    r.or_else(|e| if e.description() == OUT_OF_DATA {
+        Ok(Default::default())
+    } else { Err(e) })
+}
 
 pub trait EventSource<T, D> {
     fn next(&mut self) -> Result<(T, Vec<D>)>;
@@ -82,7 +96,7 @@ impl Null {
 
 impl<T, D> EventSource<T, D> for Null {
     fn next(&mut self) -> Result<(T, Vec<D>)> {
-        Err(Error::new(ErrorKind::Other, "Out of data."))
+        out_of_data()
     }
 }
 
@@ -149,7 +163,7 @@ impl<T: Timestamp, D> EventSource<T, D> for FileInput where String: ToData<T, D>
     fn next(&mut self) -> Result<(T, Vec<D>)> {
         let ref mut stream = self.stream;
         to_message(|| stream.next()
-                   .unwrap_or_else(|| Err(Error::new(ErrorKind::Other, "Out of data")))
+                   .unwrap_or_else(|| out_of_data())
                    .and_then(|line| line.to_data()))
     }
 }
@@ -201,7 +215,7 @@ impl<T: Timestamp, D> EventSource<T, D> for VectorEndpoint<T, D> {
         if let Some(e) = self.vector.pop() {
             Ok(e)
         } else {
-            Err(Error::new(ErrorKind::Other, "Out of data"))
+            out_of_data()
         }
     }
 }
