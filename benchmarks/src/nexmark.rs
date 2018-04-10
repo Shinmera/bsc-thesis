@@ -237,9 +237,9 @@ impl ToData<usize, Event> for String{
     }
 }
 
-impl<T: Timestamp> FromData<T> for Event {
-    fn from_data(&self, t: &T) -> String {
-        format!("{:?} {:?}", t, self)
+impl FromData<usize> for Event {
+    fn from_data(&self, t: &usize) -> String {
+        serde_json::to_string(&EventCarrier{ time: t.clone(), event: self.clone()}).unwrap()
     }
 }
 
@@ -391,13 +391,10 @@ impl TestImpl for Query0 {
 
     fn name(&self) -> &str { "NEXMarkConfig Query 0" }
     
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
-        let int: Result<_> = config.clone().into();
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -419,11 +416,23 @@ impl TestImpl for Query1 {
     type DO = (Id, Id, usize, Date);
 
     fn name(&self) -> &str { "NEXMark Query 1" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .filter_map(|e| e.into())
             .map(|b: Bid| (b.auction, b.bidder, (b.price*89)/100, b.date_time))
+    }
+}
+
+impl FromData<usize> for (Id, Id, usize, Date) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -441,6 +450,12 @@ impl TestImpl for Query2 {
     type DO = (Id, usize);
 
     fn name(&self) -> &str { "NEXMark Query 2" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auction_skip = config.get_as_or("auction-skip", 123);
@@ -448,6 +463,12 @@ impl TestImpl for Query2 {
             .filter_map(|e| e.into())
             .filter(move |b: &Bid| b.auction % auction_skip == 0)
             .map(|b| (b.auction, b.price))
+    }
+}
+
+impl FromData<usize> for (Id, usize) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -465,6 +486,12 @@ impl TestImpl for Query3 {
     type DO = (String, String, String, Id);
 
     fn name(&self) -> &str { "NEXMark Query 3" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auctions = stream
@@ -474,9 +501,15 @@ impl TestImpl for Query3 {
         let persons = stream
             .filter_map(|e| e.into())
             .filter(|p: &Person| p.state=="OR" || p.state=="ID" || p.state=="CA");
-        
+        // FIXME
         persons.left_join(&auctions, |p| p.id, |a| a.seller,
                           |p, a| (p.name, p.city, p.state, a.id))
+    }
+}
+
+impl FromData<usize> for (String, String, String, Id) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -494,6 +527,12 @@ impl TestImpl for Query4 {
     type DO = (usize, usize);
 
     fn name(&self) -> &str { "NEXMark Query 4" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
@@ -516,11 +555,17 @@ impl TestImpl for Query5 {
     type DO = Id;
 
     fn name(&self) -> &str { "NEXMark Query 5" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let bids = stream
             .filter_map(|e| e.into())
-            .epoch_window(60*60, 60);
+            .epoch_window(10, 5);
         
         let count = bids.reduce_to(0, |_, c| c+1);
         
@@ -528,6 +573,12 @@ impl TestImpl for Query5 {
             .epoch_join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
             .filter(|&(t, _, c)| c >= t)
             .map(|(_, a, _)| a)
+    }
+}
+
+impl FromData<usize> for Id {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -545,10 +596,22 @@ impl TestImpl for Query6 {
     type DO = (Id, f32);
 
     fn name(&self) -> &str { "NEXMark Query 6" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
             .average_by(|&(_, ref a)| a.seller, |(p, _)| p)
+    }
+}
+
+impl FromData<usize> for (Id, f32) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -566,15 +629,27 @@ impl TestImpl for Query7 {
     type DO = (Id, usize, Id);
 
     fn name(&self) -> &str { "NEXMark Query 7" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .filter_map(|e| e.into())
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/60)+1)*60))
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
             .reduce(|_| 0, (0, 0, 0), |b: Bid, (a, p, bi)| {
                 if p < b.price { (b.auction, b.price, b.bidder) }
                 else { (a, p, bi) }
             }, |_, d, _| d)
+    }
+}
+
+impl FromData<usize> for (Id, usize, Id) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -592,18 +667,30 @@ impl TestImpl for Query8 {
     type DO = (Id, String, usize);
 
     fn name(&self) -> &str { "NEXMark Query 8" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auctions = stream
             .filter_map(|e| e.into())
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/3600)+1)*3600));
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10));
         
         let persons = stream
             .filter_map(|e| e.into())
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/3600)+1)*3600));
+            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10));
         
         persons.epoch_join(&auctions, |p: &Person| p.id, |a: &Auction| a.seller,
                            |p, a| (p.id, p.name, a.reserve))
+    }
+}
+
+impl FromData<usize> for (Id, String, usize) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {:?}", t, self)
     }
 }
 
@@ -661,14 +748,11 @@ impl TestImpl for Query9 {
     type DO = (usize, Auction);
 
     fn name(&self) -> &str { "NEXMark Query 9" }
-
-    fn create_endpoints(&self, config: &Config, index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        let mut config = config.clone();
-        let data_dir = format!("{}/nexmark", config.get_or("data-dir", "data"));
-        config.insert("input-file", format!("{}/events-{}.json", &data_dir, index));
-        let int: Result<_> = config.clone().into();
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
         let out: Result<_> = config.clone().into();
-        Ok((int?, out?))
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -694,6 +778,12 @@ impl TestImpl for Query10 {
     type DO = Event;
 
     fn name(&self) -> &str { "NEXMark Query 10" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream.map(|e| e)
@@ -712,6 +802,12 @@ impl TestImpl for Query11 {
     type DO = Event;
 
     fn name(&self) -> &str { "NEXMark Query 11" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream.map(|e| e)
@@ -730,6 +826,12 @@ impl TestImpl for Query12 {
     type DO = Event;
 
     fn name(&self) -> &str { "NEXMark Query 12" }
+    
+    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+        // FIXME: Handle input creation more generally
+        let out: Result<_> = config.clone().into();
+        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+    }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream.map(|e| e)

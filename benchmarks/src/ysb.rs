@@ -38,6 +38,12 @@ impl ToData<usize, Event> for String{
     }
 }
 
+impl FromData<usize> for Event{
+    fn from_data(&self, _: &usize) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+}
+
 impl<T: Timestamp> FromData<T> for (String, usize) {
     fn from_data(&self, t: &T) -> String {
         format!("{:?} {:?}", t, self)
