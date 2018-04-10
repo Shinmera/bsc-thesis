@@ -105,7 +105,7 @@ test                    Run the benchmarks.
 generate                Generate benchmark workloads.
   --benchmarks STRING      A comma-separated list of benchmark names to generate.
   --data-dir DIR           The directory for the benchmark data files.
-  --partitions NUM         The number of dataset partitions to create.
+  --threads NUM            The number of dataset partitions to create.
   --campaigns NUM          (YSB) How many campaign IDs to generate.
   --ads NUM                (YSB) How many ads per campaign to generate.
   --seconds NUM            (YSB) How many seconds to generate events for.

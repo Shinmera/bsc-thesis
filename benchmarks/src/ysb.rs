@@ -1,5 +1,5 @@
 use config::Config;
-use endpoint::{Source, Drain, ToData, FromData};
+use endpoint::{self, Source, Drain, ToData, FromData, EventSource};
 use operators::{Window, Reduce};
 use rand::{self, Rng};
 use serde_json;
@@ -91,6 +91,73 @@ impl TestImpl for Query {
     }
 }
 
+#[derive(Clone)]
+struct YSBGenerator {
+    map: HashMap<String, String>,
+    time: f64,
+    timestep: f64,
+    max_time: f64,
+}
+
+impl YSBGenerator {
+    fn new(config: &Config) -> Self {
+        let index = config.get_as_or("worker-index", 0);
+        let threads = config.get_as_or("threads", 10);
+        let campaigns = config.get_as_or("campaigns", 100);
+        let ads = config.get_as_or("ads", 10);
+        let seconds = config.get_as_or("seconds", 60);
+        let events_per_second = config.get_as_or("events-per-second", 100_000);
+        let timestep = (1000 * threads) as f64 / events_per_second as f64;
+        
+        // Generate campaigns map
+        let mut map = HashMap::new();
+        for _ in 0..campaigns {
+            let campaign_id = format!("{}", Uuid::new_v4());
+            for _ in 0..ads {
+                let ad_id = format!("{}", Uuid::new_v4());
+                map.insert(ad_id, campaign_id.clone());
+            }
+        }
+
+        YSBGenerator{
+            map: map,
+            time: 1.0+(index*1000/threads) as f64,
+            timestep: timestep,
+            max_time: (seconds * 1000) as f64,
+        }
+    }
+}
+
+impl EventSource<usize, Event> for YSBGenerator {
+    fn next(&mut self) -> Result<(usize, Vec<Event>)> {
+        const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
+        const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
+        let mut rng = rand::thread_rng();
+        let mut data = Vec::new();
+        let epoch = self.time as usize / 1000;
+        
+        while self.time < ((epoch+1)*1000) as f64
+            && self.time < self.max_time as f64 {
+            data.push(Event {
+                user_id: format!("{}", Uuid::new_v4()),
+                page_id: format!("{}", Uuid::new_v4()),
+                ad_id: self.map.keys().nth(rng.gen_range(0, self.map.len())).unwrap().clone(),
+                ad_type: String::from(*rng.choose(&AD_TYPES).unwrap()),
+                event_type: String::from(*rng.choose(&EVENT_TYPES).unwrap()),
+                event_time: self.time as usize,
+                ip_address: String::from("0.0.0.0"),
+            });
+            self.time += self.timestep;
+        }
+
+        if data.len() == 0 {
+            endpoint::out_of_data()
+        } else {
+            Ok((epoch, data))
+        }
+    }
+}
+
 pub struct YSB {}
 
 impl YSB {
@@ -113,49 +180,27 @@ impl Benchmark for YSB {
         println!("Generating {} events/s for {}s over {} partitions for {} campaigns with {} ads each.",
                  events_per_second, seconds, partitions, campaigns, ads);
         
-        // Generate campaigns map
-        let mut map = HashMap::new();
-        for _ in 0..campaigns {
-            let campaign_id = format!("{}", Uuid::new_v4());
-            for _ in 0..ads {
-                let ad_id = format!("{}", Uuid::new_v4());
-                map.insert(ad_id, campaign_id.clone());
-            }
-        }
+        let generator = YSBGenerator::new(config);
         let campaign_file = File::create(format!("{}/campaigns.json", &data_dir))?;
-        serde_json::to_writer(campaign_file, &map)?;
+        serde_json::to_writer(campaign_file, &generator.map)?;
         
         // Generate events
-        const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
-        const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
-        let timestep = (1000 * partitions) as f64 / events_per_second as f64;
         let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
         for p in 0..partitions {
-            let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;
-            let map = map.clone();
+            let mut generator = generator.clone();
+            let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;;
             threads.push(thread::spawn(move || {
-                let mut rng = rand::thread_rng();
-                let mut time: f64 = (1 + p) as f64;
-                while time < (1000 * seconds) as f64 {
-                    let event = Event {
-                        user_id: format!("{}", Uuid::new_v4()),
-                        page_id: format!("{}", Uuid::new_v4()),
-                        ad_id: map.keys().nth(rng.gen_range(0, map.len())).unwrap().clone(),
-                        ad_type: String::from(*rng.choose(&AD_TYPES).unwrap()),
-                        event_type: String::from(*rng.choose(&EVENT_TYPES).unwrap()),
-                        event_time: time as usize,
-                        ip_address: String::from("0.0.0.0"),
-                    };
-                    
-                    serde_json::to_writer(&file, &event)?;
-                    file.write(b"\n")?;
-                    time += timestep;
+                loop{
+                    let (_, d) = generator.next()?;
+                    for e in d {
+                        serde_json::to_writer(&file, &e)?;
+                        file.write(b"\n")?;
+                    }
                 }
-                Ok(())
             }));
         }
         for t in threads.drain(..){
-            t.join().unwrap()?;
+            endpoint::accept_out_of_data(t.join().unwrap())?;
         }
         Ok(())
     }

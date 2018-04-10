@@ -19,7 +19,7 @@ use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
 use timely::progress::timestamp::{RootTimestamp, Timestamp};
 use timely_communication::allocator::Generic;
-use endpoint::{Drain, Source, FromData, ToData};
+use endpoint::{self, Drain, Source, FromData, ToData, EventSource};
 
 // Hasher used for data shuffling
 fn hasher(x: &String) -> u64 {
@@ -231,6 +231,59 @@ impl<T: Timestamp> FromData<T> for (String, (u64, u32)) {
     }
 }
 
+#[derive(Clone)]
+pub struct HiBenchGenerator {
+    ips: Vec<String>,
+    count: usize,
+    epoch: usize,
+    max: usize,
+}
+
+impl HiBenchGenerator {
+    fn new(config: &Config) -> Self {
+        let partitions = config.get_as_or("threads", 10);
+        let seconds = config.get_as_or("seconds", 60);
+        let events_per_second = config.get_as_or("events-per-second", 100_000);
+        let ips = config.get_as_or("ips", 100);
+        
+        HiBenchGenerator {
+            ips: (0..ips).map(|_| random_ip()).collect(),
+            count: events_per_second/partitions,
+            epoch: 0,
+            max: seconds,
+        }
+    }
+}
+
+impl EventSource<usize, (String, String)> for HiBenchGenerator {
+    fn next(&mut self) -> Result<(usize, Vec<(String,String)>)> {
+        if self.epoch < self.max {
+            let mut rng = rand::thread_rng();
+            let mut data = Vec::new();
+            
+            for _ in 0..self.count {
+                let ip = rng.choose(&self.ips).unwrap().clone();
+                let session: String = rng.gen_ascii_chars().take(54).collect();
+                let date = random_date();
+                let float = 0.0;
+                let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
+                let s = "DOM";
+                let subs = "DOM-ES";
+                let word = "snow";
+                let int = 6;
+                data.push((format!("{:4}", self.epoch),
+                           format!("{},{},{},{:.8},{},{},{},{},{}",
+                                   ip, session, date, float, agent, s, subs, word, int)));
+            }
+            
+            self.epoch += 1;
+            Ok((self.epoch-1, data))
+        } else {
+            endpoint::out_of_data()
+        }
+    }
+}
+
 pub struct HiBench {}
 
 impl HiBench {
@@ -242,7 +295,7 @@ impl Benchmark for HiBench {
 
     fn generate_data(&self, config: &Config) -> Result<()> {
         let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        let partitions = config.get_as_or("partitions", 10);
+        let partitions = config.get_as_or("threads", 10);
         let seconds = config.get_as_or("seconds", 60);
         let events_per_second = config.get_as_or("events-per-second", 100_000);
         let ips = config.get_as_or("ips", 100);
@@ -251,33 +304,22 @@ impl Benchmark for HiBench {
         println!("Generating {} events/s for {}s over {} partitions for {} ips.",
                  events_per_second, seconds, partitions, ips);
 
-        let ips: Vec<_> = (0..ips).map(|_| random_ip()).collect();
+        let generator = HiBenchGenerator::new(config);
         let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
         for p in 0..partitions {
             let mut file = File::create(format!("{}/events-{}.csv", &data_dir, p))?;
-            let ips = ips.clone();
+            let mut generator = generator.clone();
             threads.push(thread::spawn(move || {
-                let mut rng = rand::thread_rng();
-                for t in 0..seconds {
-                    for _ in 0..(events_per_second/partitions) {
-                        let ip = rng.choose(&ips).unwrap().clone();
-                        let session: String = rng.gen_ascii_chars().take(54).collect();
-                        let date = random_date();
-                        let float = 0.0;
-                        let agent = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)";
-                        let s = "DOM";
-                        let subs = "DOM-ES";
-                        let word = "snow";
-                        let int = 6;
-                        writeln!(&mut file, "{:4} {},{},{},{:.8},{},{},{},{},{}",
-                                 t, ip, session, date, float, agent, s, subs, word, int)?;
+                loop{
+                    let (_, d) = generator.next()?;
+                    for (t, e) in d {
+                        writeln!(&mut file, "{} {}", t, e)?;
                     }
                 }
-                Ok(())
             }));
         }
         for t in threads.drain(..){
-            t.join().unwrap()?;
+            endpoint::accept_out_of_data(t.join().unwrap())?;
         }
         Ok(())
     }

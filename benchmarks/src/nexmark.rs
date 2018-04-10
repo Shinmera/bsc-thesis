@@ -1,7 +1,7 @@
 use serde_json;
 use abomonation::Abomonation;
 use config::Config;
-use endpoint::{Source, Drain, ToData, FromData};
+use endpoint::{self, Source, Drain, ToData, FromData, EventSource};
 use operators::{Window, Reduce, Join, FilterMap};
 use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
@@ -69,6 +69,7 @@ enum RateShape {
     Sine,
 }
 
+#[derive(Clone)]
 struct NEXMarkConfig {
     active_people: usize,
     in_flight_auctions: usize,
@@ -90,10 +91,10 @@ impl NEXMarkConfig {
         let rate_shape = if config.get_or("rate-shape", "sine") == "sine"{ RateShape::Sine }else{ RateShape::Square };
         // Calculate inter event delays array.
         let mut inter_event_delays = Vec::new();
-        let first_rate = config.get_as_or("first-event-rate", 10000);
-        let next_rate = config.get_as_or("next-event-rate", 10000);
+        let first_rate = config.get_as_or("first-event-rate", 10_000);
+        let next_rate = config.get_as_or("next-event-rate", first_rate);
         let rate = config.get_as_or("rate", 1_000_000); // Rate is in μs
-        let generators = config.get_as_or("partitions", 10);
+        let generators = config.get_as_or("threads", 10);
         let rate_to_period = |r| (rate + r / 2) / r;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
@@ -231,7 +232,7 @@ impl Into<Option<Bid>> for Event {
 impl ToData<usize, Event> for String{
     fn to_data(self) -> Result<(usize, Event)> {
         serde_json::from_str(&self)
-            .map(|c: EventCarrier| (c.time / 1000, c.event))
+            .map(|c: EventCarrier| (c.time, c.event))
             .map_err(|e| e.into())
     }
 }
@@ -735,6 +736,50 @@ impl TestImpl for Query12 {
     }
 }
 
+// FIXME: Merge this with NEXMarkConfig
+#[derive(Clone)]
+pub struct NEXMarkGenerator {
+    config: NEXMarkConfig,
+    events: usize,
+    seconds: usize
+}
+
+impl NEXMarkGenerator {
+    fn new(config: &Config) -> Self {
+        NEXMarkGenerator {
+            config: NEXMarkConfig::new(config),
+            events: 0,
+            seconds: config.get_as_or("seconds", 60)
+        }
+    }
+}
+
+impl EventSource<usize, Event> for NEXMarkGenerator {
+    fn next(&mut self) -> Result<(usize, Vec<Event>)> {
+        let mut data = Vec::new();
+        let epoch = (self.config.event_timestamp(self.events + self.config.first_event_id) - self.config.base_time) / 1000;
+        
+        loop {
+            let time = self.config.event_timestamp(self.events + self.config.first_event_id);
+            let next_epoch = (time - self.config.base_time) / 1000;
+            let event = Event::new(self.events, &mut self.config);
+
+            if next_epoch < self.seconds && next_epoch == epoch {
+                self.events += 1;
+                data.push(event);
+            } else {
+                break;
+            }
+        }
+
+        if data.len() == 0 {
+            endpoint::out_of_data()
+        } else {
+            Ok((epoch, data))
+        }
+    }
+}
+
 pub struct NEXMark {}
 
 impl NEXMark {
@@ -753,28 +798,24 @@ impl Benchmark for NEXMark {
 
         println!("Generating events for {}s over {} partitions.", seconds, partitions);
 
+        let generator =  NEXMarkGenerator::new(config);
+
         let mut threads: Vec<JoinHandle<Result<()>>> = Vec::new();
         for p in 0..partitions {
             let mut file = File::create(format!("{}/events-{}.json", &data_dir, p))?;
-            let mut nex = NEXMarkConfig::new(&config);
+            let mut generator = generator.clone();
             threads.push(thread::spawn(move || {
-                let wall_base = 0;
-                for events_so_far in 0.. {
-                    let time = nex.event_timestamp(nex.first_event_id + events_so_far);
-                    let wall = wall_base + (time - nex.base_time);
-                    let event = Event::new(events_so_far, &mut nex);
-                    let carrier = EventCarrier{ time: wall, event: event };
-                    
-                    serde_json::to_writer(&file, &carrier)?;
-                    file.write(b"\n")?;
-                    
-                    if seconds < (wall / 1000) { break; }
+                loop{
+                    let (t, d) = generator.next()?;
+                    for e in d {
+                        serde_json::to_writer(&file, &EventCarrier{ time: t, event: e })?;
+                        file.write(b"\n")?;
+                    }
                 }
-                Ok(())
             }));
         }
         for t in threads.drain(..){
-            t.join().unwrap()?;
+            endpoint::accept_out_of_data(t.join().unwrap())?;
         }
         Ok(())
     }
