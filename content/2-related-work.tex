@@ -1,6 +1,6 @@
 %% FIXME: Note what state is retained for each stateful node
 \section{Related Work}
-In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. The nodes are coloured in orange if they are stateful, and covered in red if they perform windowing of some kind and thus retain previous inputs. \\
+In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. The nodes are coloured in orange if they are stateful. \\
 
 The papers were selected based on the number of citations, as well as on their direct relevance to current trends in the development and research for Big Data and streaming systems. \\
 
@@ -123,14 +123,14 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Sample application, performance study.
       & Finance
       & Stateful, DAG
-      & Map, Filter, Reduce, Join
+      & Map, Filter, Window Reduce, Join
       \\\hline
 
       D-Streams\cite{discretized}
       & Scalability and recovery test.
       & None
       & Chain
-      & Map, Reduce, Window
+      & Map, Window Reduce
       \\\hline
 
       Millwheel\cite{millwheel}
@@ -144,7 +144,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Evaluation of scalability and elasticity.
       & Telephony
       & Stateful, Chain
-      & Map, Filter, Reduce, Join
+      & Map, Filter, Window Reduce
       \\\hline
 
       Operator State\cite{integrating}
@@ -158,21 +158,21 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Low-latency test for real-world applications.
       & Search, Social Network
       & DAG
-      & Map, Filter, Reduce, Window
+      & Map, Filter, Reduce, Join, Window
       \\\hline
 
       Adaptive Scheduling\cite{storm}
       & Evaluating performance of scheduling algorithms.
       & None
       & Stateful, Chain
-      & None
+      & Reduce
       \\\hline
 
       Analytics on High Velocity Streams\cite{storm2}
       & Analysing trends for links on Twitter.
       & Social Network
       & Stateful, DAG
-      & Map, Filter, Reduce, Window
+      & Map, Filter, Reduce, Join, Window
       \\\hline
 
       BigDataBench\cite{bigdatabench}
@@ -199,8 +199,8 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       NEXMark\cite{nexmark}
       & Adaptation of XMark for streaming systems.
       & Auctioning
-      & {\bfseries TODO}
-      & {\bfseries TODO}
+      & Stateful
+      & Map, Filter, Reduce, Join, Window, Session
       \\\hline
     \end{tabular}
   }
