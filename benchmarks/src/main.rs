@@ -79,7 +79,8 @@ fn main() {
             .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
             .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
         tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
-        
+
+        println!("{:25} Samples    Total      Minimum    Maximum    Median     Average    Std. Dev   ", "Test");
         for test in tests {
             let name = String::from(test.name());
             eprintln!("> Running test {}", name);
