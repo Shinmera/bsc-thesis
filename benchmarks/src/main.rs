@@ -84,8 +84,8 @@ fn main() {
             let name = String::from(test.name());
             eprintln!("> Running test {}", name);
             match run_test(test, &config) {
-                Ok(s) => println!("{:32} {}", name, String::from(&s)),
-                Err(e) => eprintln!("{:32} Failed: {}", name, e)
+                Ok(s) => println!("{:25} {}", name, String::from(&s)),
+                Err(e) => eprintln!("{:25} Failed: {}", name, e)
             }
         }
     }else if mode == "generate" {
