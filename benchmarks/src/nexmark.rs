@@ -389,7 +389,7 @@ impl TestImpl for Query0 {
     type D = Event;
     type DO = Event;
 
-    fn name(&self) -> &str { "NEXMarkConfig Query 0" }
+    fn name(&self) -> &str { "NEXMark Query 0" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
         // FIXME: Handle input creation more generally
