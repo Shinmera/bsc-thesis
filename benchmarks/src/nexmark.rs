@@ -915,7 +915,8 @@ impl Benchmark for NEXMark {
              Box::new(Query8::new()),
              Box::new(Query9::new()),
              Box::new(Query11::new()),
-             Box::new(Query12::new())]
+             //Box::new(Query12::new())
+        ]
     }
 
 }
