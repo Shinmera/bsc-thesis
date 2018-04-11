@@ -122,19 +122,17 @@ impl TestImpl for Repartition {
     }
     
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let peers = config.get_as_or("workers", 1) as u64;
+        let peers = config.get_as_or("threads", 1) as u64;
         // Simulate a RoundRobin shuffling
         stream.unary_stream(Pipeline, "RoundRobin", move |input, output| {
-                let mut counter = 0u64;
-                input.for_each(|time, data| {
-                    for record in data.drain(..) {
-                        let r = (counter, record);
-                        counter += 1;
-                        if counter == peers { counter = 0; }
-                        output.session(&time).give(r);
-                    }
-                });
-            })
+            let mut counter = 0u64;
+            input.for_each(|time, data| {
+                output.session(&time).give_iterator(data.drain(..).map(|r| {
+                    counter = (counter + 1) % peers;
+                    println!("{}", counter);
+                    (counter, r)
+                }));
+            })})
             // Exchange on worker id (worker ids are in [0,peers)
             .exchange(|&(worker_id, _)| worker_id)
             .map(|(_, record)| record)
