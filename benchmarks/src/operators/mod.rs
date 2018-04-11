@@ -4,6 +4,7 @@ pub use self::join::Join;
 pub use self::reduce::Reduce;
 pub use self::filtermap::FilterMap;
 pub use self::timer::Timer;
+pub use self::session::Session;
 
 pub mod rollingcount;
 pub mod window;
@@ -11,3 +12,4 @@ pub mod join;
 pub mod reduce;
 pub mod filtermap;
 pub mod timer;
+pub mod session;
