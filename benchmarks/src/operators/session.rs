@@ -1,8 +1,9 @@
 use std::collections::{HashMap};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 use std::ops::{Add,Sub};
 use timely::Data;
-use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::operators::Unary;
 use timely::dataflow::{Stream, Scope};
 use timely::progress::nested::product::Product;
@@ -35,24 +36,33 @@ impl<N: Add<Output=N>+Sub<Output=N>+Timestamp> Relative<N> for Product<RootTimes
     }
 }
 
-pub trait Session<G: Scope, D: Data> {
-    fn session<W, H>(&self, timeout: usize, w: W) -> Stream<G, (H, Vec<D>)>
+pub trait Session<G: Scope, D: Data+Send> {
+    fn session<W, H>(&self, timeout: usize, sessioner: W) -> Stream<G, (H, Vec<D>)>
     where W: Fn(&D)->(H, G::Timestamp)+'static,
           H: Hash+Eq+Data+Clone,
           G::Timestamp: Relative<usize>+Hash;
 }
 
-impl<G: Scope, D: Data> Session<G, D> for Stream<G, D> {
-    fn session<W, H>(&self, timeout: usize, w: W) -> Stream<G, (H, Vec<D>)>
+impl<G: Scope, D: Data+Send> Session<G, D> for Stream<G, D> {
+    fn session<W, H>(&self, timeout: usize, sessioner: W) -> Stream<G, (H, Vec<D>)>
     where W: Fn(&D)->(H, G::Timestamp)+'static,
           H: Hash+Eq+Data+Clone,
           G::Timestamp: Relative<usize>+Hash {
         let mut sessions = HashMap::new();
+
+        let key = Rc::new(sessioner);
+        let key_ = key.clone();
+        let exchange = Exchange::new(move |d| {
+            let mut h: ::fnv::FnvHasher = Default::default();
+            let (s, _) = key_(d);
+            s.hash(&mut h);
+            h.finish()
+        });
         
-        self.unary_notify(Pipeline, "Session", Vec::new(), move |input, output, notificator| {
+        self.unary_notify(exchange, "Session", Vec::new(), move |input, output, notificator| {
             input.for_each(|cap, data| {
                 for data in data.drain(..){
-                    let (s, t) = w(&data);
+                    let (s, t) = key(&data);
                     notificator.notify_at(cap.delayed(&(t.clone().add(timeout))));
                     let session = sessions
                         .entry(t).or_insert_with(HashMap::new)
