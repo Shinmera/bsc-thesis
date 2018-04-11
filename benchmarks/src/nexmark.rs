@@ -2,7 +2,7 @@ use serde_json;
 use abomonation::Abomonation;
 use config::Config;
 use endpoint::{self, Source, Drain, ToData, FromData, EventSource};
-use operators::{Window, Reduce, Join, FilterMap};
+use operators::{Window, Reduce, Join, FilterMap, Session};
 use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::f64::consts::PI;
 use std::fs::File;
 use std::fs;
+use std::time::Instant;
 use std::thread::{self, JoinHandle};
 use std::io::{Result, Write};
 use test::{Test, TestImpl, Benchmark};
@@ -793,7 +794,7 @@ impl Query11 {
 impl TestImpl for Query11 {
     type T = Date;
     type D = Event;
-    type DO = Event;
+    type DO = (Id, usize);
 
     fn name(&self) -> &str { "NEXMark Query 11" }
     
@@ -804,7 +805,10 @@ impl TestImpl for Query11 {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|e| e)
+        stream
+            .filter_map(|e| Bid::from(e))
+            .session(10, |b| (b.bidder, RootTimestamp::new(b.date_time / 1000)))
+            .map(|(b, d)| (b, d.len()))
     }
 }
 
@@ -817,7 +821,7 @@ impl Query12 {
 impl TestImpl for Query12 {
     type T = Date;
     type D = Event;
-    type DO = Event;
+    type DO = (Id, usize);
 
     fn name(&self) -> &str { "NEXMark Query 12" }
     
@@ -828,7 +832,14 @@ impl TestImpl for Query12 {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|e| e)
+        let start = Instant::now();
+        stream
+            .filter_map(|e| Bid::from(e))
+            .session(10, move |b| {
+                let d = Instant::now().duration_since(start);
+                (b.bidder, RootTimestamp::new(d.as_secs() as usize))
+            })
+            .map(|(b, d)| (b, d.len()))
     }
 }
 
