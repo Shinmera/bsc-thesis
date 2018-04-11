@@ -761,30 +761,6 @@ impl<T: Timestamp> FromData<T> for (usize, Auction) {
     }
 }
 
-struct Query10 {}
-
-impl Query10 {
-    fn new() -> Self { Query10{} }
-}
-
-impl TestImpl for Query10 {
-    type T = Date;
-    type D = Event;
-    type DO = Event;
-
-    fn name(&self) -> &str { "NEXMark Query 10" }
-    
-    fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
-    }
-
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|e| e)
-    }
-}
-
 struct Query11 {}
 
 impl Query11 {
@@ -938,7 +914,6 @@ impl Benchmark for NEXMark {
              Box::new(Query7::new()),
              Box::new(Query8::new()),
              Box::new(Query9::new()),
-             Box::new(Query10::new()),
              Box::new(Query11::new()),
              Box::new(Query12::new())]
     }
