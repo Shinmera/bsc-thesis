@@ -202,33 +202,6 @@ impl Event {
     }
 }
 
-impl Into<Option<Person>> for Event {
-    fn into(self) -> Option<Person> {
-        match self {
-            Event::Person(p) => Some(p),
-            _ => None
-        }
-    }
-}
-
-impl Into<Option<Auction>> for Event {
-    fn into(self) -> Option<Auction> {
-        match self {
-            Event::Auction(p) => Some(p),
-            _ => None
-        }
-    }
-}
-
-impl Into<Option<Bid>> for Event {
-    fn into(self) -> Option<Bid> {
-        match self {
-            Event::Bid(p) => Some(p),
-            _ => None
-        }
-    }
-}
-
 impl ToData<usize, Event> for String{
     fn to_data(self) -> Result<(usize, Event)> {
         serde_json::from_str(&self)
@@ -255,6 +228,13 @@ struct Person{
 }
 
 impl Person {
+    fn from(event: Event) -> Option<Person> {
+        match event {
+            Event::Person(p) => Some(p),
+            _ => None
+        }
+    }
+    
     fn new(id: usize, time: Date, rng: &mut StdRng) -> Self {
         Person {
             id: Self::last_id(id) + FIRST_PERSON_ID,
@@ -296,6 +276,13 @@ struct Auction{
 unsafe_abomonate!(Auction : id, item_name, description, initial_bid, reserve, date_time, expires, seller, category);
 
 impl Auction {
+    fn from(event: Event) -> Option<Auction> {
+        match event {
+            Event::Auction(p) => Some(p),
+            _ => None
+        }
+    }
+    
     fn new(events_so_far: usize, id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         let initial_bid = rng.gen_price();
         let seller = if rng.gen_range(0, nex.hot_seller_ratio) > 0 {
@@ -356,6 +343,13 @@ struct Bid{
 unsafe_abomonate!(Bid : auction, bidder, price, date_time);
 
 impl Bid {
+    fn from(event: Event) -> Option<Bid> {
+        match event {
+            Event::Bid(p) => Some(p),
+            _ => None
+        }
+    }
+    
     fn new(id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         let auction = if rng.gen_range(0, nex.hot_auction_ratio) > 0 {
             (Auction::last_id(id) / HOT_AUCTION_RATIO) * HOT_AUCTION_RATIO
@@ -425,8 +419,8 @@ impl TestImpl for Query1 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
-            .filter_map(|e| e.into())
-            .map(|b: Bid| (b.auction, b.bidder, (b.price*89)/100, b.date_time))
+            .filter_map(|e| Bid::from(e))
+            .map(|b| (b.auction, b.bidder, (b.price*89)/100, b.date_time))
     }
 }
 
@@ -460,8 +454,8 @@ impl TestImpl for Query2 {
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auction_skip = config.get_as_or("auction-skip", 123);
         stream
-            .filter_map(|e| e.into())
-            .filter(move |b: &Bid| b.auction % auction_skip == 0)
+            .filter_map(|e| Bid::from(e))
+            .filter(move |b| b.auction % auction_skip == 0)
             .map(|b| (b.auction, b.price))
     }
 }
@@ -495,12 +489,12 @@ impl TestImpl for Query3 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auctions = stream
-            .filter_map(|e| e.into())
-            .filter(|a: &Auction| a.category == 10);
+            .filter_map(|e| Auction::from(e))
+            .filter(|a| a.category == 10);
         
         let persons = stream
-            .filter_map(|e| e.into())
-            .filter(|p: &Person| p.state=="OR" || p.state=="ID" || p.state=="CA");
+            .filter_map(|e| Person::from(e))
+            .filter(|p| p.state=="OR" || p.state=="ID" || p.state=="CA");
         // FIXME
         persons.left_join(&auctions, |p| p.id, |a| a.seller,
                           |p, a| (p.name, p.city, p.state, a.id))
@@ -564,12 +558,12 @@ impl TestImpl for Query5 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let bids = stream
-            .filter_map(|e| e.into())
+            .filter_map(|e| Bid::from(e))
             .epoch_window(10, 5);
         
         let count = bids.reduce_to(0, |_, c| c+1);
         
-        bids.reduce_by(|b: &Bid| b.auction, 0, |_, c| c+1)
+        bids.reduce_by(|b| b.auction, 0, |_, c| c+1)
             .epoch_join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
             .filter(|&(t, _, c)| c >= t)
             .map(|(_, a, _)| a)
@@ -638,9 +632,9 @@ impl TestImpl for Query7 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
-            .filter_map(|e| e.into())
+            .filter_map(|e| Bid::from(e))
             .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
-            .reduce(|_| 0, (0, 0, 0), |b: Bid, (a, p, bi)| {
+            .reduce(|_| 0, (0, 0, 0), |b, (a, p, bi)| {
                 if p < b.price { (b.auction, b.price, b.bidder) }
                 else { (a, p, bi) }
             }, |_, d, _| d)
@@ -676,14 +670,14 @@ impl TestImpl for Query8 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         let auctions = stream
-            .filter_map(|e| e.into())
+            .filter_map(|e| Auction::from(e))
             .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10));
         
         let persons = stream
-            .filter_map(|e| e.into())
+            .filter_map(|e| Person::from(e))
             .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10));
         
-        persons.epoch_join(&auctions, |p: &Person| p.id, |a: &Auction| a.seller,
+        persons.epoch_join(&auctions, |p| p.id, |a| a.seller,
                            |p, a| (p.id, p.name, a.reserve))
     }
 }
@@ -703,15 +697,15 @@ impl Query9 {
 }
 
 fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (usize, Auction)> {
-    let bids = stream.filter_map(|e|{let b: Option<Bid>=e.into(); b});
-    let auctions = stream.filter_map(|e|{let a: Option<Auction>=e.into(); a});
+    let bids = stream.filter_map(|e| Bid::from(e));
+    let auctions = stream.filter_map(|e| Auction::from(e));
     
     let mut auction_map = HashMap::new();
     let mut bid_prices: HashMap<Id, usize> = HashMap::new();
     
     auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
         input1.for_each(|time, data|{
-            data.drain(..).for_each(|a: Auction|{
+            data.drain(..).for_each(|a|{
                 let future = RootTimestamp::new(a.expires - BASE_TIME);
                 let auctions = auction_map.entry(future).or_insert_with(||Vec::new());
                 auctions.push(a);
@@ -720,7 +714,7 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
         });
 
         input2.for_each(|_, data|{
-            data.drain(..).for_each(|b: Bid|{
+            data.drain(..).for_each(|b|{
                 // FIXME: Check if (B.date_time < A.expires)
                 if let Some(other) = bid_prices.remove(&b.auction) {
                     bid_prices.insert(b.auction, max(other, b.price));
