@@ -62,6 +62,7 @@ fn benchmarks() -> Vec<Box<Benchmark>> {
 
 fn main() {
     let config = Config::from(std::env::args()).unwrap();
+    let report = config.get_or("report", "summary");
     let mut benchmarks = benchmarks();
     // Compute applicable benchmarks
     let to_run = config.get("benchmarks")
@@ -80,13 +81,24 @@ fn main() {
             .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
         tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
 
-        println!("{:25} Samples    Total      Minimum    Maximum    Median     Average    Std. Dev   ", "Test");
-        for test in tests {
-            let name = String::from(test.name());
-            eprintln!("> Running test {}", name);
-            match run_test(test, &config) {
-                Ok(s) => println!("{:25} {}", name, String::from(&s)),
-                Err(e) => eprintln!("{:25} Failed: {}", name, e)
+        if report == "summary" {
+            println!("{:25} Samples    Total      Minimum    Maximum    Median     Average    Std. Dev   ", "Test");
+            for test in tests {
+                let name = String::from(test.name());
+                eprintln!("> Running test {}", name);
+                match run_test(test, &config) {
+                    Ok(s) => println!("{:25}  {}", name, String::from(&s)),
+                    Err(e) => eprintln!("{:25} Failed: {}", name, e)
+                }
+            }
+        } else if report == "latencies" {
+            for test in tests {
+                let name = String::from(test.name());
+                eprintln!("> Running test {}", name);
+                match run_test(test, &config) {
+                    Ok(s) => println!("{:25}  {}", name, s.data.iter().fold(String::new(), |acc, &num| acc + &num.to_string() + " ")),
+                    Err(e) => eprintln!("{:25} Failed: {}", name, e)
+                }
             }
         }
     }else if mode == "generate" {
