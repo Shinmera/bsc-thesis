@@ -68,10 +68,10 @@
 \newcommand{\latencyplot}[1]{%
   \begin{tikzpicture}
     \begin{axis}[
-      title={Latency (32 workers)},
-      xlabel={Rate [e/s]},
-      ylabel={Latency [s]},
-      xmode=log, ymode=log,
+      title={Median Latency (32 workers)},
+      ylabel={Rate [e/s]},
+      xlabel={Latency [s]},
+      xmode=lin, ymode=log,
       legend pos=north west,
       ymajorgrids=true,
       grid style=dashed,

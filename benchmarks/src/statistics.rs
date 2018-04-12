@@ -10,6 +10,7 @@ use std::fmt;
 /// values into this statistics struct. It will automatically
 /// calculate the relevant fields.
 pub struct Statistics{
+    pub data: Vec<f64>,
     pub total: f64,
     pub count: usize,
     pub minimum: f64,
@@ -68,6 +69,7 @@ impl From<Vec<f64>> for Statistics{
         let deviation = local.iter().map(|x|{ let a=x-average; a*a }).fold(0.0, f64::add) / local.len() as f64;
         let median = *local.get(local.len()/2).unwrap_or(&0.0);
         Statistics{
+            data: vec,
             total: total,
             count: count,
             minimum: minimum,
