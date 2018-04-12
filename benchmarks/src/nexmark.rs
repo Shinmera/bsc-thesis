@@ -83,8 +83,8 @@ struct NEXMarkConfig {
     base_time: usize,
     step_length: usize,
     events_per_epoch: usize,
-    epoch_period: usize,
-    inter_event_delays: Vec<usize>,
+    epoch_period: f32,
+    inter_event_delays: Vec<f32>,
 }
 
 impl NEXMarkConfig {
@@ -95,8 +95,8 @@ impl NEXMarkConfig {
         let first_rate = config.get_as_or("first-event-rate", config.get_as_or("events-per-second", 10_000));
         let next_rate = config.get_as_or("next-event-rate", first_rate);
         let rate = config.get_as_or("rate", 1_000_000); // Rate is in μs
-        let generators = config.get_as_or("threads", 10);
-        let rate_to_period = |r| (rate + r / 2) / r;
+        let generators = config.get_as_or("threads", 10) as f32;
+        let rate_to_period = |r| (rate) as f32 / r as f32;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
         } else {
@@ -120,12 +120,12 @@ impl NEXMarkConfig {
         let n = if rate_shape == RateShape::Square { 2 } else { SINE_APPROX_STEPS };
         let step_length = (config.get_as_or("rate-period", 600) + n - 1) / n;
         let mut events_per_epoch = 0;
-        let mut epoch_period = 0;
+        let mut epoch_period = 0.0;
         if inter_event_delays.len() > 1 {
             for inter_event_delay in &inter_event_delays {
-                let num_events_for_this_cycle = (step_length * 1_000_000) / inter_event_delay;
-                events_per_epoch += num_events_for_this_cycle;
-                epoch_period += (num_events_for_this_cycle * inter_event_delay) / 1000;
+                let num_events_for_this_cycle = (step_length * 1_000_000) as f32 / inter_event_delay;
+                events_per_epoch += num_events_for_this_cycle.round() as usize;
+                epoch_period += (num_events_for_this_cycle * inter_event_delay) / 1000.0;
             }
         }
         NEXMarkConfig {
@@ -147,20 +147,20 @@ impl NEXMarkConfig {
 
     fn event_timestamp(&self, event_number: usize) -> usize {
         if self.inter_event_delays.len() == 1 {
-            return self.base_time + (event_number * self.inter_event_delays[0]) / 1000;
+            return self.base_time + ((event_number as f32 * self.inter_event_delays[0]) / 1000.0).round() as usize;
         }
 
         let epoch = event_number / self.events_per_epoch;
         let mut event_i = event_number % self.events_per_epoch;
-        let mut offset_in_epoch = 0;
+        let mut offset_in_epoch = 0.0;
         for inter_event_delay in &self.inter_event_delays {
-            let num_events_for_this_cycle = (self.step_length * 1_000_000) / inter_event_delay;
-            if self.out_of_order_group_size < num_events_for_this_cycle {
-                let offset_in_cycle = event_i * inter_event_delay;
-                return self.base_time + epoch * self.epoch_period + offset_in_epoch + offset_in_cycle / 1000;
+            let num_events_for_this_cycle = (self.step_length * 1_000_000) as f32 / inter_event_delay;
+            if self.out_of_order_group_size < num_events_for_this_cycle.round() as usize {
+                let offset_in_cycle = event_i as f32 * inter_event_delay;
+                return self.base_time + (epoch as f32 * self.epoch_period + offset_in_epoch + offset_in_cycle / 1000.0).round() as usize;
             }
-            event_i -= num_events_for_this_cycle;
-            offset_in_epoch += (num_events_for_this_cycle * inter_event_delay) / 1000;
+            event_i -= num_events_for_this_cycle.round() as usize;
+            offset_in_epoch += (num_events_for_this_cycle * inter_event_delay) / 1000.0;
         }
         return 0
     }
