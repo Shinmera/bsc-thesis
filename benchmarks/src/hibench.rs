@@ -129,7 +129,6 @@ impl TestImpl for Repartition {
             input.for_each(|time, data| {
                 output.session(&time).give_iterator(data.drain(..).map(|r| {
                     counter = (counter + 1) % peers;
-                    println!("{}", counter);
                     (counter, r)
                 }));
             })})
