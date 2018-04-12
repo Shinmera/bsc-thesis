@@ -13,6 +13,7 @@
 \usepackage{ifthen}
 \usepackage{multicol}
 \usepackage{minted}
+\usepackage{pgfplots}
 \usepackage{tablefootnote}
 \usepackage[margin=1cm]{caption}
 \usepackage[bottom,marginal]{footmisc}
@@ -63,6 +64,76 @@
     {}%
     {\label{figure:#1}}%
   \end{figure}}
+
+\newcommand{\latencyplot}[1]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      title={Latency (32 workers)},
+      xlabel={Rate [e/s]},
+      ylabel={Latency [s]},
+      xmode=log, ymode=log,
+      legend pos=north west,
+      ymajorgrids=true,
+      grid style=dashed,
+      ]
+      
+      #1
+    \end{axis}
+  \end{tikzpicture}}
+
+\newcommand{\latencyfigure}[3][]{\begin{figure}[H]%
+    \centering
+    \latencyplot{#2}%
+    \caption{#3}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1-latency}}%
+  \end{figure}}
+
+\newcommand{\scalingplot}[1]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      title={Scaling (100Ke/s)},
+      xlabel={Workers [n]},
+      ylabel={Latency [s]},
+      xmode=log,
+      log basis x={2},
+      scaled y ticks=false,
+      y tick label style={/pgf/number format/fixed},
+      xtick={1, 2, 4, 8, 16, 32},
+      legend pos=north west,
+      ymajorgrids=true,
+      grid style=dashed,
+      ]
+      
+      #1
+    \end{axis}
+  \end{tikzpicture}}
+
+\newcommand{\scalingfigure}[3][]{\begin{figure}[H]%
+    \centering
+    \scalingplot{#2}%
+    \caption{#3}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1-scaling}}%
+  \end{figure}}
+
+\newcommand{\throughputplot}[1]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      title={Throughput vs. Latency},
+      xlabel={Throughput [n]},
+      ylabel={Latency [s]},
+      xmode=lin, ymode=lin,
+      legend pos=north west,
+      ymajorgrids=true,
+      grid style=dashed,
+      ]
+      
+      #1
+    \end{axis}
+  \end{tikzpicture}}
 
 \setcounter{secnumdepth}{4}
 \titleformat{\paragraph}{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
