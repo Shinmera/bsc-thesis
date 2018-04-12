@@ -164,6 +164,35 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
 \end{listing}
 
 \subsection{Evaluation}
+\latencyfigure[nex]{
+  \addplot table[x index=0, y index=1] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=2] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=3] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=4] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=5] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=6] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=7] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=8] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=9] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=10] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=11] {data/nex-latency.csv};
+  \addplot table[x index=0, y index=12] {data/nex-latency.csv};
+}{Loglog plot of the Latency vs Rate.}
+
+\scalingfigure[nex]{
+  \addplot table[x index=0, y index=1] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=2] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=3] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=4] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=5] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=6] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=7] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=8] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=9] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=10] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=11] {data/nex-scaling.csv};
+  \addplot table[x index=0, y index=12] {data/nex-scaling.csv};
+}{Linlog plot of the scaling behaviour.}
 
 \subsection{Remarks}
 
