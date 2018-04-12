@@ -2,10 +2,8 @@ use config::Config;
 use operators::{Window, RollingCount, Reduce};
 use rand::{self, Rng};
 use std::cmp::min;
-use std::collections::hash_map::DefaultHasher;
 use std::fs::File;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::io::{Result, Write, Error, ErrorKind};
 use std::str::FromStr;
 use std::time::SystemTime;
@@ -21,20 +19,27 @@ use timely::progress::timestamp::{RootTimestamp, Timestamp};
 use timely_communication::allocator::Generic;
 use endpoint::{self, Drain, Source, FromData, ToData, EventSource};
 
-// Hasher used for data shuffling
-fn hasher(x: &String) -> u64 {
-    let mut s = DefaultHasher::new();
-    x.hash(&mut s);
-    s.finish()
+#[derive(Eq, PartialEq, Clone, Abomonation)]
+struct Event {
+    time: usize,
+    data: String,
 }
 
-impl ToData<usize, (String, String)> for String{
-    fn to_data(self) -> Result<(usize, (String, String))> {
+impl Event {
+    fn ip(&self) -> String {
+        let end = self.data.find(',').expect("HiBench: Cannot parse IP.");
+        let ip = &self.data[0..end];
+        String::from(ip)
+    }
+}
+
+impl ToData<usize, Event> for String{
+    fn to_data(self) -> Result<(usize, Event)> {
         if let Some(t) = self.get(0..4){
             let t = t.trim_left();
             if let Some(d) = self.get(5..) {
                 match usize::from_str(t) {
-                    Ok(tt) => return Ok((tt, (String::from(t), String::from(d)))),
+                    Ok(tt) => return Ok((tt, Event{ time: tt, data: String::from(d)})),
                     Err(e) => return Err(Error::new(ErrorKind::Other, ::std::error::Error::description(&e)))
                 }
             }
@@ -43,17 +48,17 @@ impl ToData<usize, (String, String)> for String{
     }
 }
 
+impl FromData<usize> for Event{
+    fn from_data(&self, _: &usize) -> String {
+        format!("{:4} {}", self.time, self.data)
+    }
+}
+
 // Function used for extracting the IP address from HiBench records with the following text format:
 // timestamp  ip, session id, something, something, browser, ...
 // 0    227.209.164.46,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1991-06-10,0.115967035,Mozilla/5.0 (iPhone; U; CPU like Mac OS X)AppleWebKit/420.1 (KHTML like Gecko) Version/3.0 Mobile/4A93Safari/419.3,YEM,YEM-AR,snowdrops,1
 // 0    35.143.225.164,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1996-05-31,0.8792629,Mozilla/5.0 (Windows; U; Windows NT 5.2) AppleWebKit/525.13 (KHTML like Gecko) Chrome/0.2.149.27 Safari/525.13,PRT,PRT-PT,fraternally,8
 // 0    34.57.45.175,nbizrgdziebtsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,2001-06-29,0.14202267,Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1),DOM,DOM-ES,Gaborone's,7
-fn get_ip(record: &String) -> String {
-    // TODO (john): Change this into a regex 
-    let end = record.find(',').expect("HiBench: Cannot parse IP.");
-    let ip = &record[0..end];
-    String::from(ip)
-}
 
 fn random_ip() -> String {
     let mut rng = rand::thread_rng();
@@ -75,8 +80,8 @@ impl Identity {
 }
 
 impl TestImpl for Identity {
-    type D = (String,String);
-    type DO = (u64,u64);
+    type D = Event;
+    type DO = (usize, u64);
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Identity" }
@@ -88,13 +93,13 @@ impl TestImpl for Identity {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|(ts, _)|
-            (u64::from_str(&ts).unwrap(),
-             SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()))
+        stream.map(|e|
+                   (e.time,
+                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()))
     }
 }
 
-impl<T: Timestamp> FromData<T> for (u64,u64) {
+impl<T: Timestamp> FromData<T> for (usize, u64) {
     fn from_data(&self, t: &T) -> String {
         format!("{:?} {:?}", t, self)
     }
@@ -109,8 +114,8 @@ impl Repartition {
 }
 
 impl TestImpl for Repartition {
-    type D = (String,String);
-    type DO = (String,String);
+    type D = Event;
+    type DO = Event;
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Repartition" }
@@ -153,8 +158,8 @@ impl Wordcount {
 }
 
 impl TestImpl for Wordcount {
-    type D = (String,String);
-    type DO = (String, String, usize);
+    type D = Event;
+    type DO = (String, usize, usize);
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Wordcount" }
@@ -167,13 +172,12 @@ impl TestImpl for Wordcount {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
-            .map(|(ts,b)| (get_ip(&b), ts))
-            .exchange(|&(ref ip,_)| hasher(&ip))
+            .map(|e| (e.ip(), e.time))
             .rolling_count(|&(ref ip, _)| ip.clone(), |(ip, ts), c| (ip, ts, c))
     }
 }
 
-impl<T: Timestamp> FromData<T> for (String, String, usize) {
+impl<T: Timestamp> FromData<T> for (String, usize, usize) {
     fn from_data(&self, t: &T) -> String {
         format!("{:?} {:?}", t, self)
     }
@@ -188,8 +192,8 @@ impl Fixwindow {
 }
 
 impl TestImpl for Fixwindow {
-    type D = (String,String);
-    type DO = (String,(u64,u32));
+    type D = Event;
+    type DO = (String,(usize, u32));
     type T = usize;
     
     fn name(&self) -> &str { "HiBench Fixwindow" }
@@ -203,14 +207,14 @@ impl TestImpl for Fixwindow {
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // TODO (john): Check if timestamps in the input stream correspond to seconds
         stream
-            .map(|(ts, b)| (get_ip(&b), u64::from_str(&ts).unwrap()))
+            .map(|e| (e.ip(), e.time))
             .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
             .reduce_by(|&(ref ip, _)| ip.clone(),
                        (0, 0), |(_, t), (m, c)| (min(m, t), c+1))
     }
 }
 
-impl<T: Timestamp> FromData<T> for (String, (u64, u32)) {
+impl<T: Timestamp> FromData<T> for (String, (usize, u32)) {
     fn from_data(&self, t: &T) -> String {
         format!("{:?} {:?}", t, self)
     }
@@ -240,8 +244,8 @@ impl HiBenchGenerator {
     }
 }
 
-impl EventSource<usize, (String, String)> for HiBenchGenerator {
-    fn next(&mut self) -> Result<(usize, Vec<(String,String)>)> {
+impl EventSource<usize, Event> for HiBenchGenerator {
+    fn next(&mut self) -> Result<(usize, Vec<Event>)> {
         if self.epoch < self.max {
             let mut rng = rand::thread_rng();
             let mut data = Vec::new();
@@ -256,9 +260,11 @@ impl EventSource<usize, (String, String)> for HiBenchGenerator {
                 let subs = "DOM-ES";
                 let word = "snow";
                 let int = 6;
-                data.push((format!("{}", self.epoch),
-                           format!("{},{},{},{:.8},{},{},{},{},{}",
-                                   ip, session, date, float, agent, s, subs, word, int)));
+                data.push(Event{
+                    time: self.epoch,
+                    data: format!("{},{},{},{:.8},{},{},{},{},{}",
+                                  ip, session, date, float, agent, s, subs, word, int)
+                });
             }
             
             self.epoch += 1;
@@ -297,8 +303,8 @@ impl Benchmark for HiBench {
             threads.push(thread::spawn(move || {
                 loop{
                     let (_, d) = generator.next()?;
-                    for (t, e) in d {
-                        writeln!(&mut file, "{:4} {}", t, e)?;
+                    for e in d {
+                        writeln!(&mut file, "{:4} {}", e.time, e.data)?;
                     }
                 }
             }));
@@ -316,16 +322,3 @@ impl Benchmark for HiBench {
              Box::new(Fixwindow::new())]
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use ::hibench::get_ip;
-
-    #[test]
-    fn test_ip_parser() {
-        let record = "0    227.209.164.46,nbizrgdziebsaecsecujfjcqtvnpcnxxwiopmddorcxnlijdizgoi,1991-06-10,0.115967035,Mozilla/5.0 (iPhone; U; CPU like Mac OS X)AppleWebKit/420.1 (KHTML like Gecko) Version/3.0 Mobile/4A93Safari/419.3,YEM,YEM-AR,snowdrops,1".to_string();
-        assert_eq!(get_ip(&record),"227.209.164.46");
-    }
-}
-
-
