@@ -100,6 +100,8 @@ fn main() {
                     Err(e) => eprintln!("{:25} Failed: {}", name, e)
                 }
             }
+        } else {
+            eprintln!("Invalid report mode, should be one of summary, latencies.");
         }
     }else if mode == "generate" {
         for bench in benchmarks {
@@ -147,5 +149,7 @@ generate                Generate benchmark workloads.
 
 help                    Show this documentation.
 ");
+    } else {
+        eprintln!("Invalid mode, should be one of test, generate, help.");
     }
 }
