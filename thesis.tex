@@ -72,7 +72,8 @@
       ylabel={Rate [e/s]},
       xlabel={Latency [s]},
       ymode=log,
-      legend pos=north west,
+      x tick label style={/pgf/number format/fixed},
+      legend pos=outer north east,
       ymajorgrids=true,
       grid style=dashed,
       ]
@@ -93,7 +94,7 @@
 \newcommand{\scalingplot}[1]{%
   \begin{tikzpicture}
     \begin{axis}[
-      title={Scaling (100Ke/s)},
+      title={Scaling (1'000'000e/s)},
       xlabel={Workers [n]},
       ylabel={Latency [s]},
       xmode=log,
@@ -101,7 +102,7 @@
       scaled y ticks=false,
       y tick label style={/pgf/number format/fixed},
       xtick={1, 2, 4, 8, 16, 32},
-      legend pos=north west,
+      legend pos=outer north east,
       ymajorgrids=true,
       grid style=dashed,
       ]
@@ -119,27 +120,25 @@
     {\label{figure:#1-scaling}}%
   \end{figure}}
 
-\newcommand{\cdfplot}[2]{%
+\newcommand{\cdfplot}[1]{%
   \begin{tikzpicture}
     \begin{axis}[
       title={CDF},
       xlabel={Latency [s]},
       ylabel={CDF [\%]},
-      legend pos=north west,
+      legend pos=outer north east,
       ymajorgrids=true,
       grid style=dashed,
-      table/create on use/cdf/.style={
-        create col/expr={\pgfmathaccuma + \thisrow{#1}}   
-      }]
+      ]
       
       #1
     \end{axis}
   \end{tikzpicture}}
 
-\newcommand{\cdffigure}[4][]{\begin{figure}[H]%
+\newcommand{\cdffigure}[3][]{\begin{figure}[H]%
     \centering
-    \cdfplot{#2}{#3}%
-    \caption{#4}%
+    \cdfplot{#2}%
+    \caption{#3}%
     \ifthenelse{ \equal{#1}{} }%
     {}%
     {\label{figure:#1-cdf}}%

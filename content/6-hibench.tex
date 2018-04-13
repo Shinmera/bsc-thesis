@@ -79,14 +79,24 @@ For this query, we merely need to create a tumbling window for ten seconds, and 
   \addplot table[y index=0, x index=2] {data/latency.csv};
   \addplot table[y index=0, x index=3] {data/latency.csv};
   \addplot table[y index=0, x index=4] {data/latency.csv};
+  \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{Linlog plot of the Latency vs Rate.}
 
 \scalingfigure[nex]{
-  \addplot table[y index=0, x index=1] {data/scaling.csv};
-  \addplot table[y index=0, x index=2] {data/scaling.csv};
-  \addplot table[y index=0, x index=3] {data/scaling.csv};
-  \addplot table[y index=0, x index=4] {data/scaling.csv};
+  \addplot table[x index=0, y index=1] {data/scaling.csv};
+  \addplot table[x index=0, y index=2] {data/scaling.csv};
+  \addplot table[x index=0, y index=3] {data/scaling.csv};
+  \addplot table[x index=0, y index=4] {data/scaling.csv};
+  \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{Linlog plot of the scaling behaviour.}
+
+\cdffigure[nex]{
+  \addplot table[y index=0, x index=1] {data/cdf.csv};
+  \addplot table[y index=0, x index=2] {data/cdf.csv};
+  \addplot table[y index=0, x index=3] {data/cdf.csv};
+  \addplot table[y index=0, x index=4] {data/cdf.csv};
+  \legend{Identity, Repartition, Wordcount, Fixwindow}
+}{CDF plot.}
 
 \subsection{Remarks}
 Surprisingly enough, HiBench gave us a lot of trouble to implement. Not because the queries were complex, but simply because of the lack of proper documentation and maintenance. Beyond the very superficial descriptions of the queries on their homepage, there is nothing about how the workloads are generated, how the queries perform in detail, or what the though process behind the design was. The code base itself is not easy to decipher either, as the information about data generation is distributed over a swath of files, none of which are commented or explained anywhere. \\
