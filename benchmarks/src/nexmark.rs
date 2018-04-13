@@ -496,7 +496,7 @@ impl TestImpl for Query3 {
         let persons = stream
             .filter_map(|e| Person::from(e))
             .filter(|p| p.state=="OR" || p.state=="ID" || p.state=="CA");
-        // FIXME
+        
         persons.left_join(&auctions, |p| p.id, |a| a.seller,
                           |p, a| (p.name, p.city, p.state, a.id))
     }
@@ -708,7 +708,7 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
         input1.for_each(|time, data|{
             data.drain(..).for_each(|a|{
                 let future = RootTimestamp::new(a.expires - BASE_TIME);
-                let auctions = auction_map.entry(future).or_insert_with(||Vec::new());
+                let auctions = auction_map.entry(future).or_insert_with(Vec::new);
                 auctions.push(a);
                 notificator.notify_at(time.delayed(&future));
             });
