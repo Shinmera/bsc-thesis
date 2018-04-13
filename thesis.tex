@@ -71,7 +71,7 @@
       title={Median Latency (32 workers)},
       ylabel={Rate [e/s]},
       xlabel={Latency [s]},
-      xmode=lin, ymode=log,
+      ymode=log,
       legend pos=north west,
       ymajorgrids=true,
       grid style=dashed,
@@ -119,21 +119,31 @@
     {\label{figure:#1-scaling}}%
   \end{figure}}
 
-\newcommand{\throughputplot}[1]{%
+\newcommand{\cdfplot}[2]{%
   \begin{tikzpicture}
     \begin{axis}[
-      title={Throughput vs. Latency},
-      xlabel={Throughput [n]},
-      ylabel={Latency [s]},
-      xmode=lin, ymode=lin,
+      title={CDF},
+      xlabel={Latency [s]},
+      ylabel={CDF [\%]},
       legend pos=north west,
       ymajorgrids=true,
       grid style=dashed,
-      ]
+      table/create on use/cdf/.style={
+        create col/expr={\pgfmathaccuma + \thisrow{#1}}   
+      }]
       
       #1
     \end{axis}
   \end{tikzpicture}}
+
+\newcommand{\cdffigure}[4][]{\begin{figure}[H]%
+    \centering
+    \cdfplot{#2}{#3}%
+    \caption{#4}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1-cdf}}%
+  \end{figure}}
 
 \setcounter{secnumdepth}{4}
 \titleformat{\paragraph}{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}

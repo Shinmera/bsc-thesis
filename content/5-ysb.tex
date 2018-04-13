@@ -23,11 +23,11 @@ As the data used in YSB is fairly straight forward, we created our own data gene
 
 This is all in line with the implementation of the data generator found in the original YSB repository (\code{data/src/setup/core.clj}). Curiously, their implementation does include parts to skew the time stamps and randomise them, but they are not actually used. Like many other implementations of YSB, we also do not rely on Redis for the \code{ad_id} to \code{campaign_id} lookup, and instead keep this small table in memory of our query. \\
 
-The primary purpose of implementing our own generation for YSB is to find a short path to testing the query. While it is possible to add Kafka as an event source, reading directly from files gives us more precise data about the performance of Timely itself.
+The primary purpose of implementing our own generation for YSB is to find a short path to testing the query. While it is possible to add Kafka as an event source, generating the data directly in memory allows us to more easily test various configurations and explore datasets that would take up massive amounts of space to store ahead of time.
 
 \subsubsection{Query}
 \begin{listing}[H]
-  \inputminted[firstline=84,lastline=93]{rust}{benchmarks/src/ysb.rs}
+  \inputminted[firstline=82,lastline=92]{rust}{benchmarks/src/ysb.rs}
   \caption{Dataflow implementation of the YSB benchmark.}
   \label{lst:ysb}
 \end{listing}
@@ -38,12 +38,16 @@ The second \code{map} operator is responsible for performing the lookup in the \
 
 \subsection{Evaluation}
 \latencyfigure[ysb]{
-  \addplot table {data/ysb-latency.csv};
-}{Loglog plot of the Latency vs Rate.}
+  \addplot table[y index=0, x index=5] {data/latency.csv};
+}{Linlog plot of the Latency vs Rate.}
 
 \scalingfigure[ysb]{
-  \addplot table {data/ysb-scaling.csv};
+  \addplot table[y index=0, x index=5] {data/scaling.csv};
 }{Linlog plot of the scaling behaviour.}
+
+\cdffigure[ysb]{5}{
+  \addplot table[x index=4, y=cdf] {data/cdf.csv};
+}{CDF latency plot.}
 
 \subsection{Remarks}
 Compared to the queries shown in NEXMark, the Yahoo Streaming Benchmark is exceedingly simple. It also includes some rather odd requirements that were most likely simply specific to Yahoo's internal use-case, rather than born out of consideration for what would make a good benchmark. Most notably the lookup in Redis would present a significant bottleneck for most modern streaming systems, and the required JSON deserialisation step will lead to the benchmark mostly testing the JSON library's speed, rather than the streaming system's actual performance in processing the data. \\

@@ -1,5 +1,5 @@
 \section{NEXMark Benchmark\cite{nexmark}}
-NEXMark is an evolution of the XMark benchmark. XMark was initially designed for relational databases and defines a small schema for an online auction house. NEXMark builds on this idea and presents a schema of three concrete tables, and a set of queries to run in a streaming sense. NEXMark attempts to provide a benchmark that is both extensive in its use of operators, and close to a real-world application by being grounded in a well-known problem. The original benchmark proposed by Tucker et al. was adopted and extended by the Apache Foundation for their use in Beam\cite{nexmark-beam}. We will follow the Beam implementation, as it is the most widely adopted one, despite having several differences to the benchmark originally outlined in the paper. See SOME-SECTION for an outline of the differences we found. \\
+NEXMark is an evolution of the XMark benchmark. XMark was initially designed for relational databases and defines a small schema for an online auction house. NEXMark builds on this idea and presents a schema of three concrete tables, and a set of queries to run in a streaming sense. NEXMark attempts to provide a benchmark that is both extensive in its use of operators, and close to a real-world application by being grounded in a well-known problem. The original benchmark proposed by Tucker et al. was adopted and extended by the Apache Foundation for their use in Beam\cite{nexmark-beam}, a system intended to provide a general API for a variety of streaming systems. We will follow the Beam implementation, as it is the most widely adopted one, despite having several differences to the benchmark originally outlined in the paper. See \autoref{section:nexmark-remarks} for an outline of the differences we found. \\
 
 The benchmark defines the following queries:
 
@@ -69,133 +69,133 @@ The queries are based on three types of events that can enter the system: \code{
 
 \subsection{Implementation}
 \subsubsection{Data Generation}
-In order to be able to run the benchmark outside of the Beam framework, we had to replicate their generator. For this we translated the original Java sources of the generator (\code{sdks/java/nexmark/src/main/java/org/apache/beam/sdk/nexmark/sources/generator}) into Rust. We output generated events to aggregate JSON files, where each line is made up of a single event to feed into the system. \\
+In order to be able to run the benchmark outside of the Beam framework, we had to replicate their generator. For this we translated the original Java sources of the generator (\code{sdks/java/nexmark/src/main/java/org/apache/beam/sdk/nexmark/sources/generator}) into Rust. Unfortunately it appears that the Beam generator has a hard constraint on its rate due to a lack of precision, and can thus only output at most 2M events per second. In our tests the system did not congest at these rates, so we had to modify the generation to be more precise, and allow higher rates. This may have changed the generation in subtle ways that we are not aware of. If it is indeed possible to output more than 2M events per second in the original generator, we could not figure out how to make it do so due to the lack of proper documentation.
 
 \subsubsection{Queries}
 \paragraph{Query 0}
 \begin{listing}[H]
-  \inputminted[firstline=404,lastline=404]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=396,lastline=396]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 0}
   \label{lst:nexmark-query0}
 \end{listing}
 
 \paragraph{Query 1}
 \begin{listing}[H]
-  \inputminted[firstline=424,lastline=426]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=422,lastline=424]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 1}
   \label{lst:nexmark-query1}
 \end{listing}
 
 \paragraph{Query 2}
 \begin{listing}[H]
-  \inputminted[firstline=447,lastline=450]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=457,lastline=460]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 2}
   \label{lst:nexmark-query2}
 \end{listing}
 
 \paragraph{Query 3}
 \begin{listing}[H]
-  \inputminted[firstline=470,lastline=479]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=492,lastline=501]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 3}
   \label{lst:nexmark-query3}
 \end{listing}
 
 \paragraph{Query 4}
 \begin{listing}[H]
-  \inputminted[firstline=499,lastline=501]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=533,lastline=535]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 4}
   \label{lst:nexmark-query4}
 \end{listing}
 
 \paragraph{Query 5}
 \begin{listing}[H]
-  \inputminted[firstline=521,lastline=530]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=561,lastline=570]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 5}
   \label{lst:nexmark-query5}
 \end{listing}
 
 \paragraph{Query 6}
 \begin{listing}[H]
-  \inputminted[firstline=550,lastline=551]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=602,lastline=603]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 6}
   \label{lst:nexmark-query6}
 \end{listing}
 
 \paragraph{Query 7}
 \begin{listing}[H]
-  \inputminted[firstline=571,lastline=577]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=635,lastline=641]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 7}
   \label{lst:nexmark-query7}
 \end{listing}
 
 \paragraph{Query 8}
 \begin{listing}[H]
-  \inputminted[firstline=597,lastline=606]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=673,lastline=682]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 8}
   \label{lst:nexmark-query8}
 \end{listing}
 
 \paragraph{Query 9}
 \begin{listing}[H]
-  \inputminted[firstline=619,lastline=655]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=701,lastline=737]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 9}
   \label{lst:nexmark-query9}
 \end{listing}
 
 \paragraph{Query 10}
-\begin{listing}[H]
-  \inputminted[firstline=0,lastline=1]{rust}{benchmarks/src/nexmark.rs}
-  \caption{Implementation for NEXMark's Query 10}
-  \label{lst:nexmark-query10}
-\end{listing}
+We did not implement Query 10 as we felt it did not reflect a useful case outside of the very specific and particular application of writing to a Google Cloud Storage file.
 
 \paragraph{Query 11}
 \begin{listing}[H]
-  \inputminted[firstline=0,lastline=1]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=784,lastline=787]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 11}
   \label{lst:nexmark-query11}
 \end{listing}
 
 \paragraph{Query 12}
 \begin{listing}[H]
-  \inputminted[firstline=0,lastline=1]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=811,lastline=818]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 12}
   \label{lst:nexmark-query12}
 \end{listing}
 
 \subsection{Evaluation}
 \latencyfigure[nex]{
-  \addplot table[x index=0, y index=1] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=2] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=3] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=4] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=5] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=6] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=7] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=8] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=9] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=10] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=11] {data/nex-latency.csv};
-  \addplot table[x index=0, y index=12] {data/nex-latency.csv};
-}{Loglog plot of the Latency vs Rate.}
+   \addplot table[y index=0, x index=6] {data/latency.csv};
+   \addplot table[y index=0, x index=7] {data/latency.csv};
+   \addplot table[y index=0, x index=8] {data/latency.csv};
+   \addplot table[y index=0, x index=9] {data/latency.csv};
+   \addplot table[y index=0, x index=10] {data/latency.csv};
+   \addplot table[y index=0, x index=11] {data/latency.csv};
+   \addplot table[y index=0, x index=12] {data/latency.csv};
+   \addplot table[y index=0, x index=13] {data/latency.csv};
+   \addplot table[y index=0, x index=14] {data/latency.csv};
+   \addplot table[y index=0, x index=15] {data/latency.csv};
+   \addplot table[y index=0, x index=16] {data/latency.csv};
+%   \addplot table[y index=0, x index=17] {data/latency.csv};
+}{Linlog plot of the Latency vs Rate.}
 
 \scalingfigure[nex]{
-  \addplot table[x index=0, y index=1] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=2] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=3] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=4] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=5] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=6] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=7] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=8] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=9] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=10] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=11] {data/nex-scaling.csv};
-  \addplot table[x index=0, y index=12] {data/nex-scaling.csv};
+  \addplot table[y index=0, x index=6] {data/scaling.csv};
+  \addplot table[y index=0, x index=7] {data/scaling.csv};
+  \addplot table[y index=0, x index=8] {data/scaling.csv};
+  \addplot table[y index=0, x index=9] {data/scaling.csv};
+  \addplot table[y index=0, x index=10] {data/scaling.csv};
+  \addplot table[y index=0, x index=11] {data/scaling.csv};
+  \addplot table[y index=0, x index=12] {data/scaling.csv};
+  \addplot table[y index=0, x index=13] {data/scaling.csv};
+  \addplot table[y index=0, x index=14] {data/scaling.csv};
+  \addplot table[y index=0, x index=15] {data/scaling.csv};
+  \addplot table[y index=0, x index=16] {data/scaling.csv};
+%  \addplot table[y index=0, x index=17] {data/scaling.csv};
 }{Linlog plot of the scaling behaviour.}
 
-\subsection{Remarks}
+\subsection{Remarks}\label{section:nexmark-remarks}
+NEXMark presents the most extensive benchmark of the three we have investigated. It shows a number of different applications that involve a variety of different operators and configurations. Unlike the other two, NEXMark was a research project designed to present a useful benchmark for streaming systems. As such it has a formal specification of the datastructures and queries involved, and presents a reference data generation implementation. These are vital pieces if it should be possible for third-parties to implement the benchmark and compare results. \\
 
+However, due to the lack of impact of the original paper, the only widespread use of the benchmark is with Apache's Beam system. The Beam implementors made several relatively severe changes to the benchmark. First, they implemented their own generator that has almost nothing in common with the original generator. Second, they added more queries whose precise behaviour and purpose is not formally specified or documented anywhere. Third, they changed the size of the windows to be merely ten seconds, rather than the minutes and hours the original specification sets. \\
+
+We assume the idea behind Beam's implementation is that, in order to offer comparable benchmarks for systems, you would simply have to write a backend for your system in Beam. This however is not trivially achievable, and also will not actually produce results that will properly reflect your system, as the benchmark will implicitly measure and compare not just your system on its own, but also the backend you wrote for Beam and how well it translates queries. \\
 
 %%% Local Variables:
 %%% mode: latex

@@ -39,7 +39,7 @@ Since, as far as we can tell, only the IP and timestamp are actually used by any
 \subsubsection{Queries}\label{section:hibench-queries}
 \paragraph{Identity}
 \begin{listing}[H]
-  \inputminted[firstline=94,lastline=96]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=96,lastline=98]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Identity query.}
   \label{lst:hibench-identity}
 \end{listing}
@@ -48,7 +48,7 @@ In this query we simply parse out the timestamp from its string representation a
 
 \paragraph{Repartition}
 \begin{listing}[H]
-  \inputminted[firstline=133,lastline=146]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=132,lastline=142]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Repartition query.}
   \label{lst:hibench-repartition}
 \end{listing}
@@ -57,7 +57,7 @@ This is the most complex implementation of all queries in the HiBench set, since
 
 \paragraph{Wordcount}
 \begin{listing}[H]
-  \inputminted[firstline=181,lastline=184]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=174,lastline=176]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the WordCount query.}
   \label{lst:hibench-wordcount}
 \end{listing}
@@ -66,7 +66,7 @@ For a word count, all we really need is the \code{rolling_count} operator, which
 
 \paragraph{Fixwindow}
 \begin{listing}[H]
-  \inputminted[firstline=220,lastline=224]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=209,lastline=213]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Fixwindow query.}
   \label{lst:hibench-fixwindow}
 \end{listing}
@@ -74,6 +74,19 @@ For a word count, all we really need is the \code{rolling_count} operator, which
 For this query, we merely need to create a tumbling window for ten seconds, and then count the number of events per IP in the window as well as their minimal timestamp, both of which can be achieved with a single \code{reduce_by}.
 
 \subsection{Evaluation}
+\latencyfigure[nex]{
+  \addplot table[y index=0, x index=1] {data/latency.csv};
+  \addplot table[y index=0, x index=2] {data/latency.csv};
+  \addplot table[y index=0, x index=3] {data/latency.csv};
+  \addplot table[y index=0, x index=4] {data/latency.csv};
+}{Linlog plot of the Latency vs Rate.}
+
+\scalingfigure[nex]{
+  \addplot table[y index=0, x index=1] {data/scaling.csv};
+  \addplot table[y index=0, x index=2] {data/scaling.csv};
+  \addplot table[y index=0, x index=3] {data/scaling.csv};
+  \addplot table[y index=0, x index=4] {data/scaling.csv};
+}{Linlog plot of the scaling behaviour.}
 
 \subsection{Remarks}
 Surprisingly enough, HiBench gave us a lot of trouble to implement. Not because the queries were complex, but simply because of the lack of proper documentation and maintenance. Beyond the very superficial descriptions of the queries on their homepage, there is nothing about how the workloads are generated, how the queries perform in detail, or what the though process behind the design was. The code base itself is not easy to decipher either, as the information about data generation is distributed over a swath of files, none of which are commented or explained anywhere. \\
