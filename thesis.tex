@@ -65,17 +65,44 @@
     {\label{figure:#1}}%
   \end{figure}}
 
+\usetikzlibrary{
+  pgfplots.colorbrewer,
+}
+\pgfplotsset{
+  % define a `cycle list' for marker
+  cycle list/.define={my marks}{
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=*\\
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=square*\\
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=triangle*\\
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=diamond*\\
+  },
+}
+
+\pgfplotsset{tikzDefaults/.style=
+  {legend pos=outer north east,
+    ymajorgrids=true,
+    grid style=dashed,
+    cycle list/Spectral-11,
+    cycle multiindex* list={
+      Spectral-11
+      \nextlist
+      my marks
+      \nextlist
+      [3 of]linestyles
+      \nextlist
+      very thick
+      \nextlist},
+  }}
+
 \newcommand{\latencyplot}[1]{%
   \begin{tikzpicture}
     \begin{axis}[
+      tikzDefaults,
       title={Median Latency (32 workers)},
       ylabel={Rate [e/s]},
       xlabel={Latency [s]},
       ymode=log,
       x tick label style={/pgf/number format/fixed},
-      legend pos=outer north east,
-      ymajorgrids=true,
-      grid style=dashed,
       ]
       
       #1
@@ -94,6 +121,7 @@
 \newcommand{\scalingplot}[1]{%
   \begin{tikzpicture}
     \begin{axis}[
+      tikzDefaults,
       title={Scaling (1'000'000e/s)},
       xlabel={Workers [n]},
       ylabel={Latency [s]},
@@ -102,9 +130,6 @@
       scaled y ticks=false,
       y tick label style={/pgf/number format/fixed},
       xtick={1, 2, 4, 8, 16, 32},
-      legend pos=outer north east,
-      ymajorgrids=true,
-      grid style=dashed,
       ]
       
       #1
@@ -123,12 +148,10 @@
 \newcommand{\cdfplot}[1]{%
   \begin{tikzpicture}
     \begin{axis}[
+      tikzDefaults,
       title={CDF (1'000'000e/s)},
       xlabel={Latency [s]},
       ylabel={CDF [\%]},
-      legend pos=outer north east,
-      ymajorgrids=true,
-      grid style=dashed,
       ]
       
       #1
