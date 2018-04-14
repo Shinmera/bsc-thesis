@@ -226,6 +226,18 @@ impl<T: Timestamp, D> EventDrain<T, D> for VectorEndpoint<T, D> {
     }
 }
 
+pub struct MeterOutput {}
+
+impl MeterOutput {
+    pub fn new() -> Self { MeterOutput {} }
+}
+
+impl<T: Timestamp, D> EventDrain<T, D> for MeterOutput {
+    fn next(&mut self, t: T, d: Vec<D>) {
+        eprintln!("{:?}: {} records out.", t, d.len());
+    }
+}
+
 /// This struct acts as an opaque event source for a dataflow.
 ///
 /// It is merely a container to bypass Rust's restriction on materialised traits.
@@ -350,6 +362,9 @@ impl<T: Timestamp, D: Data+FromData<T>> Into<Result<Drain<T, D>>> for Config {
             },
             "file" => {
                 Ok(Drain::from(File::create(self.get_or("output-file", "output.log"))?))
+            },
+            "meter" => {
+                Ok(Drain::new(Box::new(MeterOutput::new())))
             },
             // "kafka" => {
             //     let mut config = ClientConfig::new();
