@@ -122,6 +122,8 @@ test                    Run the benchmarks.
   --processes NUM         Number of processes.
   --hostfile FILE         Process address host file.
   --report BOOL           Whether to report connection progress.
+  --window-size NUM       The size of the windows in epochs (usually seconds).
+  --window-slide NUM      The slide of the windows in epochs (usually seconds).
 
 generate                Generate benchmark workloads.
   --benchmarks STRING      A comma-separated list of benchmark names to generate.

@@ -557,10 +557,13 @@ impl TestImpl for Query5 {
         Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let window_size = config.get_as_or("window-size", 10);
+        let window_slide = config.get_as_or("window-slide", 5);
+        
         let bids = stream
             .filter_map(|e| Bid::from(e))
-            .epoch_window(10, 5);
+            .epoch_window(window_size, window_slide);
         
         let count = bids.reduce_to(0, |_, c| c+1);
         
@@ -631,10 +634,12 @@ impl TestImpl for Query7 {
         Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let window_size = config.get_as_or("window-size", 10);
+        
         stream
             .filter_map(|e| Bid::from(e))
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
+            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size))
             .reduce(|_| 0, (0, 0, 0), |b, (a, p, bi)| {
                 if p < b.price { (b.auction, b.price, b.bidder) }
                 else { (a, p, bi) }
@@ -669,14 +674,16 @@ impl TestImpl for Query8 {
         Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let window_size = config.get_as_or("window-size", 10);
+        
         let auctions = stream
             .filter_map(|e| Auction::from(e))
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10));
+            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size));
         
         let persons = stream
             .filter_map(|e| Person::from(e))
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10));
+            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size));
         
         persons.epoch_join(&auctions, |p| p.id, |a| a.seller,
                            |p, a| (p.id, p.name, a.reserve))

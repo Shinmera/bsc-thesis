@@ -78,8 +78,9 @@ impl TestImpl for Query {
         Ok((Source::new(Box::new(gen)), out?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let table = self.campaign_map.read().unwrap().clone();;
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let window_size = config.get_as_or("window-size", 10);
+        let table = self.campaign_map.read().unwrap().clone();
         stream
             .filter(|x: &Event| x.event_type == "view")
             .map(|x| (x.ad_id, x.event_time))
@@ -88,7 +89,7 @@ impl TestImpl for Query {
                      Some(id) => id.clone(),
                      None => String::from("UNKNOWN AD")
                  })
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
+            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size))
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1)
     }
 }

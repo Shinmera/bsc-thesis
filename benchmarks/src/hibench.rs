@@ -204,11 +204,12 @@ impl TestImpl for Fixwindow {
         Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // TODO (john): Check if timestamps in the input stream correspond to seconds
+        let window_size = config.get_as_or("window-size", 10);
         stream
             .map(|e| (e.ip(), e.time))
-            .tumbling_window(|t| RootTimestamp::new(((t.inner/10)+1)*10))
+            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size))
             .reduce_by(|&(ref ip, _)| ip.clone(),
                        (0, 0), |(_, t), (m, c)| (min(m, t), c+1))
     }
