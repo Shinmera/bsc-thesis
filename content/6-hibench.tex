@@ -34,9 +34,9 @@ Since the benchmarks focus on very small tests, they can only really give insigh
 \subsubsection{Data Generation}
 As the data generation process is not documented explicitly anywhere and the source is rather hard to decode, we opted for a much simpler scheme that should nevertheless follow the overall structure of the data used in HiBench. Our generator produces a fixed-size set of random IPs, by default set to 100. It then generates events at a fixed number of events per second, with the assumption that the timestamps in the data records correspond to seconds. For each event, the \code{ip} is chosen at random from the set, the \code{session_id} is a random 54 character long ASCII string, and the \code{date} is a randomly generated date string in the appropriate format. All of the remaining fields are left the same across all events. \\
 
-Since, as far as we can tell, only the IP and timestamp are actually used by any of the streaming queries, we do not believe that the lack of proper data generation for the remaining fields severely skews our workloads.
+Since, as far as we can tell, only the IP and timestamp are actually used by any of the streaming queries, we do not believe that the lack of proper data generation for the remaining fields severely skews our workloads. This observation is based on the Flink implementation of HiBench.
 
-\subsubsection{Queries}\label{section:hibench-queries}
+\subsubsection{Data Flows}\label{section:hibench-queries}
 \paragraph{Identity}
 \begin{listing}[H]
   \inputminted[firstline=96,lastline=98]{rust}{benchmarks/src/hibench.rs}

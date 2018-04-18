@@ -21,11 +21,11 @@ The dataflow proceeds as follows: the first operator parses the JSON string into
 \subsubsection{Data Generation}
 As the data used in YSB is fairly straight forward, we created our own data generator. The generator creates random \code{user_id}s, \code{page_id}s, and \code{ip_address}es. Since those fields aren't actually touched by the query, the precise data should not make any difference. The \code{ad_type} and \code{event_type} are randomly chosen from the specified sets. The \code{ad_id} is chosen from a randomly generated table of \code{ad_id}s to \code{campaign_id}s. This table consists of 100 campaigns with 10 ads each, as specified by YSB. The most interesting field is the \code{event_time} which is monotonically stepped in milliseconds according to how many events per second should be generated. \\
 
-This is all in line with the implementation of the data generator found in the original YSB repository (\code{data/src/setup/core.clj}). Curiously, their implementation does include parts to skew the time stamps and randomise them, but they are not actually used. Like many other implementations of YSB, we also do not rely on Redis for the \code{ad_id} to \code{campaign_id} lookup, and instead keep this small table in memory of our query. \\
+This is all in line with the implementation of the data generator found in the original YSB repository (\code{data/src/setup/core.clj}). Curiously, their implementation does include parts to skew the time stamps and randomise them, but they are not actually used. Like many other implementations of YSB, we also do not rely on Redis for the \code{ad_id} to \code{campaign_id} lookup, and instead keep this small table in memory. \\
 
 The primary purpose of implementing our own generation for YSB is to find a short path to testing the query. While it is possible to add Kafka as an event source, generating the data directly in memory allows us to more easily test various configurations and explore datasets that would take up massive amounts of space to store ahead of time.
 
-\subsubsection{Query}
+\subsubsection{Data Flow}
 \begin{listing}[H]
   \inputminted[firstline=82,lastline=92]{rust}{benchmarks/src/ysb.rs}
   \caption{Dataflow implementation of the YSB benchmark.}

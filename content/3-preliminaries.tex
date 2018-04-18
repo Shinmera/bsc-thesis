@@ -1,4 +1,6 @@
-\section{Timely Dataflow}
+\section{Preliminaries}
+
+\subsection{Timely Dataflow}
 Timely\cite{timely} is a system written in Rust based on research initially proposed in Naiad\cite{naiad}. Timely offers a dataflow based processing framework, where a dataflow is composed of a possibly cyclic graph of operators. Each operator can receive data from previous operators through input edges in the graph, and send data to other operators through output edges. Each edge represents a communication channel that is managed by the Timely system, which allows parallelising the computation to many workers at a time. Timely handles the exchange of data between operators and across workers. \\
 
 Timely tracks progress of the dataflow computation through ``epochs'' --- rounds of input data that are associated with a logical timestamp. These timestamps are required to implement a partial order, which is used to infer information about the progress of an operator. An important part of this inference is the notion of epoch closure: when an epoch is closed, no more input may arrive for it. Operators can request to be notified when specific epochs are closed, and can thus reason about when they have the full picture of the data. As a consequence of this, data before the closure of an epoch can arrive out of order, which typically improves performance as it lowers synchronisation constraints. The tracking of the epoch closure is called the ``frontier''. \\

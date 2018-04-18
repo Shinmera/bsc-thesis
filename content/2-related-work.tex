@@ -1,75 +1,75 @@
-%% FIXME: Note what state is retained for each stateful node
+%% FIXME: Note what state is retained for each stateful operator
 \section{Related Work}
-In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. The nodes are coloured in orange if they are stateful. \\
+In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. The operators are coloured in orange if they are stateful. \\
 
 The papers were selected based on the number of citations, as well as on their direct relevance to current trends in the development and research for Big Data and streaming systems. \\
 
 Overall we found that most of the systems were evaluated with relatively simple data flows and algorithms that are well understood. A lot of the papers also do not provide direct source code, nor a way to replicate the workload to confirm their findings. It seems that so far no generally accepted algorithm, workload, setup, nor even a precisely defined way of measuring performance have emerged.
 
 \subsection{\citefulltitle{s4}}
-The S4 paper evaluates its performance with two sample algorithms: click-through rate (CTR), and online parameter optimisation (OPO). \\
+The S4 paper evaluates its performance with two algorithms: click-through rate (CTR), and online parameter optimisation (OPO). \\
 
 \imagefigure{images/s4-graphs.pdf}{Graphs of the two tests used to evaluate the S4 platform: click-through rate and online parameter optimisation.}
 
-The CTR test is implemented by four nodes: initially a map assigns key to the keyless events coming in. It passes them to a node that combines matching events. From there the events go on to a filter that removes unwanted events. Finally, the events are passed to a node that computes the CTR, and emits it as a new event. \\
+The CTR data flow is implemented by four operators: initially a map assigns key to the keyless events coming in. It passes them to a operator that combines matching events. From there the events go on to a filter that removes unwanted events. Finally, the events are passed to a operator that computes the CTR, and emits it as a new event. \\
 
-The OPO test consists of five nodes: the split operator assigns keys to route the events to either one of the map operators. These nodes then perform some computations on the events and emit the results as new events. The reduce node compares the events it gets in order to determine the optimisation parameters. The final map operator runs an adaptation depending on the parameters it receives and passes them onwards.
+The OPO data flow consists of five operators: the split operator assigns keys to route the events to either one of the map operators. These operators then perform some computations on the events and emit the results as new events. The reduce operator compares the events it gets in order to determine the optimisation parameters. The final map operator runs an adaptation depending on the parameters it receives and passes them onwards.
 
 \subsection{\citefulltitle{spade}}
 In order to evaluate the system, a simple algorithm is run to determine bargains to buy. \\
 
 \imagefigure{images/spade-graphs.pdf}{Graph of the example used in the SPADE paper: a bargain index computation.}
 
-The data flow is composed of six nodes: a filter node filters out trade information and computes its price. It passes its information on to a moving aggregation node, with a window size of 15, and a slide of 1. The aggregate is passed on to a mapping node that computes the volume weighted average price (VWAP). Another filter node filters out quote information from the main input stream. This is then, together with the VWAP, reduced to compute the bargain index. The final filter simply removes the zero indexes.
+The data flow is composed of six operators: a filter operator filters out trade information and computes its price. It passes its information on to a moving aggregation operator, with a window size of 15 tuples, and a slide of 1 tuple. The aggregate is passed on to a mapping operator that computes the volume weighted average price (VWAP). Another filter operator filters out quote information from the main input stream. This is then, together with the VWAP, reduced to compute the bargain index. The final filter simply removes the zero indexes.
 
 \subsection{\citefulltitle{discretized}}
 In the Discretized Streams paper, the performance is evaluated through a simple Word Count algorithm. \\
 
 \imagefigure{images/discretized-graphs.pdf}{Graph of the Word Count example used to illustrate the discretized streams.}
 
-The Word Count test is implemented through three operators: a ``flat map'' that splits an incoming string into words, a map that turns each word into a tuple of the word and a counter, and finally a hopping-window aggregation that adds the counters together grouped by word.
+The Word Count test is implemented through three operators: a ``flat map'' that splits an incoming string into words, a map that turns each word into a tuple of the word and a counter, and finally a tumbling window aggregation that adds the counters together grouped by word.
 
 \subsection{\citefulltitle{millwheel}}
 The Millwheel paper unfortunately provides barely any information at all about the tests implemented. The only mention is about how many stages the pipelines have they use to evaluate the system. Two tests are performed: a single-stage test to measure the latency, and a three-stage test to measure the lag of their fault tolerance system.
 
 \subsection{\citefulltitle{streamcloud}}
-In this paper, the system is evaluated by two distinct queries. It is not stated whether either of the queries have any real-world application. The StreamCloud system provides a number of predefined operators that can be strung together to perform these queries. \\
+In this paper, the system is evaluated by two distinct data flows. It is not stated whether either of the data flows have any real-world application. The StreamCloud system provides a number of predefined operators that can be strung together to perform these data flows. \\
 
-\imagefigure{images/streamcloud-graphs.pdf}{Graph of the query used to evaluate StreamCloud.}
+\imagefigure{images/streamcloud-graphs.pdf}{Graph of the data flow used to evaluate StreamCloud.}
 
-Both queries perform a sequence of maps and filters followed by aggregations. The aggregate is based on a window size and slide, which can be configured for each node. However, the configurations used are not provided by the paper.
+Both data flows perform a sequence of maps and filters followed by aggregations. The aggregate is based on a window size and slide, which can be configured for each operator. However, the configurations used are not provided by the paper.
 
 \subsection{\citefulltitle{integrating}}
-To evaluate their approach for fault tolerance using Operator State Management, two queries were implemented: a linear road benchmark (LRB) to determine tolls in a network, and a Top-K query to determine the top visited pages. The data flow is composed out of stateless and stateful nodes, where stateful nodes must communicate their state to the system so that it may be recovered. \\
+To evaluate their approach for fault tolerance using Operator State Management, two data flows were implemented: a linear road benchmark (LRB) to determine tolls in a network, and a Top-K data flow to determine the top visited pages. The data flow is composed out of stateless and stateful operators, where stateful operators must communicate their state to the system so that it may be recovered. \\
 
-\imagefigure{images/integrating-graphs.pdf}{Illustration of the queries for the Linear Road Benchmark and the Top-K tests used to evaluate their system.}
+\imagefigure{images/integrating-graphs.pdf}{Illustration of the data flows for the Linear Road Benchmark and the Top-K tests used to evaluate their system.}
 
-The LRB is implemented using six nodes. The first split node routes the tuples depending on their type. The following map node calculates tolls and accidents, the information of which is then forwarded to a node that collects toll information, and a node that evaluates the toll information. The output from the evaluation, together with account balance information, is aggregated and finally reduced to a single tuple together with the information from the toll collector node. \\
+The LRB is implemented using six operators. The first split operator routes the tuples depending on their type. The following map operator calculates tolls and accidents, the information of which is then forwarded to a operator that collects toll information, and a operator that evaluates the toll information. The output from the evaluation, together with account balance information, is aggregated and finally reduced to a single tuple together with the information from the toll collector operator. \\
 
-The Top-K query is implemented using three nodes. The starting map node strips unnecessary information from the tuples. The following node reduces the tuples to local top-k counts. Finally the many local counts are reduced to a single top-k count for the whole data.
+The Top-K data flow is implemented using three operators. The starting map operator strips unnecessary information from the tuples. The following operator reduces the tuples to local top-k counts. Finally the many local counts are reduced to a single top-k count for the whole data.
 
 \subsection{\citefulltitle{timestream}}
 The TimeStream system is evaluated using two algorithms: a distinct count to count URLs and a Twitter sentiment analysis. \\
 
-\imagefigure{images/timestream-graphs.pdf}{The Distinct Count and Sentiment Analysis queries used to evaluate the Timestream system.}
+\imagefigure{images/timestream-graphs.pdf}{The Distinct Count and Sentiment Analysis data flows used to evaluate the Timestream system.}
 
-The distinct count is implemented using five nodes. The split node distributes the tuples based on a hash. The following filter removes bot-generated queries, and passes them on to a windowing operator with a window of 30'000 and a slide of 2'000. The windowed events are then reduced into local counts. The local counts are finally aggregated into global counts. \\
+The distinct count is implemented using five operators. The split operator distributes the tuples based on a hash. The following filter removes bot-generated data flows, and passes them on to a windowing operator with a window of 30 seconds and a slide of 2 seconds. The windowed events are then reduced into local counts. The local counts are finally aggregated into global counts. \\
 
-The sentiment analysis performs two individual computations before finally joining the results together with a custom operator. The first computation determines changes in sentiments. It uses a tumbling window on the tweets, averages the sentiments, for each window, then uses a sliding window of size 2 to feed a filter that only returns sentiments that changed. The second computation returns the change in word counts. It uses a tumbling window of the same size as the first computation, then aggregates the word counts for each batch. Using another sliding window of 2 it then computes a delta in the counts. Using a custom operator the sentiment changes and word count deltas are then joined together to analyse them.
+The sentiment analysis performs two individual computations before finally joining the results together with a custom operator. The first computation determines changes in sentiments. It uses a tumbling window on the tweets, averages the sentiments, for each window, then uses a sliding window of 2 ms to feed a filter that only returns sentiments that changed. The second computation returns the change in word counts. It uses a tumbling window of the same size as the first computation, then aggregates the word counts for each batch. Using another sliding window of 2 ms it then computes a delta in the counts. Using a custom operator the sentiment changes and word count deltas are then joined together to analyse them.
 
 \subsection{\citefulltitle{storm}}
-This paper proposes a new scheduling algorithm for Storm. It then uses a query specifically geared towards evaluating the scheduling. This query is believed to be representative of typical topologies found in applications of Storm.\\
+This paper proposes a new scheduling algorithm for Storm. It then uses a data flow specifically geared towards evaluating the scheduling. This data flow is believed to be representative of typical topologies found in applications of Storm.\\
 
 \imagefigure{images/storm-graphs.pdf}{The topology graph used to evaluate the Storm schedulers.}
 
-The query is composed of a sequence of nodes that produce arbitrary, new events distinguished by a counter. The data flow has no interesting properties aside from the alternation between stateless and stateful nodes.
+The data flow is composed of a sequence of operators that produce arbitrary, new events distinguished by a counter. The data flow has no interesting properties aside from the alternation between stateless and stateful operators.
 
 \subsection{\citefulltitle{storm2}}
 This paper presents a case study to perform real-time analysis of trends on Twitter using Storm. \\
 
 \imagefigure{images/storm2-graphs.pdf}{An illustration of the topology used for the Twitter \& Bitly link trend analysis.}
 
-The data flow for this is the most complicated one presented in the related works we analysed. It uses a total of eleven nodes, excluding edge nodes that act as interfaces to the external systems. The computation can be separated into three stages: Twitter extraction, Bit.ly extraction, and trend analysis. The first stage filters out tweets that contain Bit.ly links. Those are then sent to the Bit.ly extraction stage and a map that extracts useful values for the trend analysis. The second stage extracts relevant information from the Bit.ly feed, then uses this together with the code received from the first stage to perform a Bloom filter. The output from there is then filtered for useful values before being saved. The trend analysis uses the extracted values from the tweets to find hashtags, which are then put through a rolling-window count. The resulting counts are reduced by two stages of ranking.
+The data flow for this is the most complicated one presented in the related works we analysed. It uses a total of eleven operators, excluding edge operators that act as interfaces to the external systems. The computation can be separated into three stages: Twitter extraction, Bit.ly extraction, and trend analysis. The first stage filters out tweets that contain Bit.ly links. Those are then sent to the Bit.ly extraction stage and a map that extracts useful values for the trend analysis. The second stage extracts relevant information from the Bit.ly feed, then uses this together with the code received from the first stage to perform a Bloom filter. The output from there is then filtered for useful values before being saved. The trend analysis uses the extracted values from the tweets to find hashtags, which are then put through a rolling-window count. The resulting counts are reduced by two stages of ranking.
 
 \subsection{\citefulltitle{bigdatabench}}
 This paper proposes a suite of benchmarks and tests to evaluate Big Data systems. The paper primarily focuses on the generation of suitable testing data sets, and proposes the following algorithms to test the system:
@@ -109,7 +109,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
     \hspace*{-1cm}
     \begin{tabular}{|p{3cm}|p{4cm}|p{3cm}|p{2.5cm}|p{2.5cm}|}
       \hline
-      Paper & Goal & Application & Dataflow Properties & Dataflow Operators
+      \tb{Paper} & \tb{Goal} & \tb{Application} & \tb{Data Flow Properties} & \tb{Data Flow Operators}
       \\\hline
       
       S4\cite{s4}
@@ -147,7 +147,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       & Map, Filter, Window Reduce
       \\\hline
 
-      Operator State\cite{integrating}
+      Seep\cite{integrating}
       & Testing dynamic scaling and fault-tolerance.
       & Road tolls
       & Stateful, DAG
@@ -216,7 +216,7 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
     \hspace*{-1cm}
     \begin{tabular}{|p{3cm}|p{3.5cm}|p{4cm}|p{2.5cm}|p{2cm}|}
       \hline
-      Paper & Workloads & Testbed & External Systems & Public Data
+      \tb{Paper} & \tb{Workloads} & \tb{Testbed} & \tb{External Systems} & \tb{Public Data}
       \\\hline
       
       S4\cite{s4}
@@ -228,14 +228,14 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
       
       SPADE\cite{spade}
       & \textasciitilde 250M transactions, resulting in about 20GB of data.
-      & 16 cluster nodes. Further details not available.
+      & 16 cluster operators. Further details not available.
       & IBM GPFS
       & Maybe\tablefootnote{The data was retrieved from the IBM WebSphere Web Front Office for all of December 2005.}
       \\\hline
 
       D-Streams\cite{discretized}
-      & \textasciitilde 20 MB/s/node (200K records/s/node) for WordCount.
-      & Up to 60 Amazon EC2 nodes, 4 cores, 15GB RAM each.
+      & \textasciitilde 20 MB/s/operator (200K records/s/operator) for WordCount.
+      & Up to 60 Amazon EC2 operators, 4 cores, 15GB RAM each.
       & Unspecified
       & No
       \\\hline
@@ -249,12 +249,12 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
 
       StreamCloud\cite{streamcloud}
       & Up to 450'000 transactions per second.
-      & 100 nodes, 32 cores, 8GB RAM, 0.5TB disks each, 1Gbit LAN.
+      & 100 operators, 32 cores, 8GB RAM, 0.5TB disks each, 1Gbit LAN.
       & Unspecified
       & No
       \\\hline
 
-      Operator State\cite{integrating}
+      Seep\cite{integrating}
       & Up to 600'000 tuples/s.
       & Up to 50 Amazon EC2 ``small'' instances with 1.7GB RAM.
       & Unspecified
@@ -270,21 +270,21 @@ In \autoref{table:test-properties} and \autoref{table:test-setups} we compare th
 
       Adaptive Scheduling\cite{storm}
       & Generated.
-      & 8 nodes, 2x2.8GHz CPU, 3GB RAM, 15GB disks each, 10Gbit LAN.
+      & 8 operators, 2x2.8GHz CPU, 3GB RAM, 15GB disks each, 10Gbit LAN.
       & Nimbus, Zookeper
       & Yes\tablefootnote{The data is generated on the fly, the algorithm of which is specified in the paper.}
       \\\hline
 
       Analytics on High Velocity Streams\cite{storm2}
       & \textasciitilde 1'600GB of compressed text data.
-      & 4 nodes, Intel i7-2600 CPU, 8GB RAM each.
+      & 4 operators, Intel i7-2600 CPU, 8GB RAM each.
       & Kafka, Cassandra
       & Maybe\tablefootnote{Data stems from Twitter and Bit.ly for June of 2012, but is not publicly available.}
       \\\hline
 
       BigDataBench\cite{bigdatabench}
       & Up to 1TB.
-      & 15 nodes, Xeon E5645, 16GB RAM, 8TB disks each.
+      & 15 operators, Xeon E5645, 16GB RAM, 8TB disks each.
       & Hadoop, MPI, Hbase, Hive, MySQL
       & Yes\tablefootnote{Obtainable at \url{http://prof.ict.ac.cn/BigDataBench/}}
       \\\hline
