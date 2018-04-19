@@ -23,13 +23,7 @@ impl<G: Scope, D: Data+Send> RollingCount<G, D> for Stream<G, D> {
           C: Fn(D, usize)->DO+'static {
         let mut counts = HashMap::new();
 
-        let key = Rc::new(key_extractor);
-        let key_ = key.clone();
-        let exchange = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            key_(d).hash(&mut h);
-            h.finish()
-        });
+        let (key, exchange) = exchange!(key_extractor);
         
         self.unary_stream(exchange, "RollingCount", move |input, output| {
             input.for_each(|time, data| {

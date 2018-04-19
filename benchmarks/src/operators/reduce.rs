@@ -43,13 +43,7 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
           C: Fn(H, V, usize)->D2+'static{
         let mut epochs = HashMap::new();
 
-        let key = Rc::new(key_extractor);
-        let key_ = key.clone();
-        let exchange = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            key_(d).hash(&mut h);
-            h.finish()
-        });
+        let (key, exchange) = exchange!(key_extractor);
 
         self.unary_notify(exchange, "Reduce", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {

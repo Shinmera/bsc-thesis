@@ -50,14 +50,7 @@ impl<G: Scope, D: Data+Send> Session<G, D> for Stream<G, D> {
           G::Timestamp: Relative<usize>+Hash {
         let mut sessions = HashMap::new();
 
-        let key = Rc::new(sessioner);
-        let key_ = key.clone();
-        let exchange = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            let (s, _) = key_(d);
-            s.hash(&mut h);
-            h.finish()
-        });
+        let (key, exchange) = exchange!(sessioner, |(s, _)| s);
         
         self.unary_notify(exchange, "Session", Vec::new(), move |input, output, notificator| {
             input.for_each(|cap, data| {

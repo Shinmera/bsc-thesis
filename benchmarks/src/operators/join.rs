@@ -32,21 +32,8 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
         let mut epoch1 = HashMap::new();
         let mut epoch2 = HashMap::new();
 
-        let key_1 = Rc::new(key_1);
-        let key_1_ = key_1.clone();
-        let exchange_1 = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            key_1_(d).hash(&mut h);
-            h.finish()
-        });
-
-        let key_2 = Rc::new(key_2);
-        let key_2_ = key_2.clone();
-        let exchange_2 = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            key_2_(d).hash(&mut h);
-            h.finish()
-        });
+        let (key_1, exchange_1) = exchange!(key_1);
+        let (key_2, exchange_2) = exchange!(key_2);
         
         self.binary_notify(stream, exchange_1, exchange_2, "Join", Vec::new(), move |input1, input2, output, notificator| {
             input1.for_each(|time, data|{
@@ -97,21 +84,8 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
         let mut d1s = HashMap::new();
         let mut d2s = HashMap::new();
 
-        let key_1 = Rc::new(key_1);
-        let key_1_ = key_1.clone();
-        let exchange_1 = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            key_1_(d).hash(&mut h);
-            h.finish()
-        });
-
-        let key_2 = Rc::new(key_2);
-        let key_2_ = key_2.clone();
-        let exchange_2 = Exchange::new(move |d| {
-            let mut h: ::fnv::FnvHasher = Default::default();
-            key_2_(d).hash(&mut h);
-            h.finish()
-        });
+        let (key_1, exchange_1) = exchange!(key_1);
+        let (key_2, exchange_2) = exchange!(key_2);
 
         self.binary_notify(stream, exchange_1, exchange_2, "Join", Vec::new(), move |input1, input2, output, _| {
             input1.for_each(|time, data|{
