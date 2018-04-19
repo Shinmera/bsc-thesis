@@ -53,14 +53,14 @@
           (T
            (error "Unknown event type:~% ~s" event)))))
 
-(defun convert-file (source target)
+(defun convert-file (source target &key (if-exists :supersede))
   (with-open-file (in source :direction :input)
-    (with-open-file (out target :direction :output :if-exists :supersede)
+    (with-open-file (out target :direction :output :if-exists if-exists)
       (loop for line = (read-line in NIL)
             while line
-            do (cl-ppcre:register-groups-bind (json time) ("TimestampedValue\\((.+), ([\\d\\w-:.]+)\\)" line)
+            do (cl-ppcre:register-groups-bind (json NIL) ("TimestampedValue\\((.+), ([\\d\\w-:.]+)\\)" line)
                  (let* ((json (yason:parse json))
-                        (time (local-time:parse-timestring time))
+                        (time (local-time:unix-to-timestamp (round (/ (gethash "dateTime" json) 1000))))
                         (epoch (- (local-time:timestamp-to-universal time)
                                   (encode-universal-time 0 0 0 15 7 2015 0))))
                    (yason:encode
