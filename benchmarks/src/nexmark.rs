@@ -30,6 +30,11 @@ const AUCTION_ID_LEAD: usize = 10;
 const HOT_SELLER_RATIO: usize = 100;
 const HOT_AUCTION_RATIO: usize = 100;
 const HOT_BIDDER_RATIO: usize = 100;
+// WARNING: You might think that you can just change these three proportion values
+//          linearly as you please as long as their relation does not change without
+//          the results changing, but this is /not/ the case. For instance, changing
+//          these values to 2, 6, 92 to make it a denominator of 100 actually changes
+//          the results even though the proportions are the same relatively.
 const PERSON_PROPORTION: usize = 1;
 const AUCTION_PROPORTION: usize = 3;
 const BID_PROPORTION: usize = 46;
@@ -352,12 +357,12 @@ impl Bid {
     }
     
     fn new(id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
-        let auction = if rng.gen_range(0, nex.hot_auction_ratio) > 0 {
+        let auction = if 0 < rng.gen_range(0, nex.hot_auction_ratio){
             (Auction::last_id(id) / HOT_AUCTION_RATIO) * HOT_AUCTION_RATIO
         } else {
             Auction::next_id(id, rng, nex)
         };
-        let bidder = if rng.gen_range(0, nex.hot_bidder_ratio) > 0 {
+        let bidder = if 0 < rng.gen_range(0, nex.hot_bidder_ratio) {
             (Person::last_id(id) / HOT_BIDDER_RATIO) * HOT_BIDDER_RATIO + 1
         } else {
             Person::next_id(id, rng, nex)
