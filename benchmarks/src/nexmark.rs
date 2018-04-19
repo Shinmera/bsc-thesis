@@ -99,9 +99,9 @@ impl NEXMarkConfig {
         let mut inter_event_delays = Vec::new();
         let first_rate = config.get_as_or("first-event-rate", config.get_as_or("events-per-second", 10_000));
         let next_rate = config.get_as_or("next-event-rate", first_rate);
-        let rate = config.get_as_or("rate", 1_000_000); // Rate is in μs
+        let us_per_unit = config.get_as_or("us_per_unit", 1_000_000); // Rate is in μs
         let generators = config.get_as_or("threads", 10) as f32;
-        let rate_to_period = |r| (rate) as f32 / r as f32;
+        let rate_to_period = |r| (us_per_unit) as f32 / r as f32;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
         } else {
