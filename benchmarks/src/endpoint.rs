@@ -253,6 +253,32 @@ impl<T: Timestamp, D> Source<T, D> {
     pub fn new(it: Box<EventSource<T, D>>) -> Self {
         Source(it)
     }
+
+    pub fn from_config(config: &Config, generator: Source<T, D>) -> Result<Self>
+    where String: ToData<T, D>, D: Data {
+        match config.get_or("input", "generated").as_ref() {
+            "null" => {
+                Ok(Source::from(()))
+            },
+            "console" => {
+                Ok(Source::from(io::stdin()))
+            },
+            "file" => {
+                Ok(Source::from(File::open(config.get_or("input-file", "input.log"))?))
+            },
+            "generated" => {
+                Ok(generator)
+            },
+            // "kafka" => {
+            //     let mut config = ClientConfig::new();
+            //     config
+            //         .set("produce.offset.report", "true")
+            //         .set("bootstrap.servers", &self.get_or("kafka-server", "localhost:9092"));
+            //     Ok(Source::new(Box::new(kafkaesque::EventConsumer::new(config, self.get_or("kafka-topic", "1")))))
+            // },
+            _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
+        }
+    }
 }
 
 impl<T: Timestamp, D> EventSource<T, D> for Source<T, D> {
@@ -286,31 +312,6 @@ impl<T: Timestamp, D: Data> From<Vec<(T, Vec<D>)>> for Source<T, D> {
     }
 }
 
-impl<T: Timestamp, D: Data> Into<Result<Source<T, D>>> for Config
-where String: ToData<T, D> {
-    fn into(self) -> Result<Source<T, D>> {
-        match self.get_or("input", "file").as_ref() {
-            "null" => {
-                Ok(Source::from(()))
-            },
-            "console" => {
-                Ok(Source::from(io::stdin()))
-            },
-            "file" => {
-                Ok(Source::from(File::open(self.get_or("input-file", "input.log"))?))
-            },
-            // "kafka" => {
-            //     let mut config = ClientConfig::new();
-            //     config
-            //         .set("produce.offset.report", "true")
-            //         .set("bootstrap.servers", &self.get_or("kafka-server", "localhost:9092"));
-            //     Ok(Source::new(Box::new(kafkaesque::EventConsumer::new(config, self.get_or("kafka-topic", "1")))))
-            // },
-            _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
-        }
-    }
-}
-
 /// This struct acts as an opaque event drain for a dataflow.
 ///
 /// It is merely a container to bypass Rust's restriction on materialised traits.
@@ -321,6 +322,32 @@ pub struct Drain<T, D>(Box<EventDrain<T, D>>);
 impl<T: Timestamp, D> Drain<T, D> {
     pub fn new(it: Box<EventDrain<T, D>>) -> Self {
         Drain(it)
+    }
+
+    pub fn from_config(config: &Config) -> Result<Self>
+    where D: Data+FromData<T> {
+        match config.get_or("output", "null").as_ref() {
+            "null" => {
+                Ok(Drain::from(()))
+            },
+            "console" => {
+                Ok(Drain::from(io::stdout()))
+            },
+            "file" => {
+                Ok(Drain::from(File::create(config.get_or("output-file", "output.log"))?))
+            },
+            "meter" => {
+                Ok(Drain::new(Box::new(MeterOutput::new())))
+            },
+            // "kafka" => {
+            //     let mut config = ClientConfig::new();
+            //     config
+            //         .set("produce.offset.report", "true")
+            //         .set("bootstrap.servers", &self.get_or("kafka-server", "localhost:9092"));
+            //     Ok(Drain::new(Box::new(kafkaesque::EventProducer::new(config, self.get_or("kafka-topic", "1")))))
+            // },
+            _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
+        }
     }
 }
 
@@ -352,32 +379,5 @@ impl<T: Timestamp, D: Data+FromData<T>> From<File> for Drain<T, D> {
 impl<T: Timestamp, D: Data> From<Vec<(T, Vec<D>)>> for Drain<T, D> {
     fn from(vec: Vec<(T, Vec<D>)>) -> Drain<T, D> {
         Drain::new(Box::new(VectorEndpoint::new(vec)))
-    }
-}
-
-impl<T: Timestamp, D: Data+FromData<T>> Into<Result<Drain<T, D>>> for Config {
-    fn into(self) -> Result<Drain<T, D>> {
-        match self.get_or("output", "null").as_ref() {
-            "null" => {
-                Ok(Drain::from(()))
-            },
-            "console" => {
-                Ok(Drain::from(io::stdout()))
-            },
-            "file" => {
-                Ok(Drain::from(File::create(self.get_or("output-file", "output.log"))?))
-            },
-            "meter" => {
-                Ok(Drain::new(Box::new(MeterOutput::new())))
-            },
-            // "kafka" => {
-            //     let mut config = ClientConfig::new();
-            //     config
-            //         .set("produce.offset.report", "true")
-            //         .set("bootstrap.servers", &self.get_or("kafka-server", "localhost:9092"));
-            //     Ok(Drain::new(Box::new(kafkaesque::EventProducer::new(config, self.get_or("kafka-topic", "1")))))
-            // },
-            _ => Err(Error::new(ErrorKind::Other, "Unknown output."))
-        }
     }
 }

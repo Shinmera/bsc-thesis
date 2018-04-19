@@ -70,12 +70,11 @@ impl TestImpl for Query {
     fn name(&self) -> &str { "Yahoo Streaming Benchmark" }
 
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
         let gen = YSBGenerator::new(config);
         let mut target = self.campaign_map.write().unwrap();
         for (k, v) in &gen.map { target.insert(k.clone(), v.clone()); }
-        Ok((Source::new(Box::new(gen)), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(gen)))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {

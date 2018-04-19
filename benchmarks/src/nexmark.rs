@@ -177,7 +177,7 @@ impl NEXMarkConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Abomonation)]
+#[derive(Serialize, Deserialize, Abomonation, Debug)]
 struct EventCarrier {
     time: Date,
     event: Event,
@@ -392,9 +392,8 @@ impl TestImpl for Query0 {
     fn name(&self) -> &str { "NEXMark Query 0" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -418,9 +417,8 @@ impl TestImpl for Query1 {
     fn name(&self) -> &str { "NEXMark Query 1" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -452,9 +450,8 @@ impl TestImpl for Query2 {
     fn name(&self) -> &str { "NEXMark Query 2" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -488,9 +485,8 @@ impl TestImpl for Query3 {
     fn name(&self) -> &str { "NEXMark Query 3" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -529,9 +525,8 @@ impl TestImpl for Query4 {
     fn name(&self) -> &str { "NEXMark Query 4" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -557,9 +552,8 @@ impl TestImpl for Query5 {
     fn name(&self) -> &str { "NEXMark Query 5" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -601,9 +595,8 @@ impl TestImpl for Query6 {
     fn name(&self) -> &str { "NEXMark Query 6" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -634,9 +627,8 @@ impl TestImpl for Query7 {
     fn name(&self) -> &str { "NEXMark Query 7" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -674,9 +666,8 @@ impl TestImpl for Query8 {
     fn name(&self) -> &str { "NEXMark Query 8" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -757,9 +748,8 @@ impl TestImpl for Query9 {
     fn name(&self) -> &str { "NEXMark Query 9" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -787,9 +777,8 @@ impl TestImpl for Query11 {
     fn name(&self) -> &str { "NEXMark Query 11" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -814,9 +803,8 @@ impl TestImpl for Query12 {
     fn name(&self) -> &str { "NEXMark Query 12" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(NEXMarkGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {

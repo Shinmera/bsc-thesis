@@ -87,9 +87,8 @@ impl TestImpl for Identity {
     fn name(&self) -> &str { "HiBench Identity" }
 
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(HiBenchGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -121,9 +120,8 @@ impl TestImpl for Repartition {
     fn name(&self) -> &str { "HiBench Repartition" }
     
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(HiBenchGenerator::new(config))))?,
+            Drain::from_config(config)?))
     }
     
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -165,9 +163,8 @@ impl TestImpl for Wordcount {
     fn name(&self) -> &str { "HiBench Wordcount" }
 
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(HiBenchGenerator::new(config))))?, 
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
@@ -199,9 +196,8 @@ impl TestImpl for Fixwindow {
     fn name(&self) -> &str { "HiBench Fixwindow" }
 
     fn create_endpoints(&self, config: &Config, _index: usize, _workers: usize) -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-        // FIXME: Handle input creation more generally
-        let out: Result<_> = config.clone().into();
-        Ok((Source::new(Box::new(HiBenchGenerator::new(config))), out?))
+        Ok((Source::from_config(config, Source::new(Box::new(HiBenchGenerator::new(config))))?, 
+            Drain::from_config(config)?))
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
