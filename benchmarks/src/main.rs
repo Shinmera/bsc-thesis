@@ -79,7 +79,7 @@ fn main() {
         let to_run = config.get("tests")
             .map(|s| s.split(",").map(|s|String::from(s)).collect::<Vec<_>>())
             .unwrap_or(tests.iter().map(|t|String::from(t.name())).collect::<Vec<_>>());
-        tests.retain(|t| to_run.iter().any(|n|t.name().contains(n)));
+        tests.retain(|t| to_run.iter().any(|n|t.name() == n));
 
         if report == "summary" {
             println!("{:25} Samples    Total      Minimum    Maximum    Median     Average    Std. Dev   ", "Test");
@@ -124,6 +124,10 @@ test                    Run the benchmarks.
   --report BOOL           Whether to report connection progress.
   --window-size NUM       The size of the windows in epochs (usually seconds).
   --window-slide NUM      The slide of the windows in epochs (usually seconds).
+  --input MODE            The input generation mode. Can be one of:
+                            null, console, file, generated
+  --output MODE           The output consuming mode. Can be one of:
+                            null, console, file, meter
 
 generate                Generate benchmark workloads.
   --benchmarks STRING      A comma-separated list of benchmark names to generate.
