@@ -136,7 +136,7 @@ impl NEXMarkConfig {
         NEXMarkConfig {
             active_people: config.get_as_or("active-people", 1000),
             in_flight_auctions: config.get_as_or("in-flight-auctions", 100),
-            out_of_order_group_size: config.get_as_or("out-of-order-group-size", 11),
+            out_of_order_group_size: config.get_as_or("out-of-order-group-size", 1),
             hot_seller_ratio: config.get_as_or("hot-seller-ratio", 4),
             hot_auction_ratio: config.get_as_or("hot-auction-ratio", 2),
             hot_bidder_ratio: config.get_as_or("hot-bidder-ratio", 4),
