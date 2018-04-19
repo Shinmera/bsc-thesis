@@ -37,20 +37,20 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
         
         self.binary_notify(stream, exchange_1, exchange_2, "Join", Vec::new(), move |input1, input2, output, notificator| {
             input1.for_each(|time, data|{
-                let epoch = epoch1.entry(time.clone()).or_insert_with(||HashMap::new());
+                let epoch = epoch1.entry(time.clone()).or_insert_with(HashMap::new);
                 data.drain(..).for_each(|dat|{
                     let key = key_1(&dat);
-                    let datavec = epoch.entry(key).or_insert_with(||Vec::new());
+                    let datavec = epoch.entry(key).or_insert_with(Vec::new);
                     datavec.push(dat);
                 });
                 notificator.notify_at(time);
             });
             
             input2.for_each(|time, data|{
-                let epoch = epoch2.entry(time.clone()).or_insert_with(||HashMap::new());
+                let epoch = epoch2.entry(time.clone()).or_insert_with(HashMap::new);
                 data.drain(..).for_each(|dat|{
                     let key = key_2(&dat);
-                    let datavec = epoch.entry(key).or_insert_with(||Vec::new());
+                    let datavec = epoch.entry(key).or_insert_with(Vec::new);
                     datavec.push(dat);
                 });
                 notificator.notify_at(time);
@@ -82,7 +82,7 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
           K2: Fn(&D2)->H+'static,
           J: Fn(D1, D2)->D3+'static {
         let mut d1s = HashMap::new();
-        let mut d2s = HashMap::new();
+        let mut d2s: HashMap<H, Vec<D2>> = HashMap::new();
 
         let (key_1, exchange_1) = exchange!(key_1);
         let (key_2, exchange_2) = exchange!(key_2);
@@ -91,8 +91,8 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
             input1.for_each(|time, data|{
                 data.drain(..).for_each(|d1| {
                     let k1 = key_1(&d1);
-                    if let Some(d2) = d2s.remove(&k1) {
-                        output.session(&time).give(joiner(d1.clone(), d2));
+                    if let Some(mut d2) = d2s.remove(&k1) {
+                        output.session(&time).give_iterator(d2.drain(..).map(|d| joiner(d1.clone(), d)));
                     }
                     d1s.insert(k1, d1);
                 });
@@ -104,7 +104,7 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
                     if let Some(d1) = d1s.get(&k2) {
                         output.session(&time).give(joiner(d1.clone(), d2));
                     } else {
-                        d2s.insert(k2, d2);
+                        d2s.entry(k2).or_insert_with(Vec::new).push(d2);
                     }
                 });
             });
