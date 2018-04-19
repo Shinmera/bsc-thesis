@@ -563,13 +563,13 @@ impl TestImpl for Query5 {
         
         let bids = stream
             .filter_map(|e| Bid::from(e))
-            .epoch_window(window_size, window_slide);
+            .epoch_window(window_size, window_slide)
+            .reduce_by(|b| b.auction, 0, |_, c| c+1);
         
-        let count = bids.reduce_to(0, |_, c| c+1);
+        let max = bids.reduce_to(0, |(_, p), c| max(p, c));
         
-        bids.reduce_by(|b| b.auction, 0, |_, c| c+1)
-            .epoch_join(&count, |_| 0, |_| 0, |(a, c), t| (t, a, c))
-            .filter(|&(t, _, c)| c >= t)
+        bids.epoch_join(&max, |_| 0, |_| 0, |(a, c), m| (m, a, c))
+            .filter(|&(m, _, c)| c == m)
             .map(|(_, a, _)| a)
     }
 }

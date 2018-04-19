@@ -116,6 +116,8 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
   \label{lst:nexmark-query5}
 \end{listing}
 
+Note that the implementation of this query in Beam differs from our interpretation of the query as described in the original NEXMark paper. As it stands now it emits auctions whose bid count is maximal within the window, whereas the initial query description seems to emit events if and only if there is only one auction mentioned by bids within the window.
+
 \paragraph{Query 6}
 \begin{listing}[H]
   \inputminted[firstline=605,lastline=606]{rust}{benchmarks/src/nexmark.rs}
