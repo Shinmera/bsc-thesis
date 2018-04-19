@@ -7,7 +7,7 @@
                         "NEXMark Query 0" "NEXMark Query 1" "NEXMark Query 2" "NEXMark Query 3"
                         "NEXMark Query 4" "NEXMark Query 5" "NEXMark Query 6" "NEXMark Query 7"
                         "NEXMark Query 8" "NEXMark Query 9" "NEXMark Query 11"))
-(defparameter *rates* '(1000 10000 100000 1000000 2000000 4000000 8000000))
+(defparameter *rates* '(1000 10000 100000 1000000 2000000 4000000 8000000 10000000))
 (defparameter *workers* '(1 2 4 8 16 32))
 
 (defun read-file (file)
@@ -26,7 +26,7 @@
                                                for sorted = (sort v #'<)
                                                collect (nth (round (/ (length sorted) 2)) sorted))))))))
 
-(defun scaling (&key (path "") (file "scaling.csv") (rate "1000000"))
+(defun scaling (&key (path "") (file "scaling.csv") (rate "10000000"))
   (with-open-file (out file :direction :output :if-exists :supersede)
     (dolist (workers *workers*)
       (with-simple-restart (continue "Ignore the error.")
@@ -35,7 +35,7 @@
                                                   for sorted = (sort v #'<)
                                                   collect (nth (round (/ (length sorted) 2)) sorted))))))))
 
-(defun cdf (&key (path "1000000@32.csv") (file "cdf.csv"))
+(defun cdf (&key (path "10000000@32.csv") (file "cdf.csv"))
   (with-open-file (out file :direction :output :if-exists :supersede)
     (let* ((group (read-file path))
            (length (loop for cons in group minimize (length (cdr cons)))))
@@ -49,7 +49,7 @@
   (uiop:run-program (list "rsync" "-avz" "hafnern@sgs-r815-03:/mnt/local/hafnern/thesis/benchmarks/*.csv" ".") :output T :error-output T))
 
 (defun run ()
-  ;; (sync)
+  (sync)
   (median-latency)
   (scaling)
   (cdf))
