@@ -40,7 +40,7 @@ In this paper\cite{streamcloud}, the system is evaluated by two distinct data fl
 Both data flows perform a sequence of maps and filters followed by reductions. The reduction is based on a window size and slide, which can be configured for each operator. However, the configurations used are not provided by the paper.
 
 \subsection{\citetitle*{integrating}}
-To evaluate their approach for fault tolerance using Operator State Management, two data flows were implemented: a linear road benchmark (LRB) to determine tolls in a network, and a Top-K data flow to determine the top visited pages. The data flow is composed out of stateless and stateful operators, where stateful operators must communicate their state to the system so that it may be recovered. \\
+To evaluate their approach for fault tolerance using Operator State Management\cite{integrating}, two data flows were implemented: a linear road benchmark (LRB) to determine tolls in a network, and a Top-K data flow to determine the top visited pages. The data flow is composed out of stateless and stateful operators, where stateful operators must communicate their state to the system so that it may be recovered. \\
 
 \imagefigure{images/integrating-graphs.pdf}{Illustration of the data flows for the Linear Road Benchmark (top) and Top-K (bottom) used to evaluate their system.}
 
