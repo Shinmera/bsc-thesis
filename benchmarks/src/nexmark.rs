@@ -595,7 +595,7 @@ impl TestImpl for Query6 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
-            .average_by(|&(_, ref a)| a.seller, |(p, _)| p)
+            .average_by(|&(ref a, _)| a.seller, |(_, p)| p)
     }
 }
 
@@ -694,12 +694,12 @@ impl Query9 {
     }
 }
 
-fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (usize, Auction)> {
+fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (Auction, usize)> {
     let bids = stream.filter_map(|e| Bid::from(e));
     let auctions = stream.filter_map(|e| Auction::from(e));
     
     let mut auction_map = HashMap::new();
-    let mut bid_prices: HashMap<Id, usize> = HashMap::new();
+    let mut bid_map: HashMap<Id, Vec<Bid>> = HashMap::new();
     
     auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
         input1.for_each(|time, data|{
@@ -713,20 +713,19 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
 
         input2.for_each(|_, data|{
             data.drain(..).for_each(|b|{
-                // FIXME: Check if (B.date_time < A.expires)
-                if let Some(other) = bid_prices.remove(&b.auction) {
-                    bid_prices.insert(b.auction, max(other, b.price));
-                } else {
-                    bid_prices.insert(b.auction, b.price);
-                }
+                bid_map.entry(b.auction).or_insert_with(Vec::new).push(b);
             });
         });
 
         notificator.for_each(|cap, _, _|{
             if let Some(mut auctions) = auction_map.remove(cap.time()) {
                 auctions.drain(..).for_each(|a|{
-                    if let Some(price) = bid_prices.remove(&a.id) {
-                        output.session(&cap).give((price, a));
+                    if let Some(bids) = bid_map.remove(&a.id) {
+                        bids.iter()
+                            .filter(|b| a.reserve <= b.price && b.date_time < a.expires)
+                            .map(|b| b.price)
+                            .max()
+                            .map(|price| output.session(&cap).give((a, price)));
                     }
                 });
             }
@@ -737,7 +736,7 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
 impl TestImpl for Query9 {
     type T = Date;
     type D = Event;
-    type DO = (usize, Auction);
+    type DO = (Auction, usize);
 
     fn name(&self) -> &str { "NEXMark Query 9" }
     
@@ -751,9 +750,9 @@ impl TestImpl for Query9 {
     }
 }
 
-impl<T: Timestamp> FromData<T> for (usize, Auction) {
+impl<T: Timestamp> FromData<T> for (Auction, usize) {
     fn from_data(&self, t: &T) -> String {
-        format!("{:?} {:?}", t, self)
+        format!("{:?}", self)
     }
 }
 
