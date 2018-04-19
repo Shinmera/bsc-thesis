@@ -1,4 +1,14 @@
 #!sbcl --script
+;;;;; Benchmark Data Transformer
+;;;; This script crunches the latency measurements from the timely runs
+;;;; and converts them into CSV files as used in pgfplots in the TeX
+;;;; sources.
+;;;;
+;;;; Usage: ./transform.lisp [--sync]
+;;;;
+;;;; Requires a Quicklisp installation in the user's home directory.
+;;;;
+
 (load #p"~/quicklisp/setup.lisp")
 (ql:quickload '(parse-float cl-ppcre))
 
