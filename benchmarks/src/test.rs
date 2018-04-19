@@ -1,6 +1,6 @@
 use config::Config;
 use statistics::Statistics;
-use endpoint::{Source, Drain, EventSource, EventDrain};
+use endpoint::{Source, Drain, EventSource, EventDrain, is_out_of_data};
 use std::collections::{HashMap};
 use std::io::{BufRead, Result, Error, ErrorKind};
 use std::ops::DerefMut;
@@ -149,12 +149,23 @@ pub trait TestImpl : Sync+Send {
         // Step until we're done.
         let mut starts = HashMap::new();
         let mut ends = HashMap::new();
-        while let Ok((t, mut d)) = ins.next() {
-            starts.insert(t.clone(), Instant::now());
-            input.advance_to(t.clone());
-            input.send_batch(&mut d);
-            worker.step_while(|| probe.less_than(input.time()));
-            ends.insert(t.clone(), Instant::now());
+        loop {
+            match ins.next() {
+                Ok((t, mut d)) => {
+                    starts.insert(t.clone(), Instant::now());
+                    input.advance_to(t.clone());
+                    input.send_batch(&mut d);
+                    worker.step_while(|| probe.less_than(input.time()));
+                    ends.insert(t.clone(), Instant::now());
+                },
+                Err(e) => {
+                    if is_out_of_data(&e) {
+                        break;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
         }
         // Collect statistics.
         let durations: Vec<_> = ends.iter().filter_map(|(t, i)|starts.get(t).map(|s|(s, i))).collect();

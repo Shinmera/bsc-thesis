@@ -13,9 +13,13 @@ pub fn out_of_data<D>() -> Result<D> {
     Err(Error::new(ErrorKind::Other, OUT_OF_DATA))
 }
 
+pub fn is_out_of_data(e: &Error) -> bool {
+    e.description() == OUT_OF_DATA
+}
+
 pub fn accept_out_of_data<D>(r: Result<D>) -> Result<D>
 where D: Default {
-    r.or_else(|e| if e.description() == OUT_OF_DATA {
+    r.or_else(|e| if is_out_of_data(&e) {
         Ok(Default::default())
     } else { Err(e) })
 }
@@ -163,7 +167,7 @@ impl<T: Timestamp, D> EventSource<T, D> for FileInput where String: ToData<T, D>
     fn next(&mut self) -> Result<(T, Vec<D>)> {
         let ref mut stream = self.stream;
         to_message(|| stream.next()
-                   .unwrap_or_else(|| out_of_data())
+                   .unwrap_or_else(out_of_data)
                    .and_then(|line| line.to_data()))
     }
 }
