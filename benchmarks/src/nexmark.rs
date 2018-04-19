@@ -846,7 +846,7 @@ impl NEXMarkGenerator {
 
 impl EventSource<usize, Event> for NEXMarkGenerator {
     fn next(&mut self) -> Result<(usize, Vec<Event>)> {
-        let mut data = Vec::new();
+        let mut data = Vec::with_capacity((1000.0 / self.config.inter_event_delays[0]) as usize);
         let epoch = (self.config.event_timestamp(self.events + self.config.first_event_id) - self.config.base_time) / 1000;
         
         loop {

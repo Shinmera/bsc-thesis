@@ -249,7 +249,7 @@ impl EventSource<usize, Event> for HiBenchGenerator {
     fn next(&mut self) -> Result<(usize, Vec<Event>)> {
         if self.epoch < self.max {
             let mut rng = rand::thread_rng();
-            let mut data = Vec::new();
+            let mut data = Vec::with_capacity(self.count);
             
             for _ in 0..self.count {
                 let ip = rng.choose(&self.ips).unwrap().clone();

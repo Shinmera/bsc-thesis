@@ -136,7 +136,7 @@ impl EventSource<usize, Event> for YSBGenerator {
         const AD_TYPES: [&str; 5] = ["banner", "modal", "sponsored-search", "mail", "mobile"];
         const EVENT_TYPES: [&str; 3] = ["view", "click", "purchase"];
         let mut rng = rand::StdRng::from_seed(&[0xDEAD, 0xBEEF, 0xFEED]); // Predictable RNG clutch
-        let mut data = Vec::new();
+        let mut data = Vec::with_capacity((1000.0 / self.timestep) as usize);
         let epoch = self.time as usize / 1000;
         
         while self.time < ((epoch+1)*1000) as f64
