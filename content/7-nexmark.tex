@@ -1,5 +1,7 @@
-\section{NEXMark Benchmark\cite{nexmark}}
-NEXMark is an evolution of the XMark benchmark. XMark was initially designed for relational databases and defines a small schema for an online auction house. NEXMark builds on this idea and presents a schema of three concrete tables, and a set of queries to run in a streaming sense. NEXMark attempts to provide a benchmark that is both extensive in its use of operators, and close to a real-world application by being grounded in a well-known problem. The original benchmark proposed by Tucker et al. was adopted and extended by the Apache Foundation for their use in Beam\cite{nexmark-beam}, a system intended to provide a general API for a variety of streaming systems. We will follow the Beam implementation, as it is the most widely adopted one, despite having several differences to the benchmark originally outlined in the paper. See \autoref{section:nexmark-remarks} for an outline of the differences we found. \\
+\section{NEXMark Benchmark}
+NEXMark\cite{nexmark} is an evolution of the XMark benchmark. XMark was initially designed for relational databases and defines a small schema for an online auction house. NEXMark builds on this idea and presents a schema of three concrete tables, and a set of queries to run in a streaming sense. NEXMark attempts to provide a benchmark that is both extensive in its use of operators, and close to a real-world application by being grounded in a well-known problem. \\
+
+The original benchmark proposed by Tucker et al. was adopted and extended by the Apache Foundation for their use in Beam\cite{nexmark-beam}, a system intended to provide a general API for a variety of streaming systems. We will follow the Beam implementation, as it is the most widely adopted one, despite having several differences to the benchmark originally outlined in the paper. See \autoref{section:nexmark-remarks} for an outline of the differences we found. Similar to HiBench and YSB, NEXMark as implemented by Beam does not concern itself with questions of scaling, load bearing, and fault tolerance, focusing solely on the latency aspect. \\
 
 The benchmark defines the following queries:
 
@@ -109,35 +111,35 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
 
 \paragraph{Query 5}
 \begin{listing}[H]
-  \inputminted[firstline=561,lastline=570]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=564,lastline=573]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 5}
   \label{lst:nexmark-query5}
 \end{listing}
 
 \paragraph{Query 6}
 \begin{listing}[H]
-  \inputminted[firstline=602,lastline=603]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=605,lastline=606]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 6}
   \label{lst:nexmark-query6}
 \end{listing}
 
 \paragraph{Query 7}
 \begin{listing}[H]
-  \inputminted[firstline=635,lastline=641]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=640,lastline=646]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 7}
   \label{lst:nexmark-query7}
 \end{listing}
 
 \paragraph{Query 8}
 \begin{listing}[H]
-  \inputminted[firstline=673,lastline=682]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=680,lastline=689]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 8}
   \label{lst:nexmark-query8}
 \end{listing}
 
 \paragraph{Query 9}
 \begin{listing}[H]
-  \inputminted[firstline=701,lastline=737]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=708,lastline=744]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 9}
   \label{lst:nexmark-query9}
 \end{listing}
@@ -147,14 +149,14 @@ We did not implement Query 10 as we felt it did not reflect a useful case outsid
 
 \paragraph{Query 11}
 \begin{listing}[H]
-  \inputminted[firstline=784,lastline=787]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=791,lastline=794]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 11}
   \label{lst:nexmark-query11}
 \end{listing}
 
 \paragraph{Query 12}
 \begin{listing}[H]
-  \inputminted[firstline=811,lastline=818]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=818,lastline=825]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 12}
   \label{lst:nexmark-query12}
 \end{listing}

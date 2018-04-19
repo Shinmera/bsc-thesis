@@ -17,7 +17,7 @@
                             (list* name (sort (mapcar #'parse-float:parse-float (cl-ppcre:split " +" dat))
                                               #'<))))))
 
-(defun median-latency (&key (path "") (file "latency.csv") (workers "32"))
+(defun median-latency (&key (path "") (workers "32") (file (format NIL "latency-~a.csv" workers)))
   (with-open-file (out file :direction :output :if-exists :supersede)
     (dolist (rate *rates*)
       (with-simple-restart (continue "Ignore the error.")
@@ -26,7 +26,7 @@
                                                for sorted = (sort v #'<)
                                                collect (nth (round (/ (length sorted) 2)) sorted))))))))
 
-(defun scaling (&key (path "") (file "scaling.csv") (rate "10000000"))
+(defun scaling (&key (path "") (rate "10000000") (file (format NIL "scaling-~a.csv" rate)))
   (with-open-file (out file :direction :output :if-exists :supersede)
     (dolist (workers *workers*)
       (with-simple-restart (continue "Ignore the error.")
@@ -35,9 +35,9 @@
                                                   for sorted = (sort v #'<)
                                                   collect (nth (round (/ (length sorted) 2)) sorted))))))))
 
-(defun cdf (&key (path "10000000@32.csv") (file "cdf.csv"))
+(defun cdf (&key (path "") (workers "32") (rate "10000000") (file (format NIL "cdf-~a-~a.csv" workers rate)))
   (with-open-file (out file :direction :output :if-exists :supersede)
-    (let* ((group (read-file path))
+    (let* ((group (read-file (merge-pathnames (format NIL "~a@~a.csv" rate workers) path)))
            (length (loop for cons in group minimize (length (cdr cons)))))
       (loop for i from 1 to length
             do (fresh-line out)
@@ -48,10 +48,18 @@
 (defun sync ()
   (uiop:run-program (list "rsync" "-avz" "hafnern@sgs-r815-03:/mnt/local/hafnern/thesis/benchmarks/*.csv" ".") :output T :error-output T))
 
-(defun run ()
-  (sync)
-  (median-latency)
+(defun run (&key sync)
+  (when sync (sync))
+  (median-latency :workers 8)
+  (median-latency :workers 16)
+  (median-latency :workers 32)
   (scaling)
   (cdf))
 
-(run)
+(defun toplevel (&rest args)
+  (let ((args ()))
+    (when (find "--sync" args :test #'string-equal)
+      (setf args (list* :sync T args)))
+    (apply #'run args)))
+
+(toplevel (rest (uiop:raw-command-line-arguments)))

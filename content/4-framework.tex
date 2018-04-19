@@ -7,17 +7,77 @@ In order to ease the implementation of the benchmarks and improve the usability 
 \subsubsection{FilterMap}
 This operator performs a filter followed by a map in one go. This is useful when the data stream contains mixed event types and only a single type of event is required. The operator expects a closure which can choose to either filter events by returning \code{None}, or map them by returning \code{Some(..)} with the output data.
 
+\begin{listing}[H]
+  \inputminted[firstline=10,lastline=22]{rust}{benchmarks/src/operators/filtermap.rs}
+  \caption{The implementation of the FilterMap operator.}
+  \label{lst:filtermap}
+\end{listing}
+
 \subsubsection{Join}
 This operator offers two forms of joins that merge two separate streams of data into one. The first is an epoch based join, meaning data is only matched up between the two streams within a single epoch. If no match is found for either stream, the data is discarded. The second is a left join that keeps the left-hand stream's data around indefinitely, continuously joining it with data from the right-hand stream whenever the keys match.
+
+%% FIXME: This spills the page.
+\begin{listing}[H]
+  \inputminted[firstline=26,lastline=76]{rust}{benchmarks/src/operators/join.rs}
+  \caption{The implementation of the epoch-based join operator.}
+  \label{lst:epoch-join}
+\end{listing}
+
+\begin{listing}[H]
+  \inputminted[firstline=78,lastline=112]{rust}{benchmarks/src/operators/join.rs}
+  \caption{The implementation of the left join operator.}
+  \label{lst:left-join}
+\end{listing}
 
 \subsubsection{Reduce}
 Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by} and \code{average_by} build on top of this to provide more convenient access to reduction. Finally, a separate \code{reduce_to} does not key data and instead reduces all data within the epoch to a single record.
 
+\begin{listing}[H]
+  \inputminted[firstline=37,lastline=65]{rust}{benchmarks/src/operators/reduce.rs}
+  \caption{The implementation of the reduce operator.}
+  \label{lst:reduce}
+\end{listing}
+
+\begin{listing}[H]
+  \inputminted[firstline=83,lastline=103]{rust}{benchmarks/src/operators/reduce.rs}
+  \caption{The implementation of the reduce-to operator.}
+  \label{lst:reduce-to}
+\end{listing}
+
 \subsubsection{RollingCount}
 The \code{rolling_count} operator is similar to a reductor, but has a few distinct differences. First, it emits an output record for every input record it sees, rather than only once per epoch. Second, it keeps the count across epochs, rather than resetting for each epoch. Finally, it can only count records, rather than performing arbitrary reduction operations.
 
+\begin{listing}[H]
+  \inputminted[firstline=19,lastline=38]{rust}{benchmarks/src/operators/rollingcount.rs}
+  \caption{The implementation of the rolling-count operator.}
+  \label{lst:rolling-count}
+\end{listing}
+
 \subsubsection{Window}
 The window operator batches records together into windows. Windows can be sliding or hopping, and can be of arbitrary size, although they are limited in their granularity by epochs. This means that the epochs need to be correlated to a unit that the user would like to window by. When the window is full and the frontier reaches a slide, the window operator sends out a copy of all records within the window.
+
+%% FIXME: This spills the page.
+\begin{listing}[H]
+  \inputminted[firstline=17,lastline=62]{rust}{benchmarks/src/operators/window.rs}
+  \caption{The implementation of the generic window operator.}
+  \label{lst:epoch-window}
+\end{listing}
+
+\begin{listing}[H]
+  \inputminted[firstline=64,lastline=83]{rust}{benchmarks/src/operators/window.rs}
+  \caption{The implementation of the tumbling-window operator.}
+  \label{lst:tumbling-window}
+\end{listing}
+
+\subsubsection{Session}
+The session operator is similar to a window: it batches records, but instead of using a regular interval, a session is only completed after a certain timeout has been reached. As an example, a session with a timeout of 10 seconds would only be complete if there were no records for 10 seconds on the stream. Before this timeout is reached, all incoming records are gathered into the current session.
+
+%% FIXME: This spills the page.
+\begin{listing}[H]
+  \inputminted[firstline=47,lastline=100]{rust}{benchmarks/src/operators/session.rs}
+  \caption{The implementation of the session operator.}
+  \label{lst:session}
+\end{listing}
 
 %%% Local Variables:
 %%% mode: latex
