@@ -547,7 +547,7 @@ impl Query5 {
 impl TestImpl for Query5 {
     type T = Date;
     type D = Event;
-    type DO = Id;
+    type DO = (Id, usize);
 
     fn name(&self) -> &str { "NEXMark Query 5" }
     
@@ -569,13 +569,7 @@ impl TestImpl for Query5 {
         
         max.left_join(&bids, |_| 0, |_| 0, |m, (a, c)| (a, c, m))
             .filter(|&(_, c, m)| c == m)
-            .map(|(a, _, _)| a)
-    }
-}
-
-impl FromData<usize> for Id {
-    fn from_data(&self, t: &usize) -> String {
-        format!("{} {:?}", t, self)
+            .map(|(a, c, _)| (a, c))
     }
 }
 
