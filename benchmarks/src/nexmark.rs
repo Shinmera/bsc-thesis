@@ -529,10 +529,14 @@ impl TestImpl for Query4 {
             Drain::from_config(config)?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        let window_size = config.get_as_or("window-size", 10);
+        let window_slide = config.get_as_or("window-slide", 5);
+        
         hot_bids(stream)
-            .reduce_by(|&(_, ref a)| a.category, 0,
-                       |(p, _), c| c + p/NUM_CATEGORIES)
+            .epoch_window(window_size, window_slide)
+            .reduce_by(|&(ref a, _)| a.category, 0,
+                       |(_, p), c| c + p/NUM_CATEGORIES)
     }
 }
 
