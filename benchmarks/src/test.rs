@@ -1,19 +1,23 @@
 use config::Config;
-use statistics::Statistics;
 use endpoint::{Source, Drain, EventSource, EventDrain, is_out_of_data};
+use statistics::Statistics;
 use std::collections::{HashMap};
 use std::io::{BufRead, Result, Error, ErrorKind};
+use std::net::TcpStream;
 use std::ops::DerefMut;
 use std::time::Instant;
-use timely::dataflow::scopes::{Child, Root};
+use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::operators::capture::EventWriter;
 use timely::dataflow::operators::probe::Handle;
 use timely::dataflow::operators::{Probe, Unary};
-use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::scopes::{Child, Root};
 use timely::dataflow::{Stream, Scope, InputHandle};
+use timely::logging::{LoggerConfig, EventPusherTee, TimelyEvent, TimelySetup};
 use timely::progress::Timestamp;
 use timely::{Data, Configuration};
 use timely;
 use timely_communication::allocator::Generic;
+
 
 /// This presents the public interface for a test collection.
 pub trait Benchmark {
@@ -221,7 +225,24 @@ fn timely_configuration(config: &Config) -> Configuration {
 pub fn run_test(test: Box<Test>, config: &Config) -> Result<Statistics> {
     let config = config.clone();
     let configuration = timely_configuration(&config);
-    timely::execute(configuration, move |worker| {
+    let logger_config = if config.get_as_or("log", false) {
+        let server = config.get_or("log-server", "localhost");
+        let port = config.get_as_or("log-port", 2102);
+        LoggerConfig::new(
+            move |setup| {
+                let addr = format!("{}:{}", server, port + setup.index);
+                eprintln!("[Logging]: Destination address for worker '{}' is '{}'.", setup.index, addr);
+                let send = TcpStream::connect(addr).unwrap();
+                let writer = EventWriter::<_, (u64, TimelySetup, TimelyEvent), _>::new(send);
+                let mut tee = EventPusherTee::new();
+                tee.subscribe(Box::new(writer));
+                tee
+            }, |_setup| EventPusherTee::new())
+    } else {
+        Default::default()
+    };
+    
+    timely::execute_logging(configuration, logger_config, move |worker| {
         test.run(&config, worker)
         // FIXME: Average statistics from all workers
     }).and_then(|x| x.join().pop().unwrap())
