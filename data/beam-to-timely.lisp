@@ -75,4 +75,4 @@
   (convert-file (first args) (or (second args)
                                  "output.json")))
 
-(toplevel (rest (uiop:raw-command-line-arguments)))
+(apply #'toplevel (rest (uiop:raw-command-line-arguments)))

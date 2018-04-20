@@ -72,4 +72,4 @@
       (setf args (list* :sync T args)))
     (apply #'run args)))
 
-(toplevel (rest (uiop:raw-command-line-arguments)))
+(apply #'toplevel (rest (uiop:raw-command-line-arguments)))
