@@ -2,7 +2,7 @@ use serde_json;
 use abomonation::Abomonation;
 use config::Config;
 use endpoint::{self, Source, Drain, ToData, FromData, EventSource};
-use operators::{Window, Reduce, Join, FilterMap, Session};
+use operators::{Window, Reduce, Join, FilterMap, Session, Partition};
 use rand::{Rng, StdRng, SeedableRng};
 use std::char::from_u32;
 use std::cmp::{max, min};
@@ -599,7 +599,8 @@ impl TestImpl for Query6 {
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
-            .average_by(|&(ref a, _)| a.seller, |(_, p)| p)
+            .partition(10, |&(ref a, _)| a.seller)
+            .map(|p| (p[0].1, p.iter().map(|&(_, p)| p as f32).sum::<f32>() / p.len() as f32))
     }
 }
 
@@ -756,7 +757,7 @@ impl TestImpl for Query9 {
 
 impl<T: Timestamp> FromData<T> for (Auction, usize) {
     fn from_data(&self, t: &T) -> String {
-        format!("{:?}", self)
+        format!("{:?} {:?}", t, self)
     }
 }
 
