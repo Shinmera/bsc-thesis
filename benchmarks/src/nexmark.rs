@@ -571,7 +571,7 @@ impl TestImpl for Query5 {
         
         let max = bids.reduce_to(0, |(_, p), c| max(p, c));
         
-        max.left_join(&bids, |_| 0, |_| 0, |m, (a, c)| (a, c, m))
+        max.epoch_join(&bids, |_| 0, |_| 0, |m, (a, c)| (a, c, m))
             .filter(|&(_, c, m)| c == m)
             .map(|(a, c, _)| (a, c))
     }
