@@ -520,7 +520,7 @@ impl Query4 {
 impl TestImpl for Query4 {
     type T = Date;
     type D = Event;
-    type DO = (usize, usize);
+    type DO = (usize, f32);
 
     fn name(&self) -> &str { "NEXMark Query 4" }
     
@@ -534,9 +534,7 @@ impl TestImpl for Query4 {
         let window_slide = config.get_as_or("window-slide", 5);
         
         hot_bids(stream)
-            .epoch_window(window_size, window_slide)
-            .reduce_by(|&(ref a, _)| a.category, 0,
-                       |(_, p), c| c + p/NUM_CATEGORIES)
+            .average_by(|&(ref a, _)| a.category, |(_, p)| p)
     }
 }
 
