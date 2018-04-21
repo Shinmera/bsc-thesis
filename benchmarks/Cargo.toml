@@ -5,7 +5,7 @@ authors = ["Shinmera <shinmera@tymoon.eu>"]
 
 [dependencies]
 rdkafka = "0.14"
-timely = "0.5"
+#timely = "0.5"
 timely_communication = "0.5"
 abomonation = "0.5"
 abomonation_derive = "*"
@@ -20,3 +20,11 @@ uuid = { version = "*", features = ["v4"] }
 [dependencies.kafkaesque]
 #path = "../../timely-dataflow/kafkaesque"
 git = "https://github.com/frankmcsherry/timely-dataflow.git"
+
+[dependencies.timely]
+path = "../../timely-dataflow"
+#[dependencies.timely]
+#git = "https://github.com/frankmcsherry/timely-dataflow.git"
+
+#[dependencies.timely_communication]
+#git = "https://github.com/frankmcsherry/timely-dataflow.git"

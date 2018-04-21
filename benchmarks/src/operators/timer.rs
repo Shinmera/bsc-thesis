@@ -28,7 +28,7 @@ impl<G: Scope, D: Data> Timer<G, D> for Stream<G, D> {
     
     fn time_last<T: Timestamp>(&self, time_map: Arc<Mutex<HashMap<T, Instant>>>) -> Stream<G, D>
     where G: ScopeParent<Timestamp=T> {
-        self.unary_frontier(Pipeline, "Counter", move |_| {
+        self.unary_frontier(Pipeline, "Counter", move |_,_| {
             move |input, output| {
                 let mut time_map = time_map.lock().unwrap();
                 if let Some(time) = input.frontier().frontier().get(0) {

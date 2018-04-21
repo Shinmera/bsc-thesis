@@ -54,7 +54,7 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
                     let value = reductor(dat, v);
                     window.insert(key, (value, c+1));
                 });
-                notificator.notify_at(time);
+                notificator.notify_at(time.retain());
             });
             notificator.for_each(|time, _, _| {
                 if let Some(mut window) = epochs.remove(&time) {
@@ -87,15 +87,15 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
         
         self.unary_notify(Exchange::new(|_| 0), "Reduce", Vec::new(), move |input, output, notificator| {
             input.for_each(|time, data| {
-                let mut reduced = epochs.remove(&time).unwrap_or_else(|| initial_value.clone());
+                let mut reduced = epochs.remove(&time.time().clone()).unwrap_or_else(|| initial_value.clone());
                 while let Some(dat) = data.pop() {
                     reduced = reductor(dat, reduced);
                 };
                 epochs.insert(time.clone(), reduced);
-                notificator.notify_at(time);
+                notificator.notify_at(time.retain());
             });
             notificator.for_each(|time, _, _| {
-                if let Some(reduced) = epochs.remove(&time) {
+                if let Some(reduced) = epochs.remove(&time.time().clone()) {
                     output.session(&time).give(reduced);
                 }
             });
