@@ -43,7 +43,7 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
                     let datavec = epoch.entry(key).or_insert_with(Vec::new);
                     datavec.push(dat);
                 });
-                notificator.notify_at(time);
+                notificator.notify_at(time.retain());
             });
             
             input2.for_each(|time, data|{
@@ -53,7 +53,7 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
                     let datavec = epoch.entry(key).or_insert_with(Vec::new);
                     datavec.push(dat);
                 });
-                notificator.notify_at(time);
+                notificator.notify_at(time.retain());
             });
             
             notificator.for_each(|time, _, _|{

@@ -36,7 +36,7 @@ impl<G: Scope, D: Data> Window<G, D> for Stream<G, D> {
                     }
                 });
                 
-                notificator.notify_at(cap);
+                notificator.notify_at(cap.retain());
             });
             notificator.for_each(|cap, _, _| {
                 let pos = 1 + times.iter().position(|x| x == cap.time()).unwrap_or(size);
