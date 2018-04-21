@@ -8,24 +8,107 @@ In order to ease the implementation of the benchmarks and improve the usability 
 This operator performs a filter followed by a map in one go. This is useful when the data stream contains mixed event types and only a single type of event is required. The operator expects a closure which can choose to either filter events by returning \code{None}, or map them by returning \code{Some(..)} with the output data.
 
 \begin{listing}[H]
-  \inputminted[firstline=10,lastline=22]{rust}{benchmarks/src/operators/filtermap.rs}
-  \caption{The implementation of the FilterMap operator.}
+\begin{minted}{rust}
+fn filter_map(&self, map) -> Stream {
+    self.unary_stream(move |input, output| {
+        input.for_each(|time, data| {
+            let mut session = output.session(time);
+            data.for_each(|x|{
+                if let Some(d) = map(x) {
+                    session.give(d);
+                }
+            });
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the filter map operator.}
   \label{lst:filtermap}
 \end{listing}
 
 \subsubsection{Join}
 This operator offers two forms of joins that merge two separate streams of data into one. The first is an epoch based join, meaning data is only matched up between the two streams within a single epoch. If no match is found for either stream, the data is discarded. The second is a left join that keeps the left-hand stream's data around indefinitely, continuously joining it with data from the right-hand stream whenever the keys match.
 
-%% FIXME: This spills the page.
 \begin{listing}[H]
-  \inputminted[firstline=26,lastline=76]{rust}{benchmarks/src/operators/join.rs}
-  \caption{The implementation of the epoch-based join operator.}
+\begin{minted}{rust}
+fn epoch_join(&self, stream, key_1, key_2, joiner) -> Stream{
+    let mut epoch1 = HashMap::new();
+    let mut epoch2 = HashMap::new();
+    
+    self.binary_notify(move |input1, input2, output, notificator| {
+        input1.for_each(|time, data|{
+            let epoch = epoch1.entry(time).or_insert_with(HashMap::new);
+            data.for_each(|dat|{
+                let key = key_1(&dat);
+                let datavec = epoch.entry(key).or_insert_with(Vec::new);
+                datavec.push(dat);
+            });
+            notificator.notify_at(time);
+        });
+        
+        input2.for_each(|time, data|{
+            let epoch = epoch2.entry(time).or_insert_with(HashMap::new);
+            data.for_each(|dat|{
+                let key = key_2(&dat);
+                let datavec = epoch.entry(key).or_insert_with(Vec::new);
+                datavec.push(dat);
+            });
+            notificator.notify_at(time);
+        });
+        
+        notificator.for_each(|time, _, _|{
+            if let Some(k1) = epoch1.remove(time) {
+                if let Some(mut k2) = epoch2.remove(time) {
+                    let mut out = output.session(time);
+                    for (key, data1) in k1{
+                        if let Some(mut data2) = k2.remove(&key) {
+                            for d1 in data1 {
+                                data2.for_each(|d2| out.give(joiner(d1.clone(), d2)));
+                            }
+                        }
+                    }
+                }
+            } else {
+                epoch2.remove(time);
+            }
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the epoch based join operator.}
   \label{lst:epoch-join}
 \end{listing}
 
 \begin{listing}[H]
-  \inputminted[firstline=78,lastline=112]{rust}{benchmarks/src/operators/join.rs}
-  \caption{The implementation of the left join operator.}
+\begin{minted}{rust}
+fn left_join(&self, stream, key_1, key_2, joiner) -> Stream{
+    let mut d1s = HashMap::new();
+    let mut d2s = HashMap::new();
+
+    self.binary_notify(stream, move |input1, input2, output, _| {
+        input1.for_each(|time, data|{
+            data.for_each(|d1| {
+                let k1 = key_1(&d1);
+                if let Some(mut d2) = d2s.remove(&k1) {
+                    output.session(time).give_iterator(d2.map(|d| joiner(d1.clone(), d)));
+                }
+                d1s.insert(k1, d1);
+            });
+        });
+        input2.for_each(|time, data|{
+            data.for_each(|d2| {
+                let k2 = key_2(&d2);
+                if let Some(d1) = d1s.get(&k2) {
+                    output.session(time).give(joiner(d1.clone(), d2));
+                } else {
+                    d2s.entry(k2).or_insert_with(Vec::new).push(d2);
+                }
+            });
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the left join operator.}
   \label{lst:left-join}
 \end{listing}
 
@@ -33,14 +116,56 @@ This operator offers two forms of joins that merge two separate streams of data 
 Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by} and \code{average_by} build on top of this to provide more convenient access to reduction. Finally, a separate \code{reduce_to} does not key data and instead reduces all data within the epoch to a single record.
 
 \begin{listing}[H]
-  \inputminted[firstline=37,lastline=65]{rust}{benchmarks/src/operators/reduce.rs}
-  \caption{The implementation of the reduce operator.}
+\begin{minted}{rust}
+fn reduce(&self, key_extractor, initial_value, reductor, completor) -> Stream{
+    let mut epochs = HashMap::new();
+
+    self.unary_notify(move |input, output, notificator| {
+        input.for_each(|time, data| {
+            let window = epochs.entry(time).or_insert_with(HashMap::new);
+            data.for_each(|dat|{
+                let key = key(&dat);
+                let (v, c) = window.remove(&key).unwrap_or_else(|| (initial_value.clone(), 0));
+                let value = reductor(dat, v);
+                window.insert(key, (value, c+1));
+            });
+            notificator.notify_at(time);
+        });
+        notificator.for_each(|time, _, _| {
+            if let Some(mut window) = epochs.remove(time) {
+                output.session(time).give_iterator(window.map(|(k, (v, c))| completor(k, v, c)));
+            }
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the general reduce operator.}
   \label{lst:reduce}
 \end{listing}
 
 \begin{listing}[H]
-  \inputminted[firstline=83,lastline=103]{rust}{benchmarks/src/operators/reduce.rs}
-  \caption{The implementation of the reduce-to operator.}
+\begin{minted}{rust}
+fn reduce_to(&self, initial_value, reductor) -> Stream {
+    let mut epochs = HashMap::new();
+    
+    self.unary_notify(move |input, output, notificator| {
+        input.for_each(|time, data| {
+            let mut reduced = epochs.remove(time).unwrap_or(initial_value);
+            while let Some(dat) = data.pop() {
+                reduced = reductor(dat, reduced);
+            };
+            epochs.insert(time, reduced);
+            notificator.notify_at(time);
+        });
+        notificator.for_each(|time, _, _| {
+            if let Some(reduced) = epochs.remove(time) {
+                output.session(time).give(reduced);
+            }
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the reduce to operator.}
   \label{lst:reduce-to}
 \end{listing}
 
@@ -48,35 +173,185 @@ Reducing data in some form is a very frequent operation in dataflows. This opera
 The \code{rolling_count} operator is similar to a reductor, but has a few distinct differences. First, it emits an output record for every input record it sees, rather than only once per epoch. Second, it keeps the count across epochs, rather than resetting for each epoch. Finally, it can only count records, rather than performing arbitrary reduction operations.
 
 \begin{listing}[H]
-  \inputminted[firstline=19,lastline=38]{rust}{benchmarks/src/operators/rollingcount.rs}
-  \caption{The implementation of the rolling-count operator.}
-  \label{lst:rolling-count}
+\begin{minted}{rust}
+fn rolling_count(&self, key_extractor, counter) -> Stream{
+    let mut counts = HashMap::new();
+    
+    self.unary_stream(move |input, output| {
+        input.for_each(|time, data| {
+            output.session(time).give_iterator(data.map(|x|{
+                let key = key(&x);
+                let count = counts.get(&key).unwrap_or(0)+1;
+                counts.insert(key.clone(), count);
+                counter(x, count)
+            }));
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the rolling count operator.}
+  \label{lst:reduce-to}
 \end{listing}
 
 \subsubsection{Window}
 The window operator batches records together into windows. Windows can be sliding or hopping, and can be of arbitrary size, although they are limited in their granularity by epochs. This means that the epochs need to be correlated to a unit that the user would like to window by. When the window is full and the frontier reaches a slide, the window operator sends out a copy of all records within the window.
 
-%% FIXME: This spills the page.
 \begin{listing}[H]
-  \inputminted[firstline=17,lastline=62]{rust}{benchmarks/src/operators/window.rs}
-  \caption{The implementation of the generic window operator.}
+\begin{minted}{rust}
+fn window(&self, size, slide, time) -> Stream{
+    let mut window_parts = HashMap::new();
+    let mut times = VecDeque::new();
+    self.unary_notify(move |input, output, notificator| {
+        input.for_each(|cap, data| {
+            data.drain(..).for_each(|data|{
+                let time = time(cap.time(), &data);
+                // Push the data onto a partial window.
+                let part = window_parts.entry(time).or_insert_with(Vec::new);
+                part.push(data);
+                // Remember this time for reconstruction of windows.
+                if !times.contains(time) {
+                    times.push_back(time);
+                }
+            });
+            
+            notificator.notify_at(cap);
+        });
+        notificator.for_each(|cap, _, _| {
+            let pos = 1 + times.position(|x| x == cap.time()).unwrap_or(size);
+            // Only send out data if this is on a complete window.
+            if size <= pos && (pos-size) % slide == 0 {
+                // Gather complete window from partial windows.
+                let mut window = Vec::new();
+                times.take(size).for_each(|time|{
+                    if let Some(part) = window_parts.get(time){
+                        part.for_each(|entry| window.push(entry.clone()));
+                    }
+                });
+                // Send out the completed window.
+                output.session(&cap).give_iterator(window.drain(..));
+                // Invalidate partial windows that fell out of the slide.
+                let count = min(slide, times.len());
+                times.drain(0..count).for_each(|time|{
+                    window_parts.remove(time);
+                });
+            }
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the general window operator.}
   \label{lst:epoch-window}
 \end{listing}
 
 \begin{listing}[H]
-  \inputminted[firstline=64,lastline=83]{rust}{benchmarks/src/operators/window.rs}
-  \caption{The implementation of the tumbling-window operator.}
+\begin{minted}{rust}
+fn tumbling_window(&self, w) -> Stream{
+    let mut windows = HashMap::new();
+    
+    self.unary_notify(move |input, output, notificator| {
+        input.for_each(|cap, data| {
+            let wtime = w(cap.time());
+            notificator.notify_at(cap.delayed(wtime));
+            let window = windows.entry(wtime).or_insert_with(Vec::new);
+            data.for_each(|data|{
+                window.push(data);
+            });
+        });
+        notificator.for_each(|cap, _, _| {
+            if let Some(mut window) = windows.remove(cap.time()) {
+                output.session(&cap).give_iterator(window.drain(..));
+            }
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the tumbling window operator.}
   \label{lst:tumbling-window}
 \end{listing}
 
 \subsubsection{Session}
 The session operator is similar to a window: it batches records, but instead of using a regular interval, a session is only completed after a certain timeout has been reached. As an example, a session with a timeout of 10 seconds would only be complete if there were no records for 10 seconds on the stream. Before this timeout is reached, all incoming records are gathered into the current session.
 
-%% FIXME: This spills the page.
 \begin{listing}[H]
-  \inputminted[firstline=47,lastline=100]{rust}{benchmarks/src/operators/session.rs}
-  \caption{The implementation of the session operator.}
+\begin{minted}{rust}
+fn session(&self, timeout, sessioner) -> Stream {
+    let mut sessions = HashMap::new();
+    
+    self.unary_notify(move |input, output, notificator| {
+        input.for_each(|cap, data| {
+            data.for_each(|data| {
+                let (s, t) = key(&data);
+                notificator.notify_at(cap.delayed(t+timeout));
+                let session = sessions
+                    .entry(t).or_insert_with(HashMap::new)
+                    .entry(s).or_insert_with(Vec::new);
+                session.push(data);
+            });
+        });
+        
+        notificator.for_each(|cap, _, _| {
+            // For each session at the original time we need to check if
+            // it has expired, or if we need to delay.
+            let otime = cap.time() - timeout;
+            let mut expired = sessions.remove(otime).unwrap_or_else(HashMap::new);
+            expired.for_each(|(s, mut d)| {
+                // Now we check backwards from the currently epoch.
+                let mut found = false;
+                for i in 0..timeout {
+                    let t = cap.time() - i;
+                    if let Some(session) = sessions.get(t) {
+                        if let Some(data) = session.get(s) {
+                            // If we find data within the timeout, delay
+                            // our data to that later time. If that time
+                            // does not happen to be final either, both
+                            // this and that data will get moved ahead
+                            // even further automatically.
+                            data.append(d);
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if !found {
+                    // If we don't find a any data within the timeout,
+                    // the session is full and we can output it.
+                    output.session(&cap).give((s, d));
+                }
+            });
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the session operator.}
   \label{lst:session}
+\end{listing}
+
+\subsubsection{Partition}
+The partitioning operator transforms the data stream into windows of a fixed number of records, each keyed by a property. For instance one could use this to partition the passengers on a flight into groups of four based on their age.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+fn partition(&self, size, key) -> Stream{
+    let mut partitions = HashMap::new();
+
+    self.unary_stream(move |input, output| {
+        input.for_each(|time, data| {
+            data.for_each(|dat| {
+                let key = key(&dat);
+                let mut partition = partitions.remove(&key).unwrap_or_else(|| Vec::with_capacity(size));
+                partition.push(dat);
+                if partition.len() == size {
+                    output.session(time).give(partition);
+                } else {
+                    partitions.insert(key, partition);
+                }
+            });
+        });
+    })
+}
+\end{minted}
+  \caption{Pseudo-code for the partitioning operator.}
+  \label{lst:reduce-to}
 \end{listing}
 
 %%% Local Variables:
