@@ -49,7 +49,7 @@ The second \code{map} operator is responsible for performing the lookup in the \
   \addplot table[y index=0, x index=5] {data/cdf.csv};
 }{CDF latency plot.}
 
-\subsection{Remarks}
+\subsection{Remarks}\label{section:ysb-remarks}
 Compared to the queries shown in NEXMark, the Yahoo Streaming Benchmark is exceedingly simple. It also includes some rather odd requirements that were most likely simply specific to Yahoo's internal use-case, rather than born out of consideration for what would make a good benchmark. Most notably the lookup in Redis would present a significant bottleneck for most modern streaming systems, and the required JSON deserialisation step will lead to the benchmark mostly testing the JSON library's speed, rather than the streaming system's actual performance in processing the data. \\
 
 Disregarding the Redis look up and the deserialisation, the only remaining operation the benchmark performs is a windowed reduction, as the projection can be mostly disregarded. This means that the benchmark does not add much complexity over a very basic word count test. Thus we believe it is neither representative of typical streaming systems applications, nor extensive enough in testing the system's expressiveness or capabilities.

@@ -98,7 +98,7 @@ For this query, we merely need to create a tumbling window for ten seconds, and 
   \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{CDF plot.}
 
-\subsection{Remarks}
+\subsection{Remarks}\label{section:hibench-remarks}
 Surprisingly enough, HiBench gave us a lot of trouble to implement. Not because the queries were complex, but simply because of the lack of proper documentation and maintenance. Beyond the very superficial descriptions of the queries on their homepage, there is nothing about how the workloads are generated, how the queries perform in detail, or what the though process behind the design was. The code base itself is not easy to decipher either, as the information about data generation is distributed over a swath of files, none of which are commented or explained anywhere. \\
 
 If this didn't already make things bad enough, the benchmark itself does not run on current setups. It requires versions of Hadoop and Kafka that are no longer supported, and does not work under Java 9. We could not get their data generator to work on several systems. We are unsure whether this was due to a misconfiguration somewhere or due to the software being bitrotten, but the \href{https://github.com/intel-hadoop/HiBench/issues/535}{authors did not respond to inquiries}, and their documentation for the setup of the benchmark is feeble at best. \\
