@@ -5,7 +5,7 @@
 In order to ease the implementation of the benchmarks and improve the usability of the Timely system we introduced a number of additional operators. We will outline and discuss these operators here shortly.
 
 \subsubsection{FilterMap}
-This operator performs a filter followed by a map in one go. This is useful when the data stream contains mixed event types and only a single type of event is required. The operator expects a closure which can choose to either filter events by returning \code{None}, or map them by returning \code{Some(..)} with the output data.
+This operator performs a filter followed by a map in one go. The operator expects a closure which can choose to either filter events by returning \code{None}, or map them by returning \code{Some(..)} with the output data.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -22,12 +22,36 @@ fn filter_map(&self, map) -> Stream {
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the filter map operator.}
+  \caption{Simplified code for the filter map operator.}
   \label{lst:filtermap}
 \end{listing}
 
+The operator is mostly useful for streams that contain multiple types of data encapsulated in an enum. In that case turning the stream into one of a single type is trivial using \code{filter_map}.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+enum Vehicle {
+    Car(Car)
+    Boat(Boat)
+}
+
+impl Car { 
+    fn from(vehicle: Vehicle) -> Option<Car> {
+        match vehicle {
+            Vehicle::Car(car) => Some(car),
+            _ => None
+        }
+    }
+}
+
+stream.filter_map(|x| Car::from(x))
+\end{minted}
+\caption{An example of the filter map operator to purify a stream of vehicles into one of cars.}
+\label{lst:filtermap-example}
+\end{listing}
+
 \subsubsection{Join}
-This operator offers two forms of joins that merge two separate streams of data into one. The first is an epoch based join, meaning data is only matched up between the two streams within a single epoch. If no match is found for either stream, the data is discarded. The second is a left join that keeps the left-hand stream's data around indefinitely, continuously joining it with data from the right-hand stream whenever the keys match.
+This operator offers two forms of joins that merge two separate streams of data into one. The first is an epoch based join, meaning data is only matched up between the two streams within a single epoch. If no match is found for either stream, the data is discarded.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -75,9 +99,24 @@ fn epoch_join(&self, stream, key_1, key_2, joiner) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the epoch based join operator.}
+  \caption{Simplified code for the epoch based join operator.}
   \label{lst:epoch-join}
 \end{listing}
+
+The epoch join is the more general join operator that should be useful whenever it is ensured that related events are emitted in the same epoch. If the out-of-orderness means the epochs could be different, a more general join operator is required.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+customers.epoch_join(coffees,
+    |customer| customer.id, 
+    |coffee| coffee.customer, 
+    |customer, coffee| (customer.name, coffee.price))
+\end{minted}
+\caption{An example of an epoch join to determine how much each customer needs to pay for their coffee.}
+\label{lst:epoch-join-example}
+\end{listing}
+
+The second form of join offered is a left join that keeps the left-hand stream's data around indefinitely, continuously joining it with data from the right-hand stream whenever the keys match.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -108,12 +147,25 @@ fn left_join(&self, stream, key_1, key_2, joiner) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the left join operator.}
+  \caption{Simplified code for the left join operator.}
   \label{lst:left-join}
 \end{listing}
 
+Left joins are useful when events on one side might only be emitted once, but events on the right hand side are recurring, meaning we need to retain the left side indefinitely.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+driver_registrations.left_join(speeding_cars,
+    |car| car.driver,
+    |driver| driver.id,
+    |car, driver| (car.license_plate, driver.address))
+\end{minted}
+\caption{An example of the left join operator, joining driver's registrations to cars that have been caught speeding.}
+\label{lst:left-join-example}
+\end{listing}
+
 \subsubsection{Reduce}
-Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by} and \code{average_by} build on top of this to provide more convenient access to reduction. Finally, a separate \code{reduce_to} does not key data and instead reduces all data within the epoch to a single record.
+Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by} and \code{average_by} build on top of this to provide more convenient access to reduction.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -139,9 +191,21 @@ fn reduce(&self, key_extractor, initial_value, reductor, completor) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the general reduce operator.}
+  \caption{Simplified code for the general reduce operator.}
   \label{lst:reduce}
 \end{listing}
+
+\begin{listing}[H]
+\begin{minted}{rust}
+products.reduce(|_| 0, Product::new(0), |product, highest| {
+    if highest.price < product.price { product } else { highest }
+})
+\end{minted}
+\caption{A reduction example to find the product with the highest price.}
+\label{lst:reduce-example}
+\end{listing}
+
+Finally, a separate \code{reduce_to} operator does not key data and instead reduces all data within the epoch to a single record.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -165,8 +229,18 @@ fn reduce_to(&self, initial_value, reductor) -> Stream {
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the reduce to operator.}
+  \caption{Simplified code for the reduce to operator.}
   \label{lst:reduce-to}
+\end{listing}
+
+This operator can be useful when trying to compare against a common value among all records.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+records.reduce_to(0, |_, c| c+1)
+\end{minted}
+\caption{An example showing how to count the number of records in an epoch.}
+\label{lst:reduce-to-example}
 \end{listing}
 
 \subsubsection{RollingCount}
@@ -189,8 +263,18 @@ fn rolling_count(&self, key_extractor, counter) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the rolling count operator.}
-  \label{lst:reduce-to}
+  \caption{Simplified code for the rolling count operator.}
+  \label{lst:rolling-count}
+\end{listing}
+
+The most trivial use-case is the classic word count benchmark.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+words.rolling_count(|word| word.clone(), |word, count| (word, count))
+\end{minted}
+\caption{A basic word count example using the rolling-count operator.}
+\label{lst:rolling-count-example}
 \end{listing}
 
 \subsubsection{Window}
@@ -239,9 +323,11 @@ fn window(&self, size, slide, time) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the general window operator.}
+  \caption{Simplified code for the general window operator.}
   \label{lst:epoch-window}
 \end{listing}
+
+The generic window operator has a significant amount of overhead. Thus there is a specific operator for tumbling windows which should be a lot more efficient. It expects a closure that returns the timestamp on which the window for the event will expire.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -265,8 +351,18 @@ fn tumbling_window(&self, w) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the tumbling window operator.}
+  \caption{Simplified code for the tumbling window operator.}
   \label{lst:tumbling-window}
+\end{listing}
+
+A typical example of a tumbling window usage is to batch events together into well-defined intervals.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+frames.tumbling_window(|t| RootTimestamp::new(((t.inner/60)+1)*60))
+\end{minted}
+\caption{An example of a tumbling window, batching frames into intervals of minutes, assuming an epoch represents one second.}
+\label{lst:tumbling-window-example}
 \end{listing}
 
 \subsubsection{Session}
@@ -322,12 +418,22 @@ fn session(&self, timeout, sessioner) -> Stream {
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the session operator.}
+  \caption{Simplified code for the session operator.}
   \label{lst:session}
 \end{listing}
 
+Sessions can be useful to track intervals of activity, for instance to try and estimate periods of time during which a user is actively visiting a site.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+tweets.session(3600, |tweet| (tweet.author, RootTimestamp::new(tweet.time / 1000)))
+\end{minted}
+\caption{An example of a session to determine batches of tweets during which the user is active.}
+\label{lst:session-example}
+\end{listing}
+
 \subsubsection{Partition}
-The partitioning operator transforms the data stream into windows of a fixed number of records, each keyed by a property. For instance one could use this to partition the passengers on a flight into groups of four based on their age.
+The partitioning operator transforms the data stream into windows of a fixed number of records, each keyed by a property.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -350,8 +456,18 @@ fn partition(&self, size, key) -> Stream{
     })
 }
 \end{minted}
-  \caption{Pseudo-code for the partitioning operator.}
+  \caption{Simplified code for the partitioning operator.}
   \label{lst:reduce-to}
+\end{listing}
+
+Partitioning is useful when we need to be certain about the number of events present in the stream at any particular point.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+frames.partition(30, |frame| frame.animation)
+\end{minted}
+\caption{This creates 30 frame (one second) animation batches from a stream of frames.}
+\label{lst:partition-example}
 \end{listing}
 
 %%% Local Variables:
