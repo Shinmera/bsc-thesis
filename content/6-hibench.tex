@@ -102,6 +102,8 @@ Our measurement procedure involved a closed-loop data feed, meaning each epoch w
   \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{CDF plot.}
 
+We surmise that the exceedingly poor performance of the Identity query is down to the requirement of including a current Unix time measurement, which requires a system call that bottlenecks the data flow. The repartition dataflow scales poorly as Timely automatically performs a hash-based redistribution of data for operators that require exchange and we automatically feed data on all workers by default, distributing the data from the get-go.
+
 \subsection{Remarks}\label{section:hibench-remarks}
 Surprisingly enough, HiBench gave us a lot of trouble to implement. Not because the queries were complex, but simply because of the lack of proper documentation and maintenance. Beyond the very superficial descriptions of the queries on their homepage, there is nothing about how the workloads are generated, how the queries perform in detail, or what the though process behind the design was. The code base itself is not easy to decipher either, as the information about data generation is distributed over a swath of files, none of which are commented or explained anywhere. \\
 

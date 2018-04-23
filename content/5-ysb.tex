@@ -53,6 +53,8 @@ Our measurement procedure involved a closed-loop data feed, meaning each epoch w
   \addplot table[y index=0, x index=5] {data/cdf.csv};
 }{CDF latency plot.}
 
+The latency plot reveals a nicely linear behaviour, letting us go beyond ten million events before congesting.
+
 \subsection{Remarks}\label{section:ysb-remarks}
 Compared to the queries shown in NEXMark, the Yahoo Streaming Benchmark is exceedingly simple. It also includes some rather odd requirements that were most likely simply specific to Yahoo's internal use-case, rather than born out of consideration for what would make a good benchmark. Most notably the lookup in Redis would present a significant bottleneck for most modern streaming systems, and the required JSON deserialisation step will lead to the benchmark mostly testing the JSON library's speed, rather than the streaming system's actual performance in processing the data. \\
 
