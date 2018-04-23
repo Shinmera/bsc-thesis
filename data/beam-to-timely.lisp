@@ -1,19 +1,18 @@
-#!sbcl --script
 ;;;;; Beam to Timely Benchmark Converter
 ;;;; This script converts the output of a Beam run into a JSON file
 ;;;; usable as input for the Timely Benchmark system.
 ;;;;
-;;;; Usage: ./beam-to-timely.lisp input-file [output-file]
+;;;; Usage: sbcl --load beam-to-timely.lisp input-file [output-file]
 ;;;;
 ;;;; Example beam run to generate the data:
 ;;;;   mvn exec:java -Dexec.mainClass=org.apache.beam.sdk.nexmark.Main -Pflink-runner -Dexec.args="--runner=FlinkRunner --suite=SMOKE --streaming=false --manageResources=false --monitorJobs=true --flinkMaster=local --parallelism=1 --numEventGenerators=1 --sinkType=TEXT --outputPath=."
 ;;;;
 ;;;; Example conversion invocation:
-;;;;   ./beam-to-timely.lisp nexmark_Query0_1524153175427.txt-00000-of-00001 nexmark.json
+;;;;   sbcl --load beam-to-timely.lisp nexmark_Query0_1524153175427.txt-00000-of-00001 nexmark.json
 ;;;;
 ;;;; Requires a Quicklisp installation in the user's home directory.
 ;;;;
-(load #p"~/quicklisp/setup.lisp")
+
 (ql:quickload '(yason local-time cl-ppcre))
 
 (defun table (&rest values)
@@ -76,3 +75,4 @@
                                  "output.json")))
 
 (apply #'toplevel (rest (uiop:raw-command-line-arguments)))
+(uiop:quit)
