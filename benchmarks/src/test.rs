@@ -190,7 +190,7 @@ fn timely_configuration(config: &Config) -> Configuration {
     let threads = config.get_as_or("threads", 1);
     let process = config.get_as_or("process", 0);
     let processes = config.get_as_or("processes", 1);
-    let report = config.get_or("report", "true") == "true";
+    let report = config.get_or("connection-report", "true") == "true";
 
     assert!(process < processes);
 

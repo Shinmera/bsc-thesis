@@ -876,7 +876,7 @@ impl Benchmark for NEXMark {
         let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
         fs::create_dir_all(&data_dir)?;
         let seconds = config.get_as_or("seconds", 60);
-        let partitions = config.get_as_or("partitions", 10);
+        let partitions = config.get_as_or("threads", 10);
 
         println!("Generating events for {}s over {} partitions.", seconds, partitions);
 

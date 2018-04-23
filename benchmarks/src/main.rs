@@ -133,7 +133,7 @@ The following options are available:
                              Default: 1
   --hostfile FILE          Process address host file.
                              Default: none
-  --report BOOL            Whether to report connection progress.
+  --connection-report BOOL Whether to report connection progress.
                              Default: false
   --window-size NUM        The size of the windows in epochs (usually seconds).
                              Default: test-dependent
@@ -145,6 +145,9 @@ The following options are available:
   --output MODE            The output consuming mode. Can be one of:
                              null, console, file, meter
                              Default: null
+  --report                 How to report test result data. Can be one of:
+                             summary, latencies
+                             Default: summary
   --log BOOL               Whether to log Timely events to a remote server.
                              Default: false
   --log-server HOST        The hostname of the server to connect to for logging.
@@ -165,7 +168,8 @@ The following options are available:
                              Default: 100
   --ads NUM                (YSB) How many ads per campaign to generate.
                              Default: 10
-  --rate-shape SINE/SQUARE (NEX) In what shape to generate delays between events.
+  --rate-shape SHAPE       (NEX) In what shape to generate delays between events. Can be one of:
+                             SINE/SQUARE
                              Default: SINE
   --next-event-rate NUM    (NEX)
                              Default: events-per-second
