@@ -100,7 +100,7 @@ impl NEXMarkConfig {
         let first_rate = config.get_as_or("first-event-rate", config.get_as_or("events-per-second", 10_000));
         let next_rate = config.get_as_or("next-event-rate", first_rate);
         let us_per_unit = config.get_as_or("us-per-unit", 1_000_000); // Rate is in μs
-        let generators = config.get_as_or("threads", 10) as f32;
+        let generators = config.get_as_or("threads", 1) as f32;
         let rate_to_period = |r| (us_per_unit) as f32 / r as f32;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
@@ -876,7 +876,7 @@ impl Benchmark for NEXMark {
         let data_dir = format!("{}/nexmark",config.get_or("data-dir", "data"));
         fs::create_dir_all(&data_dir)?;
         let seconds = config.get_as_or("seconds", 60);
-        let partitions = config.get_as_or("threads", 10);
+        let partitions = config.get_as_or("threads", 1);
 
         println!("Generating events for {}s over {} partitions.", seconds, partitions);
 

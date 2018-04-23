@@ -126,7 +126,7 @@ The following options are available:
   --tests STRING           A comma-separated list of test names to run.
                              Default: all
   --threads NUM            Number of workers per process.
-                             Default: 10
+                             Default: 1
   --process IDX            The identity of this process.
                              Default: 0
   --processes NUM          Number of processes.
@@ -196,7 +196,13 @@ The following options are available:
   --base-time NUM          (NEX)
                              Default: 1436918400000 (2015-07-15T00:00:00.000Z)
 
-");
+The following benchmarks and tests are available:");
+        for benchmark in benchmarks {
+            eprintln!("{}", benchmark.name());
+            for test in benchmark.tests() {
+                eprintln!("  {}", test.name());
+            }
+        }
     } else {
         eprintln!("Invalid mode, should be one of test, generate, help.");
     }

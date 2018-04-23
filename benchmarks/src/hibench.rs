@@ -227,7 +227,7 @@ pub struct HiBenchGenerator {
 
 impl HiBenchGenerator {
     fn new(config: &Config) -> Self {
-        let partitions = config.get_as_or("threads", 10);
+        let partitions = config.get_as_or("threads", 1);
         let seconds = config.get_as_or("seconds", 60);
         let events_per_second = config.get_as_or("events-per-second", 100_000);
         let ips = config.get_as_or("ips", 100);
@@ -283,7 +283,7 @@ impl Benchmark for HiBench {
 
     fn generate_data(&self, config: &Config) -> Result<()> {
         let data_dir = format!("{}/hibench", config.get_or("data-dir", "data"));
-        let partitions = config.get_as_or("threads", 10);
+        let partitions = config.get_as_or("threads", 1);
         let seconds = config.get_as_or("seconds", 60);
         let events_per_second = config.get_as_or("events-per-second", 100_000);
         let ips = config.get_as_or("ips", 100);

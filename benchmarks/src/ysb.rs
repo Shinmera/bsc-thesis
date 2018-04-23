@@ -104,7 +104,7 @@ struct YSBGenerator {
 impl YSBGenerator {
     fn new(config: &Config) -> Self {
         let index = config.get_as_or("worker-index", 0);
-        let threads = config.get_as_or("threads", 10);
+        let threads = config.get_as_or("threads", 1);
         let campaigns = config.get_as_or("campaigns", 100);
         let ads = config.get_as_or("ads", 10);
         let seconds = config.get_as_or("seconds", 60);
@@ -172,7 +172,7 @@ impl Benchmark for YSB {
 
     fn generate_data(&self, config: &Config) -> Result<()> {
         let data_dir = format!("{}/ysb", config.get_or("data-dir", "data"));
-        let partitions = config.get_as_or("threads", 10);
+        let partitions = config.get_as_or("threads", 1);
         let campaigns = config.get_as_or("campaigns", 100);
         let ads = config.get_as_or("ads", 10);
         let seconds = config.get_as_or("seconds", 60);
