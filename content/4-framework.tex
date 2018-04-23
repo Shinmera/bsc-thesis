@@ -1,5 +1,71 @@
 \section{Benchmark Framework}
+In order to factor out common operations and to be able to cleanly define the data flows of each test in the benchmarks we developed a small framework. This framework takes care of processing command line arguments, Timely setup, and statistical data collection. All that's necessary in order to implement a benchmark is the implementation of the \code{Benchmark} trait for the overall benchmark, and the implementation of the \code{TestImpl} trait for each test in the benchmark.
 
+\begin{listing}[H]
+\begin{minted}{rust}
+pub trait Benchmark {
+    fn name(&self) -> &str;
+    fn generate_data(&self, config: &Config) -> Result<()>;
+    fn tests(&self) -> Vec<Box<Test>>;
+}
+\end{minted}
+  \caption{Definition of the Benchmark trait.}
+  \label{lst:benchmark-trait}
+\end{listing}
+
+The \code{Benchmark} includes a method to generate input data files that can be used to feed into the system from disk at a later point, and a function to return all the tests that the benchmark defines. Note that it returns \code{Test} trait instances rather than \code{TestImpl}. This is done to avoid leaking associated trait types into surrounding code that doesn't need to know about it.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+pub trait Test : Sync+Send {
+    fn name(&self) -> &str;
+    fn run(&self, config: &Config, worker: &mut Root<Generic>)
+        -> Result<Statistics>;
+}
+\end{minted}
+  \caption{Definition of the Test trait.}
+  \label{lst:test-trait}
+\end{listing}
+
+The \code{Test} trait includes only one important method, which runs the test on a given worker and returns collected statistical data of the run if it completed was successfully. The \code{Test} trait is automatically implemented for all types that implement the \code{TestImpl} trait, thus avoiding the need to manually implement the \code{Test} trait, and automatically erasing the associated types required in the \code{TestImpl} definition.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+pub trait TestImpl : Sync+Send {
+    type D: Data;
+    type DO: Data;
+    type T: Timestamp;
+
+    fn name(&self) -> &str;
+    fn create_endpoints(&self, &Config, index: usize, workers: usize)
+        -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)>;
+    fn construct_dataflow<'scope>(&self, &Config, stream: 
+          &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>)
+        -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>;
+    fn run(&self, &Config, worker: &mut Root<Generic>)
+        -> Result<Statistics>;
+}
+\end{minted}
+  \caption{Definition of the TestImpl trait.}
+  \label{lst:testimpl-trait}
+\end{listing}
+
+The \code{TestImpl} trait is the most complicated, but should not be hard to utilise either. The \code{run} method has a default implementation and as such typically does not need to be implemented. This implementation makes use of the associated \code{D}, \code{DO}, and \code{T} types in order to work regardless of the test's type requirements. The \code{create_endpoints} method is responsible for initialising the input and output of the data flow. This method is required to be implemented in order for the test to function properly, but should be very straight-forward.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+ fn create_endpoints(&self, config: &Config, _: usize, _: usize)
+    -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+     Ok((Source::from_config(config,
+           Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+         Drain::from_config(config)?))
+ }
+\end{minted}
+  \caption{A sample definition of the \code{create_endpoints} method.}
+  \label{lst:create-endpoints}
+\end{listing}
+
+Finally, the most important method is \code{construct_dataflow}. It is responsible for transforming the input data stream into an output data stream, implementing the data flow logic. The function bodies of the respective \code{construct_dataflow} implementations are shown in the Data Flows subsections of each Benchmark.
 
 \subsection{Additional Operators}
 In order to ease the implementation of the benchmarks and improve the usability of the Timely system we introduced a number of additional operators. We will outline and discuss these operators here shortly.
