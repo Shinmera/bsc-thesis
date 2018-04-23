@@ -529,10 +529,7 @@ impl TestImpl for Query4 {
             Drain::from_config(config)?))
     }
 
-    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let window_size = config.get_as_or("window-size", 10);
-        let window_slide = config.get_as_or("window-slide", 5);
-        
+    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
             .average_by(|&(ref a, _)| a.category, |(_, p)| p)
     }
@@ -716,6 +713,10 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
 
         input2.for_each(|_, data|{
             data.drain(..).for_each(|b|{
+                // FIXME: If bids arrive after the expiry of their auction
+                //        they will be retained forever. I'm actually not
+                //        sure how to remedy this beyond keeping /some/ data
+                //        indefinitely, like each auction's expiry time.
                 bid_map.entry(b.auction).or_insert_with(Vec::new).push(b);
             });
         });
@@ -723,8 +724,8 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
         notificator.for_each(|cap, _, _|{
             if let Some(mut auctions) = auction_map.remove(cap.time()) {
                 auctions.drain(..).for_each(|a|{
-                    if let Some(bids) = bid_map.remove(&a.id) {
-                        bids.iter()
+                    if let Some(mut bids) = bid_map.remove(&a.id) {
+                        bids.drain(..)
                             .filter(|b| a.reserve <= b.price && b.date_time < a.expires)
                             .map(|b| b.price)
                             .max()
