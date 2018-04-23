@@ -37,6 +37,10 @@ The implementation of the query is rather straightforward. The only step of the 
 The second \code{map} operator is responsible for performing the lookup in the \code{campaign_id} table. Instead of the original Redis query, we use a simple hash-table lookup. A copy of the table is kept locally in memory of each worker. Since we don't make use of any of the remaining event fields after this step, we only emit the \code{campaign_id}, rather than a tuple of the event's fields.
 
 \subsection{Evaluation}
+We ran our experiments on an AMD Opteron 6378 2.4KHz 64bit machine with a total of 32 Cores and 504GB RAM. This machine is known to exhibit strange scaling behaviour due to non-uniform memory access patterns. You can see this behaviour in the \hyperref[figure:ysb-scaling]{scaling plot} at 16 workers. \\
+
+Our measurement procedure involved a closed-loop data feed, meaning each epoch was run to completion before a new epoch with a new round of data was started. We only measured data flow execution time, excluding data generation time. Each measurement was gathered using 300 epochs of data. \\
+
 \latencyfigure[ysb]{
   \addplot table[y index=0, x index=5] {data/latency.csv};
 }{Linlog plot of the Latency vs Rate.}

@@ -74,6 +74,10 @@ For a word count, all we really need is the \code{rolling_count} operator, which
 For this query, we merely need to create a tumbling window for ten seconds, and then count the number of events per IP in the window as well as their minimal timestamp, both of which can be achieved with a single \code{reduce_by}.
 
 \subsection{Evaluation}
+We ran our experiments on an AMD Opteron 6378 2.4KHz 64bit machine with a total of 32 Cores and 504GB RAM. This machine is known to exhibit strange scaling behaviour due to non-uniform memory access patterns. You can see this behaviour in the \hyperref[figure:ysb-scaling]{scaling plot} at 16 workers. \\
+
+Our measurement procedure involved a closed-loop data feed, meaning each epoch was run to completion before a new epoch with a new round of data was started. We only measured data flow execution time, excluding data generation time. Each measurement was gathered using 300 epochs of data. \\
+
 \latencyfigure[nex]{
   \addplot table[y index=0, x index=1] {data/latency.csv};
   \addplot table[y index=0, x index=2] {data/latency.csv};
