@@ -19,7 +19,7 @@ use timely::dataflow::operators::{Filter, Map, Binary};
 use timely::dataflow::scopes::{Root, Child};
 use timely::progress::timestamp::{Timestamp, RootTimestamp};
 use timely_communication::allocator::Generic;
-use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::channels::pact::Exchange;
 
 type Id = usize;
 type Date = usize;
@@ -700,8 +700,10 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
     
     let mut auction_map = HashMap::new();
     let mut bid_map: HashMap<Id, Vec<Bid>> = HashMap::new();
+    let auction_ex = Exchange::new(|a: &Auction| a.id as u64);
+    let bid_ex = Exchange::new(|b: &Bid| b.auction as u64);
     
-    auctions.binary_notify(&bids, Pipeline, Pipeline, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
+    auctions.binary_notify(&bids, auction_ex, bid_ex, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
         input1.for_each(|time, data|{
             data.drain(..).for_each(|a|{
                 let future = RootTimestamp::new(a.expires - BASE_TIME);
