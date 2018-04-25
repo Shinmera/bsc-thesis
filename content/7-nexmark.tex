@@ -81,12 +81,14 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
   \label{lst:nexmark-query0}
 \end{listing}
 
-\paragraph{Query 1}
+\paragraph{Query 1}\label{sec:query1}
 \begin{listing}[H]
   \inputminted[firstline=425,lastline=427]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 1}
   \label{lst:nexmark-query1}
 \end{listing}
+
+Technically we could have implemented this with a single \code{filter_map}, but keeping the filtering and the query computation separate is a tad cleaner.
 
 \paragraph{Query 2}
 \begin{listing}[H]
@@ -95,6 +97,8 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
   \label{lst:nexmark-query2}
 \end{listing}
 
+Similar to \autoref{sec:query1}, this could have been done with a single \code{filter_map}, but splitting the work up over multiple operators like this makes the code much easier to read.
+
 \paragraph{Query 3}
 \begin{listing}[H]
   \inputminted[firstline=493,lastline=502]{rust}{benchmarks/src/nexmark.rs}
@@ -102,12 +106,18 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
   \label{lst:nexmark-query3}
 \end{listing}
 
-\paragraph{Query 4}
+This query introduces the first join. Since we need to continuously report on new auctions, we need to retain all persons records indefinitely using the \code{left_join}.
+
+\paragraph{Query 4}\label{sec:query4}
 \begin{listing}[H]
   \inputminted[firstline=533,lastline=534]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 4}
   \label{lst:nexmark-query4}
 \end{listing}
+
+The bulk of the work for this query is factored out into the code from \autoref{sec:query9}. All that remains to do afterwards is to perform an averaging reduce for each category. \\
+
+It is important to note here that the Beam implementation diverges from the original NEXMark specification by performing a sliding window before the reduction. This change is not documented anywhere. We have decided not to follow this change in our implementation.
 
 \paragraph{Query 5}
 \begin{listing}[H]
@@ -116,7 +126,9 @@ In order to be able to run the benchmark outside of the Beam framework, we had t
   \label{lst:nexmark-query5}
 \end{listing}
 
-Note that the implementation of this query in Beam differs from our interpretation of the query as described in the original NEXMark paper. As it stands now it emits auctions whose bid count is maximal within the window, whereas the initial query description seems to emit events if and only if there is only one auction mentioned by bids within the window.
+Query 5 introduces the first use of windowing in NEXMark, and requires a sliding window to boot. The way the filtering for the most bid auction is done may seem a bit odd. Essentially we perform two reductions, once to perform a count of all bids within the epoch, and another time to determine the overall maximum count within the epoch. We then join the two together and filter to only retain the auction that corresponds to the maximum count. \\
+
+Note that the implementation of this query in Beam differs from our interpretation of the query as described in the original NEXMark paper. As it stands now it emits auctions whose bid count is maximal within the window, whereas the initial query description seems to emit events if and only if there is only one auction mentioned by bids within the window. We consider the initial query to be bogus, since it is practically impossible for an epoch to only contain bids of a single auction.
 
 \paragraph{Query 6}
 \begin{listing}[H]
@@ -125,12 +137,16 @@ Note that the implementation of this query in Beam differs from our interpretati
   \label{lst:nexmark-query6}
 \end{listing}
 
+Like for \autoref{sec:query4} most of the work is factored out into the code from \autoref{sec:query9}. This query is also the only one that makes use of partitioning. The partitioning operator works slightly different from the rest of the windowing-like operators in that it does not unfold its contents into the data stream. Since each epoch might encompass a multitude of partitions, we need to keep the partition's data in vectors. In order to average the data in those records we then have to manually reduce within the map operator.
+
 \paragraph{Query 7}
 \begin{listing}[H]
   \inputminted[firstline=631,lastline=637]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 7}
   \label{lst:nexmark-query7}
 \end{listing}
+
+We make use of the generic reduce operator here in order to quickly determine the maximum priced bid within the window. This could have also been done with an implementation of the \code{PartialOrd} trait on \code{Bid} and by using the \code{maximize_by} operator followed by a map.
 
 \paragraph{Query 8}
 \begin{listing}[H]
@@ -139,12 +155,20 @@ Note that the implementation of this query in Beam differs from our interpretati
   \label{lst:nexmark-query8}
 \end{listing}
 
-\paragraph{Query 9}
+Query 8 is mildly interesting due to the two windows that are joined up. However, due to Timely's epoch based data handling, the synchronisation between the two windows is free.
+
+\paragraph{Query 9}\label{sec:query9}
 \begin{listing}[H]
   \inputminted[firstline=702,lastline=739]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 9}
   \label{lst:nexmark-query9}
 \end{listing}
+
+Due to the curious constraints on real-time filtering during a join we opted for implementing a custom operator for this query. The operator proceeds by computing the epoch on which each auction it sees is going to expire. It then remembers the auction for that epoch and schedules a notification to occur at that time. This is useful since we will only be able to emit the joined bid price and auction once the expiry time has been reached and we are sure that we've seen all bids. \\
+
+On the bid side we simply store each bid on a map associated with the auction it belongs to. \\
+
+Once we have reached an expiry time, we iterate through each expired auction. We then iterate through all of the auction's bids to filter out invalid ones and compute the maximum bid price. Finally we output the auction associated with the computed price.
 
 \paragraph{Query 10}
 We did not implement Query 10 as we felt it did not reflect a useful case outside of the very specific and particular application of writing to a Google Cloud Storage file.
@@ -156,12 +180,16 @@ We did not implement Query 10 as we felt it did not reflect a useful case outsid
   \label{lst:nexmark-query11}
 \end{listing}
 
+Since we know for certain that a bid's \code{date_time} stamp corresponds to an epoch at the second level, we can simply compute the session a bid corresponds to according to that stamp.
+
 \paragraph{Query 12}
 \begin{listing}[H]
-  \inputminted[firstline=811,lastline=817]{rust}{benchmarks/src/nexmark.rs}
+  \inputminted[firstline=810,lastline=817]{rust}{benchmarks/src/nexmark.rs}
   \caption{Implementation for NEXMark's Query 12}
   \label{lst:nexmark-query12}
 \end{listing}
+
+We assume that epochs start at \code{0}, so we can use a timer to measure the elapsed wall clock time since the beginning of the dataflow run and correlate that to a real-time session. Note that for this to work at all, epochs need to be correlated to real-time seconds as well, and a closed-loop experiment with no regards for time constraints will crash.
 
 \subsection{Evaluation}
 We ran our experiments on an AMD Opteron 6378 2.4KHz 64bit machine with a total of 32 Cores and 504GB RAM. This machine is known to exhibit strange scaling behaviour due to non-uniform memory access patterns. You can see this behaviour in the \hyperref[figure:ysb-scaling]{scaling plot} at 16 workers. \\
