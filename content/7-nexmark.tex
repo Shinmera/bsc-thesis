@@ -71,7 +71,9 @@ The queries are based on three types of events that can enter the system: \code{
 
 \subsection{Implementation}
 \subsubsection{Data Generation}
-In order to be able to run the benchmark outside of the Beam framework, we had to replicate their generator. For this we translated the original Java sources of the generator (\code{sdks/java/nexmark/src/main/java/org/apache/beam/sdk/nexmark/sources/generator}) into Rust. Unfortunately it appears that the Beam generator has a hard constraint on its rate due to a lack of precision, and can thus only output at most 2M events per second. In our tests the system did not congest at these rates, so we had to modify the generation to be more precise, and allow higher rates. This may have changed the generation in subtle ways that we are not aware of. If it is indeed possible to output more than 2M events per second in the original generator, we could not figure out how to make it do so due to the lack of proper documentation.
+In order to be able to run the benchmark outside of the Beam framework, we had to replicate their generator. For this we translated the original Java sources of the generator (\code{sdks/java/nexmark/src/main/java/org/apache/beam/sdk/nexmark/sources/generator}) into Rust. Unfortunately it appears that the Beam generator has a hard constraint on its rate due to a lack of precision, and can thus only output at most 2M events per second. In our tests the system did not congest at these rates, so we had to modify the generation to be more precise, and allow higher rates. This may have changed the generation in subtle ways that we are not aware of. If it is indeed possible to output more than 2M events per second in the original generator, we could not figure out how to make it do so due to the lack of proper documentation. \\
+
+We have validated our generator against Beam's via manual data output comparison. It should function identical to Beam's setup and our results should thus be accurate even outside of Beam's framework.
 
 \subsubsection{Queries}
 \paragraph{Query 0}
