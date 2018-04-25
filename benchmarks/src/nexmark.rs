@@ -556,8 +556,8 @@ impl TestImpl for Query5 {
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let window_size = config.get_as_or("window-size", 10);
-        let window_slide = config.get_as_or("window-slide", 5);
+        let window_size = config.get_as_or("window-size", 10) as usize;
+        let window_slide = config.get_as_or("window-slide", 5) as usize;
         
         let bids = stream
             .filter_map(|e| Bid::from(e))
@@ -626,11 +626,11 @@ impl TestImpl for Query7 {
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let window_size = config.get_as_or("window-size", 10);
+        let window_size = config.get_as_or("window-size", 10) as usize;
         
         stream
             .filter_map(|e| Bid::from(e))
-            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size))
+            .tumbling_window(window_size)
             .reduce(|_| 0, (0, 0, 0), |b, (a, p, bi)| {
                 if p < b.price { (b.auction, b.price, b.bidder) }
                 else { (a, p, bi) }
@@ -665,15 +665,15 @@ impl TestImpl for Query8 {
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let window_size = config.get_as_or("window-size", 10);
+        let window_size = config.get_as_or("window-size", 10) as usize;
         
         let auctions = stream
             .filter_map(|e| Auction::from(e))
-            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size));
+            .tumbling_window(window_size);
         
         let persons = stream
             .filter_map(|e| Person::from(e))
-            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size));
+            .tumbling_window(window_size);
         
         persons.epoch_join(&auctions, |p| p.id, |a| a.seller,
                            |p, a| (p.id, p.name, a.reserve))

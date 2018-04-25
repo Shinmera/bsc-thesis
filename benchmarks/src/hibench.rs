@@ -15,7 +15,7 @@ use timely::dataflow::operators::Unary;
 use timely::dataflow::operators::{Map, Exchange};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::timestamp::{RootTimestamp, Timestamp};
+use timely::progress::timestamp::Timestamp;
 use timely_communication::allocator::Generic;
 use endpoint::{self, Drain, Source, FromData, ToData, EventSource};
 
@@ -202,10 +202,10 @@ impl TestImpl for Fixwindow {
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         // TODO (john): Check if timestamps in the input stream correspond to seconds
-        let window_size = config.get_as_or("window-size", 10);
+        let window_size = config.get_as_or("window-size", 10) as usize;
         stream
             .map(|e| (e.ip(), e.time))
-            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size))
+            .tumbling_window(window_size)
             .reduce_by(|&(ref ip, _)| ip.clone(),
                        (0, 0), |(_, t), (m, c)| (min(m, t), c+1))
     }

@@ -13,7 +13,7 @@ use test::{Test, TestImpl, Benchmark};
 use timely::dataflow::operators::{Map, Filter};
 use timely::dataflow::scopes::{Root, Child};
 use timely::dataflow::{Stream};
-use timely::progress::timestamp::{RootTimestamp, Timestamp};
+use timely::progress::timestamp::Timestamp;
 use timely_communication::allocator::Generic;
 use uuid::Uuid;
 
@@ -78,7 +78,7 @@ impl TestImpl for Query {
     }
 
     fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        let window_size = config.get_as_or("window-size", 10);
+        let window_size = config.get_as_or("window-size", 10) as usize;
         let table = self.campaign_map.read().unwrap().clone();
         stream
             .filter(|x: &Event| x.event_type == "view")
@@ -88,7 +88,7 @@ impl TestImpl for Query {
                      Some(id) => id.clone(),
                      None => String::from("UNKNOWN AD")
                  })
-            .tumbling_window(move |t| RootTimestamp::new(((t.inner/window_size)+1)*window_size))
+            .tumbling_window(window_size)
             .reduce_by(|campaign_id| campaign_id.clone(), 0, |_, count| count+1)
     }
 }
