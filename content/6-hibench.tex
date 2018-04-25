@@ -39,7 +39,7 @@ Since, as far as we can tell, only the IP and timestamp are actually used by any
 \subsubsection{Data Flows}\label{section:hibench-queries}
 \paragraph{Identity}
 \begin{listing}[H]
-  \inputminted[firstline=96,lastline=98]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=95,lastline=96]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Identity query.}
   \label{lst:hibench-identity}
 \end{listing}
@@ -48,7 +48,7 @@ In this query we simply parse out the timestamp from its string representation a
 
 \paragraph{Repartition}
 \begin{listing}[H]
-  \inputminted[firstline=132,lastline=142]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=127,lastline=139]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Repartition query.}
   \label{lst:hibench-repartition}
 \end{listing}
@@ -57,7 +57,7 @@ This is the most complex implementation of all queries in the HiBench set, since
 
 \paragraph{Wordcount}
 \begin{listing}[H]
-  \inputminted[firstline=174,lastline=176]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=170,lastline=172]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the WordCount query.}
   \label{lst:hibench-wordcount}
 \end{listing}
@@ -66,7 +66,7 @@ For a word count, all we really need is the \code{rolling_count} operator, which
 
 \paragraph{Fixwindow}
 \begin{listing}[H]
-  \inputminted[firstline=209,lastline=213]{rust}{benchmarks/src/hibench.rs}
+  \inputminted[firstline=205,lastline=209]{rust}{benchmarks/src/hibench.rs}
   \caption{Implementation for the Fixwindow query.}
   \label{lst:hibench-fixwindow}
 \end{listing}
@@ -84,7 +84,7 @@ Our measurement procedure involved a closed-loop data feed, meaning each epoch w
   \addplot table[y index=0, x index=3] {data/latency-32.csv};
   \addplot table[y index=0, x index=4] {data/latency-32.csv};
   \legend{Identity, Repartition, Wordcount, Fixwindow}
-}{Linlog plot of the Latency vs Rate.}
+}{Loglog plot of the Latency vs Rate.}
 
 \scalingfigure[nex]{
   \addplot table[x index=0, y index=1] {data/scaling-10000000.csv};

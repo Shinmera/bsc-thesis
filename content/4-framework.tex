@@ -1,6 +1,7 @@
 \section{Benchmark Framework}
-In order to factor out common operations and to be able to cleanly define the data flows of each test in the benchmarks we developed a small framework. This framework takes care of processing command line arguments, Timely setup, and statistical data collection. All that's necessary in order to implement a benchmark is the implementation of the \code{Benchmark} trait for the overall benchmark, and the implementation of the \code{TestImpl} trait for each test in the benchmark.
+In order to factor out common operations and to be able to cleanly define the data flows of each test in the benchmarks we developed a new framework. This framework takes care of processing command line arguments, Timely setup, and statistical data collection. All that's necessary in order to implement a benchmark is the implementation of the \code{Benchmark} trait for the overall benchmark, the implementation of the \code{TestImpl} trait for each test in the benchmark, and the implementation of necessary data conversion routines.
 
+\subsection{Benchmarks and Tests}
 \begin{listing}[H]
 \begin{minted}{rust}
 pub trait Benchmark {
@@ -54,18 +55,113 @@ The \code{TestImpl} trait is the most complicated, but should not be hard to uti
 
 \begin{listing}[H]
 \begin{minted}{rust}
- fn create_endpoints(&self, config: &Config, _: usize, _: usize)
-    -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
-     Ok((Source::from_config(config,
-           Source::new(Box::new(NEXMarkGenerator::new(config))))?,
-         Drain::from_config(config)?))
- }
+fn create_endpoints(&self, config: &Config, _: usize, _: usize)
+   -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)> {
+    Ok((Source::from_config(config,
+          Source::new(Box::new(NEXMarkGenerator::new(config))))?,
+        Drain::from_config(config)?))
+}
 \end{minted}
   \caption{A sample definition of the \code{create_endpoints} method.}
   \label{lst:create-endpoints}
 \end{listing}
 
-Finally, the most important method is \code{construct_dataflow}. It is responsible for transforming the input data stream into an output data stream, implementing the data flow logic. The function bodies of the respective \code{construct_dataflow} implementations are shown in the Data Flows subsections of each Benchmark.
+Finally, the most important method is \code{construct_dataflow}. It is responsible for transforming the input data stream into an output data stream, implementing the data flow logic. The function bodies of the respective \code{construct_dataflow} implementations are shown in the Data Flows subsections of each benchmark. A minimal complete example of a test definition is shown in \autoref{lst:create-test}.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+struct MyTest{}
+
+impl TestImpl for MyTest{
+    type T = usize;
+    type D = String;
+    type DO = (String, usize);
+
+    fn create_endpoints(&self, _:&Config, _: usize, _: usize)
+        -> Result<(Source<Self::T, Self::D>, Drain<Self::T, Self::DO>)>{
+        Ok(Source::from(vec!((0, vec!("a", "b").map(String::from)),
+                             (1, vec!("b", "c").map(String::from)))),
+           Drain::from(io::stdout()))
+    }
+    
+    fn construct_dataflow<'scope>(&self, _:&Config, stream: 
+          &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>)
+        -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO>{
+        stream.rolling_count(|w| w.clone(), |w, c| (w, c))
+    }
+}
+\end{minted}
+  \caption{A complete sample test definition. The endpoints are configured to feed data from a predefined vector, and output results to the standard output stream. The dataflow performs a simple word count.}
+  \label{lst:create-test}
+\end{listing}
+
+\subsection{Input and Output System}
+In order to factor out the common problem of handling the data input and result output of the dataflows, we developed a simple ``endpoints'' system. At the forefront are the opaque \code{Source} and \code{Drain} instances that wrap an inner \code{EventSource} and \code{EventDrain} trait instance respectively. This allows us to pass the sources and drains around without the rest of the system having to know about their particular properties. \\
+
+\begin{listing}[H]
+\begin{minted}{rust}
+pub struct Source<T, D>(Box<EventSource<T, D>>);
+pub struct Drain<T, D>(Box<EventDrain<T, D>>);
+
+pub trait EventSource<T, D> {
+    fn next(&mut self) -> Result<(T, Vec<D>)>;
+}
+
+pub trait EventDrain<T, D> {
+    fn next(&mut self, T, Vec<D>);
+}
+\end{minted}
+  \caption{The core traits and structs of the endpoint system.}
+  \label{lst:endpoints}
+\end{listing}
+
+We provide the following implementations of the \code{EventSource} and \code{EventDrain} traits for ease of use:
+
+\begin{itemize}
+\item \code{Null} --- This struct does not provide any data as \code{EventSource}, and simply ignores all data as \code{EventDrain}.
+\item \code{Console} --- As \code{EventSource}, this struct reads from the standard input stream and converts each line into input data. As \code{EventDrain} it simply writes each timestamp and data pair to the standard output.
+\item \code{FileInput} --- This \code{EventSource} reads lines from a file and, similar to the \code{Console}, converts each line into a single input record.
+\item \code{FileOutput} --- This \code{EventDrain} writes each record it is given to a file, one line per record.
+\item \code{VectorEndpoint} --- This can be used both as \code{EventSource} and \code{EventDrain}, providing an in-memory stream for records.
+\item \code{MeterOutput} --- This \code{EventDrain} simply reports how many records it sees for each epoch.
+\end{itemize}
+
+The \code{From} trait is implemented on both \code{Source} and \code{Drain} wherever applicable, such that constructing the proper endpoints is relatively trivial. \\
+
+\begin{listing}[H]
+\begin{minted}{rust}
+pub struct Null{}
+
+impl<T, D> EventSource<T, D> for Null {
+    fn next(&mut self) -> Result<(T, Vec<D>)> {
+        out_of_data()
+    }
+}
+
+impl<T: Timestamp, D: Data> From<()> for Source<T, D> {
+    fn from(_: ()) -> Source<T, D> {
+        Source::new(Box::new(Null{}))
+    }
+}
+\end{minted}
+  \caption{The definition of the null event source.}
+  \label{lst:null-endpoint}
+\end{listing}
+
+Some of these endpoints require the conversion of data to and from a serialised format such as strings. In order to facilitate this, the \code{ToData} and \code{FromData} traits need to be implemented by the user to perform the required conversion between their data types. An example of such conversion routines for the code from \autoref{lst:create-test} is provided in \autoref{lst:endpoint-conversion}.
+
+
+\begin{listing}[H]
+\begin{minted}{rust}
+impl FromData<usize> for (String, usize) {
+    fn from_data(&self, t: &usize) -> String {
+        format!("{} {} ×{}", t, self.0, self.1)
+    }
+}
+\end{minted}
+  \caption{Record conversion to make MyTest work.}
+  \label{lst:endpoint-conversion}
+\end{listing}
 
 \subsection{Additional Operators}
 In order to ease the implementation of the benchmarks and improve the usability of the Timely system we introduced a number of additional operators. We will outline and discuss these operators here shortly.
@@ -233,7 +329,7 @@ driver_registrations.left_join(speeding_cars,
 \end{listing}
 
 \subsubsection{Reduce}
-Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by} and \code{average_by} build on top of this to provide more convenient access to reduction.
+Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by}, \code{average_by}, \code{maximize_by}, and \code{minimize_by} build on top of this to provide more convenient access to reduction.
 
 \begin{listing}[H]
 \begin{minted}{rust}

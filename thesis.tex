@@ -1,6 +1,6 @@
 \documentclass[12pt,a4paper,titlepage]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
+%\usepackage[T1]{fontenc}
+\usepackage{fontspec}
 \usepackage[margin=3cm]{geometry}
 \usepackage{textcomp}
 \usepackage{titlesec}
@@ -25,7 +25,8 @@
 \setlength{\headheight}{30pt}
 \renewcommand{\arraystretch}{1.5}
 \newmintinline[code]{text}{}
-\setminted{breaklines=true,fontsize=\small,autogobble=true}
+\setminted{breaklines=true,fontsize=\footnotesize,autogobble=true}
+\setmonofont{Consolas}
 
 \hypersetup{
   colorlinks,
@@ -33,6 +34,8 @@
   citecolor={blue!50!black},
   urlcolor={blue!80!black}
 }
+
+\providecommand*{\listingautorefname}{listing}
 
 \covernum{197b}
 \covertitle{Implementation of a Benchmark Suite for Strymon}
