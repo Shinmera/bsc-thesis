@@ -283,8 +283,7 @@ impl<T: Timestamp, D> Source<T, D> {
 
 impl<T: Timestamp, D> EventSource<T, D> for Source<T, D> {
     fn next(&mut self) -> Result<(T, Vec<D>)> {
-        let &mut Source(ref mut it) = self;
-        it.next()
+        self.0.next()
     }
 }
 
@@ -353,8 +352,7 @@ impl<T: Timestamp, D> Drain<T, D> {
 
 impl<T: Timestamp, D> EventDrain<T, D> for Drain<T, D> {
     fn next(&mut self, t: T, d: Vec<D>) {
-        let &mut Drain(ref mut it) = self;
-        it.next(t, d);
+        self.0.next(t, d);
     }
 }
 

@@ -92,9 +92,8 @@ impl TestImpl for Identity {
     }
 
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        stream.map(|e|
-                   (e.time,
-                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()))
+        stream.map(|e| (e.time,
+                        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()))
     }
 }
 

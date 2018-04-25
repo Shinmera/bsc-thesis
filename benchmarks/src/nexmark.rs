@@ -595,7 +595,7 @@ impl TestImpl for Query6 {
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         hot_bids(stream)
             .partition(10, |&(ref a, _)| a.seller)
-            .map(|p| (p[0].1, p.iter().map(|&(_, p)| p as f32).sum::<f32>() / p.len() as f32))
+            .map(|p| (p[0].1, p.iter().map(|p| p.1 as f32).sum::<f32>() / p.len() as f32))
     }
 }
 
@@ -695,6 +695,10 @@ impl Query9 {
 }
 
 fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (Auction, usize)> {
+    // FIXME: If bids arrive after the expiry of their auction
+    //        they will be retained forever. I'm actually not
+    //        sure how to remedy this beyond keeping /some/ data
+    //        indefinitely, like each auction's expiry time.
     let bids = stream.filter_map(|e| Bid::from(e));
     let auctions = stream.filter_map(|e| Auction::from(e));
     
@@ -715,10 +719,6 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
 
         input2.for_each(|_, data|{
             data.drain(..).for_each(|b|{
-                // FIXME: If bids arrive after the expiry of their auction
-                //        they will be retained forever. I'm actually not
-                //        sure how to remedy this beyond keeping /some/ data
-                //        indefinitely, like each auction's expiry time.
                 bid_map.entry(b.auction).or_insert_with(Vec::new).push(b);
             });
         });
