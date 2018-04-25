@@ -102,3 +102,99 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
         })
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use timely;
+    use timely::dataflow::operators::{ToStream, Capture};
+    use timely::dataflow::operators::capture::Event;
+    use std::cmp::max;
+
+    //// Copypasta from timely/dataflow/operators/capture/extract.rs.html
+
+    pub trait Extract<T: PartialOrd, D: PartialOrd> {
+        fn extract(self) -> Vec<(T, Vec<D>)>;
+    }
+
+    impl<T: PartialOrd, D: PartialOrd> Extract<T,D> for ::std::sync::mpsc::Receiver<Event<T, D>> {
+        fn extract(self) -> Vec<(T, Vec<D>)> {
+            let mut result = Vec::new();
+            for event in self {
+                if let Event::Messages(time, data) = event {
+                    result.push((time, data));
+                }
+            }
+            result.sort_by(|x,y| x.0.partial_cmp(&y.0).unwrap());
+
+            let mut current = 0;
+            for i in 1 .. result.len() {
+                if result[current].0 == result[i].0 {
+                    let dataz = ::std::mem::replace(&mut result[i].1, Vec::new());
+                    result[current].1.extend(dataz);
+                }
+                else {
+                    current = i;
+                }
+            }
+
+            for &mut (_, ref mut data) in &mut result {
+                data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            }
+            result.retain(|x| !x.1.is_empty());
+            result
+        }
+    }
+    //// End copypasta
+    
+    
+    #[test]
+    fn reduce() {
+        let data = timely::example(|scope| {
+            vec!(1, 5, 10, 2, 3, 4)
+                .to_stream(scope)
+                .reduce(|x| x%2, 0, |x, p| max(x, p), |_, r, c| r / c)
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!(5/3, 10/3));
+    }
+    
+    #[test]
+    fn reduce_by() {
+        let data = timely::example(|scope| {
+            vec!(1, 5, 10, 2, 3, 4)
+                .to_stream(scope)
+                .reduce_by(|x| x%2, 0, |x, p| max(x, p))
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!((0, 10), (1, 5)));
+    }
+
+    // Awaiting a Timely fix.
+    // #[test]
+    // fn average_by() {
+    //     let data = timely::example(|scope| {
+    //         vec!(1, 2, 3, 4, 5, 6)
+    //             .to_stream(scope)
+    //             .average_by(|x| x%2, |x| x)
+    //             .capture()
+    //     });
+        
+    //     assert_eq!(data.extract()[0].1, vec!((0, 4.0), (1, 3.0)));
+    // }
+    
+    #[test]
+    fn reduce_to() {
+        let data = timely::example(|scope| {
+            vec!(1, 5, 10, 2, 3, 4)
+                .to_stream(scope)
+                .reduce_to(0, |x, p| max(x, p))
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!(10));
+    }
+}

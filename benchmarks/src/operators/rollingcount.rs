@@ -37,3 +37,23 @@ impl<G: Scope, D: Data+Send> RollingCount<G, D> for Stream<G, D> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use timely;
+    use timely::dataflow::operators::{ToStream, Capture};
+    use timely::dataflow::operators::capture::Extract;
+    
+    #[test]
+    fn rolling_count() {
+        let data = timely::example(|scope| {
+            vec!(1, 2, 3, 4, 5)
+                .to_stream(scope)
+                .rolling_count(|x| x%2, |x, c| (x, c))
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!((1, 1), (2, 1), (3, 2), (4, 2), (5, 3)));
+    }
+}

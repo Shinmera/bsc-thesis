@@ -63,7 +63,7 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
                         for (key, data1) in k1{
                             if let Some(mut data2) = k2.remove(&key) {
                                 for d1 in data1 {
-                                    data2.drain(..).for_each(|d2| out.give(joiner(d1.clone(), d2)));
+                                    data2.iter().for_each(|d2| out.give(joiner(d1.clone(), d2.clone())));
                                 }
                             }
                         }
@@ -109,5 +109,46 @@ impl<G: Scope, D1: Data+Send> Join<G, D1> for Stream<G, D1> {
                 });
             });
         })
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use timely;
+    use timely::dataflow::operators::{ToStream, Capture};
+    use timely::dataflow::operators::capture::Extract;
+    
+    #[test]
+    fn epoch_join() {
+        let data = timely::example(|scope| {
+            let rhs = vec!((1, 10),
+                           (2, 11),
+                           (4, 12), (4, 13))
+                .to_stream(scope);
+            vec!((1, 0),
+                 (2, 1), (2, 2),
+                 (4, 3))
+                .to_stream(scope)
+                .epoch_join(&rhs, |x| x.0, |y| y.0, |x, y| (x.1, y.1))
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!((0, 10), (1, 11), (2, 11), (3, 12), (3, 13)));
+    }
+
+    #[test]
+    fn left_join() {
+        let data = timely::example(|scope| {
+            let rhs = vec!((1, 0), (2, 1), (1, 2))
+                .to_stream(scope);
+            vec!(1, 2, 3)
+                .to_stream(scope)
+                .left_join(&rhs, |x| x.clone(), |y| y.0, |_, y| y.1)
+                .capture()
+        });
+
+        assert_eq!(data.extract()[0].1, vec!(0, 1, 2));
     }
 }

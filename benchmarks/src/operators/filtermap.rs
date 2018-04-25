@@ -21,3 +21,28 @@ impl<G: Scope, D: Data> FilterMap<G, D> for Stream<G, D> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use timely;
+    use timely::dataflow::operators::{ToStream, Capture};
+    use timely::dataflow::operators::capture::Extract;
+    use std::str::FromStr;
+    
+    #[test]
+    fn filtermap() {
+        let data = timely::example(|scope| {
+            vec!(String::from("1"),
+                 String::from("2"),
+                 String::from("a"),
+                 String::from("d"),
+                 String::from("3"))
+                .to_stream(scope)
+                .filter_map(|s| i32::from_str(&s).ok())
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!(1, 2, 3));
+    }
+}

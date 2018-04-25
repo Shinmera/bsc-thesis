@@ -41,7 +41,7 @@ impl<G: Scope, D: Data+Send> Partition<G, D> for Stream<G, D> {
 mod tests {
     use super::*;
     use timely;
-    use timely::dataflow::operators::{ToStream, Inspect, Capture};
+    use timely::dataflow::operators::{ToStream, Capture};
     use timely::dataflow::operators::capture::Extract;
     
     #[test]
