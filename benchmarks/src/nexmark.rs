@@ -783,7 +783,7 @@ impl TestImpl for Query11 {
     fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
         stream
             .filter_map(|e| Bid::from(e))
-            .session(10, |b| (b.bidder, RootTimestamp::new(b.date_time / 1000)))
+            .session(10, |b| (b.bidder, b.date_time / 1000))
             .map(|(b, d)| (b, d.len()))
     }
 }
@@ -812,7 +812,7 @@ impl TestImpl for Query12 {
             .filter_map(|e| Bid::from(e))
             .session(10, move |b| {
                 let d = Instant::now().duration_since(start);
-                (b.bidder, RootTimestamp::new(d.as_secs() as usize))
+                (b.bidder, d.as_secs() as usize)
             })
             .map(|(b, d)| (b, d.len()))
     }
