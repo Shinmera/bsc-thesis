@@ -113,7 +113,6 @@ mod tests {
     use std::cmp::max;
 
     //// Copypasta from timely/dataflow/operators/capture/extract.rs.html
-
     pub trait Extract<T: PartialOrd, D: PartialOrd> {
         fn extract(self) -> Vec<(T, Vec<D>)>;
     }
@@ -148,7 +147,6 @@ mod tests {
     }
     //// End copypasta
     
-    
     #[test]
     fn reduce() {
         let data = timely::example(|scope| {
@@ -173,18 +171,17 @@ mod tests {
         assert_eq!(data.extract()[0].1, vec!((0, 10), (1, 5)));
     }
 
-    // Awaiting a Timely fix.
-    // #[test]
-    // fn average_by() {
-    //     let data = timely::example(|scope| {
-    //         vec!(1, 2, 3, 4, 5, 6)
-    //             .to_stream(scope)
-    //             .average_by(|x| x%2, |x| x)
-    //             .capture()
-    //     });
+    #[test]
+    fn average_by() {
+        let data = timely::example(|scope| {
+            vec!(1, 2, 3, 4, 5, 6)
+                .to_stream(scope)
+                .average_by(|x| x%2, |x| x)
+                .capture()
+        });
         
-    //     assert_eq!(data.extract()[0].1, vec!((0, 4.0), (1, 3.0)));
-    // }
+        assert_eq!(data.extract()[0].1, vec!((0, 4.0), (1, 3.0)));
+    }
     
     #[test]
     fn reduce_to() {
