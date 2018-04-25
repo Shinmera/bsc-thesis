@@ -79,26 +79,26 @@ We ran our experiments on an AMD Opteron 6378 2.4KHz 64bit machine with a total 
 Our measurement procedure involved a closed-loop data feed, meaning each epoch was run to completion before a new epoch with a new round of data was started. We only measured data flow execution time, excluding data generation time. Each measurement was gathered using 300 epochs of data. \\
 
 \latencyfigure[nex]{
-  \addplot table[y index=0, x index=1] {data/latency.csv};
-  \addplot table[y index=0, x index=2] {data/latency.csv};
-  \addplot table[y index=0, x index=3] {data/latency.csv};
-  \addplot table[y index=0, x index=4] {data/latency.csv};
+  \addplot table[y index=0, x index=1] {data/latency-32.csv};
+  \addplot table[y index=0, x index=2] {data/latency-32.csv};
+  \addplot table[y index=0, x index=3] {data/latency-32.csv};
+  \addplot table[y index=0, x index=4] {data/latency-32.csv};
   \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{Linlog plot of the Latency vs Rate.}
 
 \scalingfigure[nex]{
-  \addplot table[x index=0, y index=1] {data/scaling.csv};
-  \addplot table[x index=0, y index=2] {data/scaling.csv};
-  \addplot table[x index=0, y index=3] {data/scaling.csv};
-  \addplot table[x index=0, y index=4] {data/scaling.csv};
+  \addplot table[x index=0, y index=1] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=2] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=3] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=4] {data/scaling-10000000.csv};
   \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{Linlog plot of the scaling behaviour.}
 
 \cdffigure[nex]{
-  \addplot table[y index=0, x index=1] {data/cdf.csv};
-  \addplot table[y index=0, x index=2] {data/cdf.csv};
-  \addplot table[y index=0, x index=3] {data/cdf.csv};
-  \addplot table[y index=0, x index=4] {data/cdf.csv};
+  \addplot table[y index=0, x index=1] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=2] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=3] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=4] {data/cdf-32-10000000.csv};
   \legend{Identity, Repartition, Wordcount, Fixwindow}
 }{CDF plot.}
 

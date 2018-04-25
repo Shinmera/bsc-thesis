@@ -169,50 +169,50 @@ We ran our experiments on an AMD Opteron 6378 2.4KHz 64bit machine with a total 
 Our measurement procedure involved a closed-loop data feed, meaning each epoch was run to completion before a new epoch with a new round of data was started. We only measured data flow execution time, excluding data generation time. Each measurement was gathered using 300 epochs of data. \\
 
 \latencyfigure[nex]{
-   \addplot table[y index=0, x index=6] {data/latency.csv};
-   \addplot table[y index=0, x index=7] {data/latency.csv};
-   \addplot table[y index=0, x index=8] {data/latency.csv};
-   \addplot table[y index=0, x index=9] {data/latency.csv};
-   \addplot table[y index=0, x index=10] {data/latency.csv};
-   \addplot table[y index=0, x index=11] {data/latency.csv};
-   \addplot table[y index=0, x index=12] {data/latency.csv};
-   \addplot table[y index=0, x index=13] {data/latency.csv};
-   \addplot table[y index=0, x index=14] {data/latency.csv};
-   \addplot table[y index=0, x index=15] {data/latency.csv};
-   \addplot table[y index=0, x index=16] {data/latency.csv};
-   %\addplot table[y index=0, x index=17] {data/latency.csv};
+   \addplot table[y index=0, x index=6] {data/latency-32.csv};
+   \addplot table[y index=0, x index=7] {data/latency-32.csv};
+   \addplot table[y index=0, x index=8] {data/latency-32.csv};
+   \addplot table[y index=0, x index=9] {data/latency-32.csv};
+   \addplot table[y index=0, x index=10] {data/latency-32.csv};
+   \addplot table[y index=0, x index=11] {data/latency-32.csv};
+   \addplot table[y index=0, x index=12] {data/latency-32.csv};
+   \addplot table[y index=0, x index=13] {data/latency-32.csv};
+   \addplot table[y index=0, x index=14] {data/latency-32.csv};
+   \addplot table[y index=0, x index=15] {data/latency-32.csv};
+   \addplot table[y index=0, x index=16] {data/latency-32.csv};
+   %\addplot table[y index=0, x index=17] {data/latency-32.csv};
    \legend{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 }{Linlog plot of the Latency vs Rate.}
 
 \scalingfigure[nex]{
-  \addplot table[x index=0, y index=6] {data/scaling.csv};
-  \addplot table[x index=0, y index=7] {data/scaling.csv};
-  \addplot table[x index=0, y index=8] {data/scaling.csv};
-  \addplot table[x index=0, y index=9] {data/scaling.csv};
-  \addplot table[x index=0, y index=10] {data/scaling.csv};
-  \addplot table[x index=0, y index=11] {data/scaling.csv};
-  \addplot table[x index=0, y index=12] {data/scaling.csv};
-  \addplot table[x index=0, y index=13] {data/scaling.csv};
-  \addplot table[x index=0, y index=14] {data/scaling.csv};
-  \addplot table[x index=0, y index=15] {data/scaling.csv};
-  \addplot table[x index=0, y index=16] {data/scaling.csv};
-  %\addplot table[x index=0, y index=17] {data/scaling.csv};
+  \addplot table[x index=0, y index=6] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=7] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=8] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=9] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=10] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=11] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=12] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=13] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=14] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=15] {data/scaling-10000000.csv};
+  \addplot table[x index=0, y index=16] {data/scaling-10000000.csv};
+  %\addplot table[x index=0, y index=17] {data/scaling-10000000.csv};
   \legend{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 }{Linlog plot of the scaling behaviour.}
 
 \cdffigure[nex]{
-  \addplot table[y index=0, x index=6] {data/cdf.csv};
-  \addplot table[y index=0, x index=7] {data/cdf.csv};
-  \addplot table[y index=0, x index=8] {data/cdf.csv};
-  \addplot table[y index=0, x index=9] {data/cdf.csv};
-  \addplot table[y index=0, x index=10] {data/cdf.csv};
-  \addplot table[y index=0, x index=11] {data/cdf.csv};
-  \addplot table[y index=0, x index=12] {data/cdf.csv};
-  \addplot table[y index=0, x index=13] {data/cdf.csv};
-  \addplot table[y index=0, x index=14] {data/cdf.csv};
-  \addplot table[y index=0, x index=15] {data/cdf.csv};
-  \addplot table[y index=0, x index=16] {data/cdf.csv};
-  %\addplot table[y index=0, x index=17] {data/cdf.csv};
+  \addplot table[y index=0, x index=6] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=7] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=8] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=9] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=10] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=11] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=12] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=13] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=14] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=15] {data/cdf-32-10000000.csv};
+  \addplot table[y index=0, x index=16] {data/cdf-32-10000000.csv};
+  %\addplot table[y index=0, x index=17] {data/cdf-32-10000000.csv};
   \legend{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 }{CDF plot.}
 

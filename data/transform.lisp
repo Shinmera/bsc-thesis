@@ -39,7 +39,7 @@
     (dolist (workers *workers*)
       (with-simple-restart (continue "Ignore the error.")
         (let ((group (read-file (merge-pathnames (format NIL "~a@~a.csv" rate workers) path))))
-          (format out "~%~a~{ ~f~}" workers (loop for (k . v) in group
+          (format out "~&~a~{ ~f~}" workers (loop for (k . v) in group
                                                   for sorted = (sort v #'<)
                                                   collect (nth (round (/ (length sorted) 2)) sorted))))))))
 
@@ -48,8 +48,7 @@
     (let* ((group (read-file (merge-pathnames (format NIL "~a@~a.csv" rate workers) path)))
            (length (loop for cons in group minimize (length (cdr cons)))))
       (loop for i from 1 to length
-            do (fresh-line out)
-               (format out "~f" (* 100 (/ i length)))
+            do (format out "~&~f" (* 100 (/ i length)))
                (loop for cons in group
                      do (format out " ~f" (pop (cdr cons))))))))
 
@@ -58,17 +57,17 @@
 
 (defun run (&key sync)
   (when sync (sync))
-  (median-latency :workers 8)
-  (median-latency :workers 16)
-  (median-latency :workers 32)
+  ;; (median-latency :workers 8)
+  ;; (median-latency :workers 16)
+  (median-latency)
   (scaling)
   (cdf))
 
 (defun toplevel (&rest args)
-  (let ((args ()))
+  (let ((kargs ()))
     (when (find "--sync" args :test #'string-equal)
-      (setf args (list* :sync T args)))
-    (apply #'run args)))
+      (setf kargs (list* :sync T kargs)))
+    (apply #'run kargs)))
 
 (apply #'toplevel (rest (uiop:raw-command-line-arguments)))
 (uiop:quit)
