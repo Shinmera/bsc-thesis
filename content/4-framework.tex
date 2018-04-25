@@ -153,7 +153,8 @@ fn epoch_join(&self, stream, key_1, key_2, joiner) -> Stream{
                     for (key, data1) in k1{
                         if let Some(mut data2) = k2.remove(&key) {
                             for d1 in data1 {
-                                data2.for_each(|d2| out.give(joiner(d1.clone(), d2)));
+                                data2.for_each(|d2|
+                                    out.give(joiner(d1.clone(), d2)));
                             }
                         }
                     }
@@ -195,7 +196,8 @@ fn left_join(&self, stream, key_1, key_2, joiner) -> Stream{
             data.for_each(|d1| {
                 let k1 = key_1(&d1);
                 if let Some(mut d2) = d2s.remove(&k1) {
-                    output.session(time).give_iterator(d2.map(|d| joiner(d1.clone(), d)));
+                    output.session(time).give_iterator(
+                        d2.map(|d| joiner(d1.clone(), d)));
                 }
                 d1s.insert(k1, d1);
             });
@@ -235,7 +237,7 @@ Reducing data in some form is a very frequent operation in dataflows. This opera
 
 \begin{listing}[H]
 \begin{minted}{rust}
-fn reduce(&self, key_extractor, initial_value, reductor, completor) -> Stream{
+fn reduce(&self, key_extractor, initial, reductor, completor) -> Stream{
     let mut epochs = HashMap::new();
 
     self.unary_notify(move |input, output, notificator| {
@@ -243,7 +245,7 @@ fn reduce(&self, key_extractor, initial_value, reductor, completor) -> Stream{
             let window = epochs.entry(time).or_insert_with(HashMap::new);
             data.for_each(|dat|{
                 let key = key(&dat);
-                let (v, c) = window.remove(&key).unwrap_or_else(|| (initial_value.clone(), 0));
+                let (v, c) = window.remove(&key).or((initial, 0));
                 let value = reductor(dat, v);
                 window.insert(key, (value, c+1));
             });
@@ -251,7 +253,8 @@ fn reduce(&self, key_extractor, initial_value, reductor, completor) -> Stream{
         });
         notificator.for_each(|time, _, _| {
             if let Some(mut window) = epochs.remove(time) {
-                output.session(time).give_iterator(window.map(|(k, (v, c))| completor(k, v, c)));
+                output.session(time).give_iterator(
+                    window.map(|(k, (v, c))| completor(k, v, c)));
             }
         });
     })
@@ -280,7 +283,7 @@ fn reduce_to(&self, initial_value, reductor) -> Stream {
     
     self.unary_notify(move |input, output, notificator| {
         input.for_each(|time, data| {
-            let mut reduced = epochs.remove(time).unwrap_or(initial_value);
+            let mut reduced = epochs.remove(time).or(initial_value);
             while let Some(dat) = data.pop() {
                 reduced = reductor(dat, reduced);
             };
@@ -348,43 +351,48 @@ The window operator batches records together into windows. Windows can be slidin
 
 \begin{listing}[H]
 \begin{minted}{rust}
-fn window(&self, size, slide, time) -> Stream{
-    let mut window_parts = HashMap::new();
-    let mut times = VecDeque::new();
+fn window(&self, size, slide, time) -> Stream
+    let mut parts = HashMap::new();
     self.unary_notify(move |input, output, notificator| {
         input.for_each(|cap, data| {
             data.drain(..).for_each(|data|{
                 let time = time(cap.time(), &data);
                 // Push the data onto a partial window.
-                let part = window_parts.entry(time).or_insert_with(Vec::new);
+                let part = parts.entry(time).or_insert_with(Vec::new);
                 part.push(data);
-                // Remember this time for reconstruction of windows.
-                if !times.contains(time) {
-                    times.push_back(time);
+                // Calculate the next epochs on which this partial window
+                // would be output in a slide, then notify on those times
+                for i in 0..size/slide {
+                    let target = if time < size { size-1
+                    } else { size-1+((time-size)/slide+1+i)*slide };
+                    notificator.notify_at(cap.delayed(target));
                 }
             });
-            
-            notificator.notify_at(cap);
         });
+        
         notificator.for_each(|cap, _, _| {
-            let pos = 1 + times.position(|x| x == cap.time()).unwrap_or(size);
-            // Only send out data if this is on a complete window.
-            if size <= pos && (pos-size) % slide == 0 {
-                // Gather complete window from partial windows.
-                let mut window = Vec::new();
-                times.take(size).for_each(|time|{
-                    if let Some(part) = window_parts.get(time){
-                        part.for_each(|entry| window.push(entry.clone()));
-                    }
-                });
-                // Send out the completed window.
-                output.session(&cap).give_iterator(window.drain(..));
-                // Invalidate partial windows that fell out of the slide.
-                let count = min(slide, times.len());
-                times.drain(0..count).for_each(|time|{
-                    window_parts.remove(time);
-                });
+            let end = cap.time();
+            let mut time = end+1-size;
+            let slide_end = time+slide;
+            let mut window = Vec::new();
+            // Compute full window from partials. First gather parts
+            // that would fall out of the window and remove them.
+            while time < slide_end {
+                if let Some(mut part) = parts.remove(time) {
+                    window.append(&mut part);
+                }
+                time += 1;
             }
+            // Then gather and clone parts that will still be relevant
+            // later.
+            while time <= end {
+                if let Some(part) = parts.get(time) {
+                    part.iter().for_each(|e| window.push(e.clone()));
+                }
+                time += 1;
+            }
+            // Finally output the full window.
+            output.session(&cap).give_iterator(window.drain(..));
         });
     })
 }
@@ -393,22 +401,26 @@ fn window(&self, size, slide, time) -> Stream{
   \label{lst:epoch-window}
 \end{listing}
 
-The generic window operator has a significant amount of overhead. Thus there is a specific operator for tumbling windows which should be a lot more efficient. It expects a closure that returns the timestamp on which the window for the event will expire.
+The generic window operator has some overhead. Thus there is a specific operator for tumbling windows which should be a lot more efficient.
 
 \begin{listing}[H]
 \begin{minted}{rust}
-fn tumbling_window(&self, w) -> Stream{
+fn tumbling_window(&self, size) -> Stream{
     let mut windows = HashMap::new();
     
     self.unary_notify(move |input, output, notificator| {
+        let size = size.clone();
         input.for_each(|cap, data| {
-            let wtime = w(cap.time());
+            // Round the time up to the next window.
+            let wtime = (cap.time() / size + 1) * size;
+            // Now act as if we were on that window's time.
             notificator.notify_at(cap.delayed(wtime));
             let window = windows.entry(wtime).or_insert_with(Vec::new);
-            data.for_each(|data|{
+            data.drain(..).for_each(|data|{
                 window.push(data);
             });
         });
+        
         notificator.for_each(|cap, _, _| {
             if let Some(mut window) = windows.remove(cap.time()) {
                 output.session(&cap).give_iterator(window.drain(..));
@@ -425,7 +437,7 @@ A typical example of a tumbling window usage is to batch events together into we
 
 \begin{listing}[H]
 \begin{minted}{rust}
-frames.tumbling_window(|t| RootTimestamp::new(((t.inner/60)+1)*60))
+frames.tumbling_window(60)
 \end{minted}
 \caption{An example of a tumbling window, batching frames into intervals of minutes, assuming an epoch represents one second.}
 \label{lst:tumbling-window-example}
@@ -436,39 +448,39 @@ The session operator is similar to a window: it batches records, but instead of 
 
 \begin{listing}[H]
 \begin{minted}{rust}
-fn session(&self, timeout, sessioner) -> Stream {
+fn session(&self, timeout, sessioner) -> Stream{
     let mut sessions = HashMap::new();
     
     self.unary_notify(move |input, output, notificator| {
         input.for_each(|cap, data| {
-            data.for_each(|data| {
+            for data in data.drain(..){
                 let (s, t) = key(&data);
-                notificator.notify_at(cap.delayed(t+timeout));
+                notificator.notify_at(cap.delayed(t + timeout));
                 let session = sessions
                     .entry(t).or_insert_with(HashMap::new)
                     .entry(s).or_insert_with(Vec::new);
                 session.push(data);
-            });
+            };
         });
         
         notificator.for_each(|cap, _, _| {
             // For each session at the original time we need to check if
             // it has expired, or if we need to delay.
             let otime = cap.time() - timeout;
-            let mut expired = sessions.remove(otime).unwrap_or_else(HashMap::new);
-            expired.for_each(|(s, mut d)| {
-                // Now we check backwards from the currently epoch.
+            let mut expired = sessions.remove(&otime).or(HashMap::new);
+            expired.drain().for_each(|(s, mut d)| {
+                // Now we check backwards from the current epoch.
                 let mut found = false;
                 for i in 0..timeout {
                     let t = cap.time() - i;
-                    if let Some(session) = sessions.get(t) {
-                        if let Some(data) = session.get(s) {
+                    if let Some(session) = sessions.get_mut(&t) {
+                        if let Some(data) = session.get_mut(&s) {
                             // If we find data within the timeout, delay
                             // our data to that later time. If that time
                             // does not happen to be final either, both
-                            // this and that data will get moved ahead
-                            // even further automatically.
-                            data.append(d);
+                            //  this and that data will get moved ahead
+                            //even further automatically.
+                            data.append(&mut d);
                             found = true;
                             break;
                         }
@@ -492,7 +504,7 @@ Sessions can be useful to track intervals of activity, for instance to try and e
 
 \begin{listing}[H]
 \begin{minted}{rust}
-tweets.session(3600, |tweet| (tweet.author, RootTimestamp::new(tweet.time / 1000)))
+tweets.session(3600, |tweet| (tweet.author, tweet.time / 1000))
 \end{minted}
 \caption{An example of a session to determine batches of tweets during which the user is active.}
 \label{lst:session-example}
@@ -510,7 +522,8 @@ fn partition(&self, size, key) -> Stream{
         input.for_each(|time, data| {
             data.for_each(|dat| {
                 let key = key(&dat);
-                let mut partition = partitions.remove(&key).unwrap_or_else(|| Vec::with_capacity(size));
+                let mut partition = partitions.remove(&key)
+                                        .or(|| Vec::with_capacity(size));
                 partition.push(dat);
                 if partition.len() == size {
                     output.session(time).give(partition);
