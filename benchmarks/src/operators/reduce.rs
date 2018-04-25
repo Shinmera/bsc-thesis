@@ -7,6 +7,15 @@ use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::operators::generic::Unary;
 use timely::dataflow::{Stream, Scope};
 
+#[inline]
+fn max<V: PartialOrd>(a: V, b: V) -> V {
+    if a < b { b } else { a }
+}
+#[inline]
+fn min<V: PartialOrd>(a: V, b: V) -> V {
+    if a < b { a } else { b }
+}
+
 pub trait Reduce<G: Scope, D: Data+Send> {
     fn reduce<H, V, K, R, D2, C>(&self, key_extractor: K, initial_value: V, reductor: R, completor: C) -> Stream<G, D2>
     where H: Hash+Eq+Data+Clone,
@@ -25,6 +34,18 @@ pub trait Reduce<G: Scope, D: Data+Send> {
     fn average_by<H, V, K, R>(&self, key_extractor: K, reductor: R) -> Stream<G, (H, f32)>
     where H: Hash+Eq+Data+Clone,
           V: Eq+Data+Clone+Num+ToPrimitive,
+          K: Fn(&D)->H+'static,
+          R: Fn(D)->V+'static;
+
+    fn maximize_by<H, V, K, R>(&self, key_extractor: K, reductor: R) -> Stream<G, (H, V)>
+    where H: Hash+Eq+Data+Clone,
+          V: Eq+Data+Clone+PartialOrd,
+          K: Fn(&D)->H+'static,
+          R: Fn(D)->V+'static;
+
+    fn minimize_by<H, V, K, R>(&self, key_extractor: K, reductor: R) -> Stream<G, (H, V)>
+    where H: Hash+Eq+Data+Clone,
+          V: Eq+Data+Clone+PartialOrd,
           K: Fn(&D)->H+'static,
           R: Fn(D)->V+'static;
 
@@ -77,7 +98,35 @@ impl<G: Scope, D: Data+Send> Reduce<G, D> for Stream<G, D> {
           V: Eq+Data+Clone+Num+ToPrimitive,
           K: Fn(&D)->H+'static,
           R: Fn(D)->V+'static,{
-        self.reduce(key_extractor, V::zero(), move |d, c| reductor(d)+c, |k, v, c| (k, v.to_f32().unwrap()/c as f32))
+        self.reduce(key_extractor, V::zero(),
+                    move |d, c| reductor(d)+c,
+                    |k, v, c| (k, v.to_f32().unwrap()/c as f32))
+    }
+
+    fn maximize_by<H, V, K, R>(&self, key_extractor: K, reductor: R) -> Stream<G, (H, V)>
+    where H: Hash+Eq+Data+Clone,
+          V: Eq+Data+Clone+PartialOrd,
+          K: Fn(&D)->H+'static,
+          R: Fn(D)->V+'static,{
+        self.reduce(key_extractor, None,
+                    move |d, c| {
+                        let new = reductor(d);
+                        Some(if let Some(c) = c { max(c, new) } else { new })
+                    },
+                    |k, v, _| (k, v.unwrap()))
+    }
+
+    fn minimize_by<H, V, K, R>(&self, key_extractor: K, reductor: R) -> Stream<G, (H, V)>
+    where H: Hash+Eq+Data+Clone,
+          V: Eq+Data+Clone+PartialOrd,
+          K: Fn(&D)->H+'static,
+          R: Fn(D)->V+'static,{
+        self.reduce(key_extractor, None,
+                    move |d, c| {
+                        let new = reductor(d);
+                        Some(if let Some(c) = c { min(c, new) } else { new })
+                    },
+                    |k, v, _| (k, v.unwrap()))
     }
 
     fn reduce_to<V, R>(&self, initial_value: V, reductor: R) -> Stream<G, V>
@@ -181,6 +230,30 @@ mod tests {
         });
         
         assert_eq!(data.extract()[0].1, vec!((0, 4.0), (1, 3.0)));
+    }
+
+    #[test]
+    fn maximize_by() {
+        let data = timely::example(|scope| {
+            vec!(1, 5, 3, 2, 1, 4)
+                .to_stream(scope)
+                .maximize_by(|x| x%2, |x| x)
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!((0, 4), (1, 5)));
+    }
+
+    #[test]
+    fn minimize_by() {
+        let data = timely::example(|scope| {
+            vec!(1, 5, 3, 2, 1, 4)
+                .to_stream(scope)
+                .minimize_by(|x| x%2, |x| x)
+                .capture()
+        });
+        
+        assert_eq!(data.extract()[0].1, vec!((0, 2), (1, 1)));
     }
     
     #[test]
