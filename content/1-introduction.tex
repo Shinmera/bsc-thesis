@@ -1,4 +1,13 @@
 \section{Introduction}
+As the world becomes more connected, and our technology more advanced, more and more observable data is generated. Especially with the introduction of the internet, the amount of data being recorded has reached insurmountable heights. Millions of people and entities interact with each other constantly all over the world, producing a stream information that can be valuable for businesses and scientific study. \\
+
+Traditional data processing systems like relational databases quickly become overwhelmed by these huge quantities of new data. Thus, new, tailored systems were created in order to address this specific concern. These systems differ from traditional databases in that they don't store data before processing it, but rather process data on the fly as it arrives at the system. The system outputs the results of its computations as a stream as well, but now in a distilled, pure form that can be more easily analysed and stored. \\
+
+An important aspect of such new systems is the evaluation methodology --- how the system can be tested to detect advantages and disadvantages in its design and implementation. Of particular importance in the case of streaming systems is their performance characteristics, since they are often employed in situations where high latency and congestion are unacceptable. For this reason there is an urgent need to benchmark the systems to allow users to determine whether a particular system will be able to suit their needs and constraints. \\
+
+At ETH Zürich the Systems Group has been developing a new streaming system called Strymon\cite{strymon}, built on top of Timely Dataflow\cite{timely}. In this thesis we implement three benchmarks for Strymon that have found widespread use in the industry. Based on popularity and widespread implementation on other systems, we have chosen the Yahoo Streaming Benchmark\cite{ysb}, Intel's HiBench\cite{hibench}, and the NEXMark benchmark\cite{nexmark} as the three to implement. The implementation of these benchmarks should allow a more tangible comparison of the performance behaviour between Strymon and other systems such as Spark and Flink. \\
+
+As part of the preliminary work we also investigated a variety of other papers for streaming systems and assessed their evaluation techniques. Based on what we learned from this survey and from the analysis of the three benchmarks we implemented, we then give a list of recommendations and suggestions that we consider important to consider for the development of a future benchmark geared towards streaming systems.
 
 %%% Local Variables:
 %%% mode: latex
