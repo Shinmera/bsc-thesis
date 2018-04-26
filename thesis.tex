@@ -14,6 +14,7 @@
 \usepackage{multicol}
 \usepackage{minted}
 \usepackage{pgfplots}
+\usepackage{etoolbox}
 \usepackage{tablefootnote}
 \usepackage[margin=1cm]{caption}
 \usepackage[bottom,marginal]{footmisc}
@@ -97,35 +98,32 @@
       \nextlist},
   }}
 
-\newcommand{\latencyplot}[1]{%
+\makeatletter
+\newcommand{\latencyplot}[3]{%
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Median Latency (32 workers)},
+      title={Median Latency (#1 workers)},
       ylabel={Rate [e/s]},
       xlabel={Latency [s]},
       xmode=log, ymode=log,
       x tick label style={/pgf/number format/fixed},
       ]
       
-      #1
+      \forcsvlist{\latencyplot@item{#1}}{#2}
+      \ifthenelse{ \equal{#3}{} }{}{\legend{#3}}
     \end{axis}
   \end{tikzpicture}}
 
-\newcommand{\latencyfigure}[3][]{\begin{figure}[H]%
-    \centering
-    \latencyplot{#2}%
-    \caption{#3}%
-    \ifthenelse{ \equal{#1}{} }%
-    {}%
-    {\label{figure:#1-latency}}%
-  \end{figure}}
+\newcommand{\latencyplot@item}[2]{%
+  \addplot table[y index=0, x index=#2] {data/latency-#1.csv};%
+}
 
-\newcommand{\scalingplot}[1]{%
+\newcommand{\scalingplot}[3]{%
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Scaling (10'000'000e/s)},
+      title={Scaling (#1 e/s)},
       xlabel={Workers [n]},
       ylabel={Latency [s]},
       xmode=log,
@@ -135,40 +133,85 @@
       xtick={1, 2, 4, 8, 16, 32},
       ]
       
-      #1
+      \forcsvlist{\scalingplot@item{#1}}{#2}
+      \ifthenelse{ \equal{#3}{} }{}{\legend{#3}}
     \end{axis}
   \end{tikzpicture}}
 
-\newcommand{\scalingfigure}[3][]{\begin{figure}[H]%
-    \centering
-    \scalingplot{#2}%
-    \caption{#3}%
-    \ifthenelse{ \equal{#1}{} }%
-    {}%
-    {\label{figure:#1-scaling}}%
-  \end{figure}}
+\newcommand{\scalingplot@item}[2]{%
+  \addplot table[x index=0, y index=#2] {data/scaling-#1.csv};%
+}
 
-\newcommand{\cdfplot}[1]{%
+\newcommand{\cdfplot}[4]{%
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={CDF (10'000'000e/s)},
+      title={CDF (#1 workers, #2 e/s)},
       xlabel={Latency [s]},
       ylabel={CDF [\%]},
       xmode=log,
       ]
       
-      #1
+      \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
+      \ifthenelse{ \equal{#4}{} }{}{\legend{#4}}
     \end{axis}
   \end{tikzpicture}}
 
-\newcommand{\cdffigure}[3][]{\begin{figure}[H]%
+\newcommand{\cdfplot@item}[3]{%
+  \addplot table[skip first n=1, y index=0, x index=#3] {data/cdf-#1-#2.csv};%
+}
+
+\newcommand{\ccdfplot}[4]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={CCDF (#1 workers, #2 e/s)},
+      xlabel={Latency [s]},
+      ylabel={CCDF [\%]},
+      xmode=log, x dir=reverse
+      ]
+      
+      \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
+      \ifthenelse{ \equal{#4}{} }{}{\legend{#4}}
+    \end{axis}
+  \end{tikzpicture}}
+
+\makeatother
+
+\newcommand{\latencyfigure}[4][]{\begin{figure}[H]%
     \centering
-    \cdfplot{#2}%
-    \caption{#3}%
+    \latencyplot{#2}{#3}{#4}%
+    \caption{Loglog plot of the benchmark's rate behaviour for #2 workers.}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1-latency}}%
+  \end{figure}}
+
+\newcommand{\scalingfigure}[4][]{\begin{figure}[H]%
+    \centering
+    \scalingplot{#2}{#3}{#4}%
+    \caption{Linlog plot of the benchmark's scaling behaviour for #2 e/s.}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1-scaling}}%
+  \end{figure}}
+
+\newcommand{\cdffigure}[5][]{\begin{figure}[H]%
+    \centering
+    \cdfplot{#2}{#3}{#4}{#5}%
+    \caption{Cumulative distribution function plot of the benchmark's latency behaviour for #2 workers and #3 e/s.}%
     \ifthenelse{ \equal{#1}{} }%
     {}%
     {\label{figure:#1-cdf}}%
+  \end{figure}}
+
+\newcommand{\ccdffigure}[5][]{\begin{figure}[H]%
+    \centering
+    \ccdfplot{#2}{#3}{#4}{#5}%
+    \caption{Complementary cumulative distribution function plot of the benchmark's latency behaviour #2 workers and #3 e/s.}%
+    \ifthenelse{ \equal{#1}{} }%
+    {}%
+    {\label{figure:#1-ccdf}}%
   \end{figure}}
 
 \setcounter{secnumdepth}{4}
