@@ -15,6 +15,7 @@
 \usepackage{minted}
 \usepackage{pgfplots}
 \usepackage{etoolbox}
+\usepackage[group-separator={'}]{siunitx}
 \usepackage{tablefootnote}
 \usepackage[margin=1cm]{caption}
 \usepackage[bottom,marginal]{footmisc}
@@ -123,7 +124,7 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Scaling (#1 e/s)},
+      title={Scaling (\num{#1} e/s)},
       xlabel={Workers [n]},
       ylabel={Latency [s]},
       xmode=log,
@@ -146,7 +147,7 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={CDF (#1 workers, #2 e/s)},
+      title={CDF (#1 workers, \num{#2} e/s)},
       xlabel={Latency [s]},
       ylabel={CDF [\%]},
       xmode=log,
@@ -190,7 +191,7 @@
 \newcommand{\scalingfigure}[4][]{\begin{figure}[H]%
     \centering
     \scalingplot{#2}{#3}{#4}%
-    \caption{Linlog plot of the benchmark's scaling behaviour for #2 e/s.}%
+    \caption{Linlog plot of the benchmark's scaling behaviour for \num{#2} e/s.}%
     \ifthenelse{ \equal{#1}{} }%
     {}%
     {\label{figure:#1-scaling}}%
@@ -199,7 +200,7 @@
 \newcommand{\cdffigure}[5][]{\begin{figure}[H]%
     \centering
     \cdfplot{#2}{#3}{#4}{#5}%
-    \caption{Cumulative distribution function plot of the benchmark's latency behaviour for #2 workers and #3 e/s.}%
+    \caption{Cumulative distribution function plot of the benchmark's latency behaviour for #2 workers and \num{#3} e/s.}%
     \ifthenelse{ \equal{#1}{} }%
     {}%
     {\label{figure:#1-cdf}}%
