@@ -141,13 +141,12 @@ pub trait TestImpl : Sync+Send {
             let mut probe = Handle::new();
             input.to_stream(scope)
                 .construct_dataflow(|s| self.construct_dataflow(config, s))
-                .probe_with(&mut probe)
-                .unary_stream::<(), _, _>(Pipeline, "Output", move |input, output|{
+                .unary_stream::<(), _, _>(Pipeline, "Output", move |input, _output|{
                     while let Some((time, data)) = input.next() {
                         out.next(time.time().inner.clone(), data.deref_mut().clone());
-                        output.session(&time);
                     }
-                });
+                })
+                .probe_with(&mut probe);
             probe
         });
         // Step until we're done.
