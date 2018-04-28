@@ -1,4 +1,4 @@
-\section{HiBench: A Cross-Platforms Micro-Benchmark Suite for Big Data}
+\section{HiBench: A Cross-Platforms Micro-Benchmark Suite for Big Data}\label{section:hibench}
 HiBench\cite{hibench} is a benchmarking suite created by Intel in 2012. It proposes a set of microbenchmarks to test Big Data processing systems. It includes implementations of the tests for Spark, Flink, Storm, and Gearpump. For our purposes in testing Strymon, we will focus only on the four tests of the streaming suite:
 
 \begin{itemize}
@@ -87,7 +87,7 @@ We surmise that the exceedingly poor performance of the Identity query is down t
 \subsection{Remarks}\label{section:hibench-remarks}
 Surprisingly enough, HiBench gave us a lot of trouble to implement. Not because the queries were complex, but simply because of the lack of proper documentation and maintenance. Beyond the very superficial descriptions of the queries on their homepage, there is nothing about how the workloads are generated, how the queries perform in detail, or what the though process behind the design was. The code base itself is not easy to decipher either, as the information about data generation is distributed over a swath of files, none of which are commented or explained anywhere. \\
 
-If this didn't already make things bad enough, the benchmark itself does not run on current setups. It requires versions of Hadoop and Kafka that are no longer supported, and does not work under Java 9. We could not get their data generator to work on several systems. We are unsure whether this was due to a misconfiguration somewhere or due to the software being bitrotten, but the \href{https://github.com/intel-hadoop/HiBench/issues/535}{authors did not respond to inquiries}, and their documentation for the setup of the benchmark is feeble at best. \\
+If this didn't already make things bad enough, the benchmark itself does not run on current setups. It requires versions of Hadoop and Kafka that are no longer supported, and does not work under Java 9. We could not get their data generator to work on several systems. We are unsure whether this was due to a misconfiguration somewhere or due to the software being outdated. \\
 
 While we do see some worth in having a very minimal benchmark that focuses on testing the performance of individual operators, we are not convinced that such information could be used to infer meaningful data about a streaming system as a whole, and especially not about its expressiveness and capability to handle larger dataflows. \\
 

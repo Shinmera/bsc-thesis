@@ -1,4 +1,4 @@
-\section{Benchmark Framework}
+\section{Strymon Benchmark Framework}
 In order to factor out common operations and to be able to cleanly define the data flows of each test in the benchmarks we developed a new framework. This framework takes care of processing command line arguments, Timely setup, and statistical data collection. All that's necessary in order to implement a benchmark is the implementation of the \code{Benchmark} trait for the overall benchmark, the implementation of the \code{TestImpl} trait for each test in the benchmark, and the implementation of necessary data conversion routines.
 
 \subsection{Benchmarks and Tests}
@@ -212,6 +212,8 @@ stream.filter_map(|x| Car::from(x))
 \label{lst:filtermap-example}
 \end{listing}
 
+\noindent This operator was used in \hyperref[section:nexmark]{NEXMark}.
+
 \subsubsection{Join}
 This operator offers two forms of joins that merge two separate streams of data into one. The first is an epoch based join, meaning data is only matched up between the two streams within a single epoch. If no match is found for either stream, the data is discarded.
 
@@ -222,6 +224,9 @@ fn epoch_join(&self, stream, key_1, key_2, joiner) -> Stream{
     let mut epoch2 = HashMap::new();
     
     self.binary_notify(move |input1, input2, output, notificator| {
+        // Gather all the records from the left side, group them into
+        // vectors keyed according to the first key function, and
+        // remember that vector for the current epoch.
         input1.for_each(|time, data|{
             let epoch = epoch1.entry(time).or_insert_with(HashMap::new);
             data.for_each(|dat|{
@@ -231,7 +236,8 @@ fn epoch_join(&self, stream, key_1, key_2, joiner) -> Stream{
             });
             notificator.notify_at(time);
         });
-        
+        // Perform the same but for the right side, using the second
+        // key function.
         input2.for_each(|time, data|{
             let epoch = epoch2.entry(time).or_insert_with(HashMap::new);
             data.for_each(|dat|{
@@ -241,10 +247,12 @@ fn epoch_join(&self, stream, key_1, key_2, joiner) -> Stream{
             });
             notificator.notify_at(time);
         });
-        
+        // Once we notice an epoch completion we can join the two sides.
         notificator.for_each(|time, _, _|{
             if let Some(k1) = epoch1.remove(time) {
                 if let Some(mut k2) = epoch2.remove(time) {
+                    // With data from both sides available, we now do an
+                    // inner join, duplicating data from the left side.
                     let mut out = output.session(time);
                     for (key, data1) in k1{
                         if let Some(mut data2) = k2.remove(&key) {
@@ -315,7 +323,7 @@ fn left_join(&self, stream, key_1, key_2, joiner) -> Stream{
   \label{lst:left-join}
 \end{listing}
 
-Left joins are useful when events on one side might only be emitted once, but events on the right hand side are recurring, meaning we need to retain the left side indefinitely.
+Left joins are useful when events on one side might only be emitted once, but events on the right hand side are recurring, meaning we need to retain the left side indefinitely. Such joins can also be implemented as co-FlatMaps using a static second input.
 
 \begin{listing}[H]
 \begin{minted}{rust}
@@ -327,6 +335,8 @@ driver_registrations.left_join(speeding_cars,
 \caption{An example of the left join operator, joining driver's registrations to cars that have been caught speeding.}
 \label{lst:left-join-example}
 \end{listing}
+
+\noindent These operators were used in \hyperref[section:nexmark]{NEXMark}.
 
 \subsubsection{Reduce}
 Reducing data in some form is a very frequent operation in dataflows. This operator offers multiple variants of reduction for ease-of-use. A generic \code{reduce} that requires a key extractor, an initial value, a reductor, and a completor. The key extractor decides the grouping of the data, and the reductor is responsible for computing the intermediate reduction result for every record that arrives. Once an epoch is complete, the completor is invoked in order to compute the final output data from the intermediate reduction, the count of records, and the key for this batch of records. The variants \code{reduce_by}, \code{average_by}, \code{maximize_by}, and \code{minimize_by} build on top of this to provide more convenient access to reduction.
@@ -408,6 +418,8 @@ records.reduce_to(0, |_, c| c+1)
 \label{lst:reduce-to-example}
 \end{listing}
 
+\noindent These operators were used in \hyperref[section:ysb]{YSB}, \hyperref[section:hibench]{HiBench}, and \hyperref[section:nexmark]{NEXMark}.
+
 \subsubsection{RollingCount}
 The \code{rolling_count} operator is similar to a reductor, but has a few distinct differences. First, it emits an output record for every input record it sees, rather than only once per epoch. Second, it keeps the count across epochs, rather than resetting for each epoch. Finally, it can only count records, rather than performing arbitrary reduction operations.
 
@@ -441,6 +453,8 @@ words.rolling_count(|word| word.clone(), |word, count| (word, count))
 \caption{A basic word count example using the rolling-count operator.}
 \label{lst:rolling-count-example}
 \end{listing}
+
+\noindent This operator was used in \hyperref[section:hibench]{HiBench}.
 
 \subsubsection{Window}
 The window operator batches records together into windows. Windows can be sliding or hopping, and can be of arbitrary size, although they are limited in their granularity by epochs. This means that the epochs need to be correlated to a unit that the user would like to window by. When the window is full and the frontier reaches a slide, the window operator sends out a copy of all records within the window.
@@ -539,6 +553,8 @@ frames.tumbling_window(60)
 \label{lst:tumbling-window-example}
 \end{listing}
 
+\noindent These operators were used in \hyperref[section:ysb]{YSB}, \hyperref[section:hibench]{HiBench}, and \hyperref[section:nexmark]{NEXMark}.
+
 \subsubsection{Session}
 The session operator is similar to a window: it batches records, but instead of using a regular interval, a session is only completed after a certain timeout has been reached. As an example, a session with a timeout of 10 seconds would only be complete if there were no records for 10 seconds on the stream. Before this timeout is reached, all incoming records are gathered into the current session.
 
@@ -606,6 +622,8 @@ tweets.session(3600, |tweet| (tweet.author, tweet.time / 1000))
 \label{lst:session-example}
 \end{listing}
 
+\noindent This operator was used in \hyperref[section:nexmark]{NEXMark}.
+
 \subsubsection{Partition}
 The partitioning operator transforms the data stream into windows of a fixed number of records, each keyed by a property.
 
@@ -644,6 +662,8 @@ frames.partition(30, |frame| frame.animation)
 \caption{This creates 30 frame (one second) animation batches from a stream of frames.}
 \label{lst:partition-example}
 \end{listing}
+
+\noindent This operator was used in \hyperref[section:nexmark]{NEXMark}.
 
 %%% Local Variables:
 %%% mode: latex

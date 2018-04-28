@@ -1,6 +1,8 @@
 %% FIXME: Note what state is retained for each stateful operator
 \section{Related Work}
-In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. The operators are coloured in orange if they are stateful. \\
+In this section we analyse and compare a number of papers about stream processors. In particular, we look at the ways in which they evaluate and test their systems in order to get an idea of how benchmarking has so far commonly been done. Each subsection looks at one paper at a time, providing a graph of the data flows and operators used to evaluate the system, if such information was available. \\
+
+Operators in the data flow graphs are coloured in orange if they retain state over multiple records. \\
 
 The papers were selected based on the number of citations, as well as on their direct relevance to current trends in the development and research for Big Data and streaming systems. \\
 
@@ -100,7 +102,7 @@ This paper\cite{bigdatabench} proposes a suite of benchmarks and tests to evalua
 The paper does not propose any particular implementation strategies. They provide performance evaluation for an implementation of different parts of the benchmark suite on the Hadoop, MPI, Hbase, Hive, and MySQL systems, but no particular details of the implementation are discussed.
 
 \subsection{Comparison}
-In \autoref{table:test-properties} and \autoref{table:test-setups} we compare the most important features of the tests performed in the various papers. Unfortunately, most of the papers do not supply or use publicly available data, making it difficult to compare them, even if the data flows were replicated.
+In \autoref{table:test-properties} and \autoref{table:test-setups} we compare the most important features of the tests performed in the various papers. We also include the three benchmarks we discuss in detail in the following sections. Unfortunately, most of the papers do not supply or use publicly available data, making it difficult to compare them, even if the data flows were replicated.
 
 \begin{table}[H]
   \centering
