@@ -1,4 +1,4 @@
-\section{Strymon Benchmark Framework}
+\section{Strymon Benchmark Framework}\label{section:framework}
 In order to factor out common operations and to be able to cleanly define the data flows of each test in the benchmarks we developed a new framework. This framework takes care of processing command line arguments, Timely setup, and statistical data collection. All that's necessary in order to implement a benchmark is the implementation of the \code{Benchmark} trait for the overall benchmark, the implementation of the \code{TestImpl} trait for each test in the benchmark, and the implementation of necessary data conversion routines.
 
 \subsection{Benchmarks and Tests}

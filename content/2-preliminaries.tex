@@ -13,7 +13,59 @@ Timely tracks progress of the dataflow computation through ``epochs'' --- rounds
 
 The permission of cycles in the dataflow graph is achieved through ``scopes''. Any cycle must be encapsulated by such a scope. Each scope extends the timestamp by another dimension that tracks the progress within that scope. When the scope receives notification that an epoch has closed, it then continues processing until all inner epochs have been closed as well, at which point it can advance the frontier itself and propagate the information to the operators after the scope as well. \\
 
-While the physical exchange of data is handled by Timely itself, data is only exchanged if specified to be by the operators. This allows the implementer of an operator to decide whether it makes sense to re-distribute the processing of the data. For instance, a keyed reduction would profit from having the data set partitioned over the workers according to the keys. A simple map on the other hand would not profit from having its data bucketed over the workers first.
+While the physical exchange of data is handled by Timely itself, data is only exchanged if specified to be by the operators. This allows the implementer of an operator to decide whether it makes sense to re-distribute the processing of the data. For instance, a keyed reduction would profit from having the data set partitioned over the workers according to the keys. A simple map on the other hand would not profit from having its data bucketed over the workers first. \\
+
+Finally, an operator in the data flow may only send data onwards in the data flow by use of a ``capability''. Each capability is associated with a specific epoch on which it allows sending data. By use of the capabilities, Timely can automatically verify whether an operator has finished work on an epoch, and thus whether the epoch may be closed and the frontier advanced. This makes it very important for an operator to make sure that it does not retain capabilities for longer than necessary, as doing so would end up blocking the progress tracking, and ultimately stall the entire computation.
+
+\subsection{Traits in Rust}
+Rust's primary method of extensible constructs is called ``traits''. Each trait encompasses a number of function signatures that must be implemented in order for a type to implement the trait. A brief example of a trait definition is shown in \autoref{lst:trait-example}. \\
+
+\begin{listing}[H]
+\begin{minted}{rust}
+trait Clock {
+    fn hour(&self) -> uint8;
+    fn minute(&self) -> uint8;
+    fn set(&mut self, hour: uint8, minute: uint8);
+}
+\end{minted}
+\caption{An example trait definition for an interface to clock-like things.}
+\label{lst:trait-example}
+\end{listing}
+
+If we know a type that implements the trait, we can then simply call the trait's functions on an instance of the type. An example of this call behaviour is shown in \autoref{lst:trait-call}.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+let watch = Watch::new();
+println!("It is now {}:{:02}.", watch.hour(), watch.minute());
+\end{minted}
+\caption{Using the \code{Clock} trait's functions to get the time of a \code{Watch} instance.}
+\label{lst:trait-call}
+\end{listing}
+
+It is important to note that as long as either the trait or the type that implements the trait are defined locally, an implementation for the trait may be written. In simpler terms this means we can add traits to existing types defined elsewhere, provided we define the trait ourselves. Thus, to complete our example, we can define the behaviour for the watch ourselves in \autoref{lst:trait-impl}.
+
+\begin{listing}[H]
+\begin{minted}{rust}
+impl Clock for Watch {
+    fn hour(&self) -> uint8 {
+        self.counter / 60 % 24
+    }
+  
+    fn minute(&self) -> uint8 {
+        self.counter % 60
+    }
+  
+    fn set(&mut self, hour: uint8, minute: uint8) {
+        self.counter = hour * 60 + minute;
+    }
+}
+\end{minted}
+\caption{With the \code{Watch}'s \code{counter} field we can implement the \code{Clock} functions.}
+\label{lst:trait-impl}
+\end{listing}
+
+Traits are the primary mechanism by which new operators are added to Timely: first, a new trait describing the operator's functions is defined, and then an implementation of the trait for Timely's \code{Stream} type is written. From there on, anything that imports the trait may use its functions to build the data flow. We also make heavy use of traits in our \hyperref[section:framework]{benchmark framework} to abstract common functionality.
 
 %%% Local Variables:
 %%% mode: latex
