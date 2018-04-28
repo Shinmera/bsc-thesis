@@ -58,7 +58,7 @@
 (defun run (&key sync)
   (when sync (sync))
   ;; (median-latency :workers 8)
-  ;; (median-latency :workers 16)
+  (median-latency :workers 16)
   (median-latency)
   (scaling)
   (cdf))
