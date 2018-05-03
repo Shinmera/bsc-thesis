@@ -25,30 +25,11 @@ type Id = usize;
 type Date = usize;
 
 const MIN_STRING_LENGTH: usize = 3;
-const NUM_CATEGORIES: usize = 5;
-const AUCTION_ID_LEAD: usize = 10;
-const HOT_SELLER_RATIO: usize = 100;
-const HOT_AUCTION_RATIO: usize = 100;
-const HOT_BIDDER_RATIO: usize = 100;
-// WARNING: You might think that you can just change these three proportion values
-//          linearly as you please as long as their relation does not change without
-//          the results changing, but this is /not/ the case. For instance, changing
-//          these values to 2, 6, 92 to make it a denominator of 100 actually changes
-//          the results even though the proportions are the same relatively.
-const PERSON_PROPORTION: usize = 1;
-const AUCTION_PROPORTION: usize = 3;
-const BID_PROPORTION: usize = 46;
-const PROPORTION_DENOMINATOR: usize = PERSON_PROPORTION + AUCTION_PROPORTION + BID_PROPORTION;
-const FIRST_AUCTION_ID: usize = 1000;
-const FIRST_PERSON_ID: usize = 1000;
-const FIRST_CATEGORY_ID: usize = 10;
-const PERSON_ID_LEAD: usize = 10;
-const SINE_APPROX_STEPS: usize = 10;
-const BASE_TIME: usize = 1436918400_000; // 2015-07-15T00:00:00.000Z
-const US_STATES: [&str; 6] = ["AZ","CA","ID","OR","WA","WY"];
-const US_CITIES: [&str; 10] = ["Phoenix", "Los Angeles", "San Francisco", "Boise", "Portland", "Bend", "Redmond", "Seattle", "Kent", "Cheyenne"];
-const FIRST_NAMES: [&str; 11] = ["Peter", "Paul", "Luke", "John", "Saul", "Vicky", "Kate", "Julie", "Sarah", "Deiter", "Walter"];
-const LAST_NAMES: [&str; 9] = ["Shultz", "Abrams", "Spencer", "White", "Bartels", "Walton", "Smith", "Jones", "Noris"];
+const BASE_TIME: usize = 1436918400_000;
+
+fn split_string_arg(string: String) -> Vec<String> {
+    string.split(",").map(String::from).collect::<Vec<String>>()
+}
 
 trait NEXMarkRng {
     fn gen_string(&mut self, usize) -> String;
@@ -90,17 +71,64 @@ struct NEXMarkConfig {
     events_per_epoch: usize,
     epoch_period: f32,
     inter_event_delays: Vec<f32>,
+    // Originally constants
+    num_categories: usize,
+    auction_id_lead: usize,
+    hot_seller_ratio_2: usize,
+    hot_auction_ratio_2: usize,
+    hot_bidder_ratio_2: usize,
+    person_proportion: usize,
+    auction_proportion: usize,
+    bid_proportion: usize,
+    proportion_denominator: usize,
+    first_auction_id: usize,
+    first_person_id: usize,
+    first_category_id: usize,
+    person_id_lead: usize,
+    sine_approx_steps: usize,
+    us_states: Vec<String>,
+    us_cities: Vec<String>,
+    first_names: Vec<String>,
+    last_names: Vec<String>,
 }
 
 impl NEXMarkConfig {
     fn new(config: &Config) -> Self{
+        let active_people = config.get_as_or("active-people", 1000);
+        let in_flight_auctions = config.get_as_or("in-flight-auctions", 100);
+        let out_of_order_group_size = config.get_as_or("out-of-order-group-size", 1);
+        let hot_seller_ratio = config.get_as_or("hot-seller-ratio", 4);
+        let hot_auction_ratio = config.get_as_or("hot-auction-ratio", 2);
+        let hot_bidder_ratio = config.get_as_or("hot-bidder-ratio", 4);
+        let first_event_id = config.get_as_or("first-event-id", 0);
+        let first_event_number = config.get_as_or("first-event-number", 0);
+        let num_categories = config.get_as_or("num-categories", 5);
+        let auction_id_lead = config.get_as_or("auction-id-lead", 10);
+        let hot_seller_ratio_2 = config.get_as_or("hot-seller-ratio-2", 100);
+        let hot_auction_ratio_2 = config.get_as_or("hot-auction-ratio-2", 100);
+        let hot_bidder_ratio_2 = config.get_as_or("hot-bidder-ratio-2", 100);
+        let person_proportion = config.get_as_or("person-proportion", 1);
+        let auction_proportion = config.get_as_or("auction-proportion", 3);
+        let bid_proportion = config.get_as_or("bid-proportion", 46);
+        let proportion_denominator = person_proportion+auction_proportion+bid_proportion;
+        let first_auction_id = config.get_as_or("first-auction-id", 1000);
+        let first_person_id = config.get_as_or("first-person-id", 1000);
+        let first_category_id = config.get_as_or("first-category-id", 10);
+        let person_id_lead = config.get_as_or("person-id-lead", 10);
+        let sine_approx_steps = config.get_as_or("sine-approx-steps", 10);
+        let base_time = config.get_as_or("base-time", BASE_TIME);
+        let us_states = split_string_arg(config.get_or("us-states", "az,ca,id,or,wa,wy"));
+        let us_cities = split_string_arg(config.get_or("us-cities", "phoenix,los angeles,san francisco,boise,portland,bend,redmond,seattle,kent,cheyenne"));
+        let first_names = split_string_arg(config.get_or("first-names", "peter,paul,luke,john,saul,vicky,kate,julie,sarah,deiter,walter"));
+        let last_names = split_string_arg(config.get_or("last-names", "shultz,abrams,spencer,white,bartels,walton,smith,jones,noris"));
         let rate_shape = if config.get_or("rate-shape", "sine") == "sine"{ RateShape::Sine }else{ RateShape::Square };
-        // Calculate inter event delays array.
-        let mut inter_event_delays = Vec::new();
+        let rate_period = config.get_as_or("rate-period", 600);
         let first_rate = config.get_as_or("first-event-rate", config.get_as_or("events-per-second", 10_000));
         let next_rate = config.get_as_or("next-event-rate", first_rate);
         let us_per_unit = config.get_as_or("us-per-unit", 1_000_000); // Rate is in μs
         let generators = config.get_as_or("threads", 1) as f32;
+        // Calculate inter event delays array.
+        let mut inter_event_delays = Vec::new();
         let rate_to_period = |r| (us_per_unit) as f32 / r as f32;
         if first_rate == next_rate {
             inter_event_delays.push(rate_to_period(first_rate) * generators);
@@ -113,8 +141,8 @@ impl NEXMarkConfig {
                 RateShape::Sine => {
                     let mid = (first_rate + next_rate) as f64 / 2.0;
                     let amp = (first_rate - next_rate) as f64 / 2.0;
-                    for i in 0..SINE_APPROX_STEPS {
-                        let r = (2.0 * PI * i as f64) / SINE_APPROX_STEPS as f64;
+                    for i in 0..sine_approx_steps {
+                        let r = (2.0 * PI * i as f64) / sine_approx_steps as f64;
                         let rate = mid + amp * r.cos();
                         inter_event_delays.push(rate_to_period(rate.round() as usize) * generators);
                     }
@@ -122,8 +150,8 @@ impl NEXMarkConfig {
             }
         }
         // Calculate events per epoch and epoch period.
-        let n = if rate_shape == RateShape::Square { 2 } else { SINE_APPROX_STEPS };
-        let step_length = (config.get_as_or("rate-period", 600) + n - 1) / n;
+        let n = if rate_shape == RateShape::Square { 2 } else { sine_approx_steps };
+        let step_length = (rate_period + n - 1) / n;
         let mut events_per_epoch = 0;
         let mut epoch_period = 0.0;
         if inter_event_delays.len() > 1 {
@@ -134,19 +162,38 @@ impl NEXMarkConfig {
             }
         }
         NEXMarkConfig {
-            active_people: config.get_as_or("active-people", 1000),
-            in_flight_auctions: config.get_as_or("in-flight-auctions", 100),
-            out_of_order_group_size: config.get_as_or("out-of-order-group-size", 1),
-            hot_seller_ratio: config.get_as_or("hot-seller-ratio", 4),
-            hot_auction_ratio: config.get_as_or("hot-auction-ratio", 2),
-            hot_bidder_ratio: config.get_as_or("hot-bidder-ratio", 4),
-            first_event_id: config.get_as_or("first-event-id", 0),
-            first_event_number: config.get_as_or("first-event-number", 0),
-            base_time: config.get_as_or("base-time", BASE_TIME),
+            active_people: active_people,
+            in_flight_auctions: in_flight_auctions,
+            out_of_order_group_size: out_of_order_group_size,
+            hot_seller_ratio: hot_seller_ratio,
+            hot_auction_ratio: hot_auction_ratio,
+            hot_bidder_ratio: hot_bidder_ratio,
+            first_event_id: first_event_id,
+            first_event_number: first_event_number,
+            base_time: base_time,
             step_length: step_length,
             events_per_epoch: events_per_epoch,
             epoch_period: epoch_period,
             inter_event_delays: inter_event_delays,
+            // Originally constants
+            num_categories: num_categories,
+            auction_id_lead: auction_id_lead,
+            hot_seller_ratio_2: hot_seller_ratio_2,
+            hot_auction_ratio_2: hot_auction_ratio_2,
+            hot_bidder_ratio_2: hot_bidder_ratio_2,
+            person_proportion: person_proportion,
+            auction_proportion: auction_proportion,
+            bid_proportion: bid_proportion,
+            proportion_denominator: proportion_denominator,
+            first_auction_id: first_auction_id,
+            first_person_id: first_person_id,
+            first_category_id: first_category_id,
+            person_id_lead: person_id_lead,
+            sine_approx_steps: sine_approx_steps,
+            us_states: us_states,
+            us_cities: us_cities,
+            first_names: first_names,
+            last_names: last_names,
         }
     }
 
@@ -193,14 +240,14 @@ enum Event {
 
 impl Event {
     fn new(events_so_far: usize, nex: &mut NEXMarkConfig) -> Self {
-        let rem = nex.next_adjusted_event(events_so_far) % PROPORTION_DENOMINATOR;
+        let rem = nex.next_adjusted_event(events_so_far) % nex.proportion_denominator;
         let timestamp = nex.event_timestamp(nex.next_adjusted_event(events_so_far));
         let id = nex.first_event_id + nex.next_adjusted_event(events_so_far);
         let mut rng = StdRng::from_seed(&[id]);
 
-        if rem < PERSON_PROPORTION {
-            Event::Person(Person::new(id, timestamp, &mut rng))
-        } else if rem < PERSON_PROPORTION + AUCTION_PROPORTION {
+        if rem < nex.person_proportion {
+            Event::Person(Person::new(id, timestamp, &mut rng, nex))
+        } else if rem < nex.person_proportion + nex.auction_proportion {
             Event::Auction(Auction::new(events_so_far, id, timestamp, &mut rng, nex))
         } else {
             Event::Bid(Bid::new(id, timestamp, &mut rng, nex))
@@ -241,29 +288,31 @@ impl Person {
         }
     }
     
-    fn new(id: usize, time: Date, rng: &mut StdRng) -> Self {
+    fn new(id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         Person {
-            id: Self::last_id(id) + FIRST_PERSON_ID,
-            name: format!("{} {}", *rng.choose(&FIRST_NAMES).unwrap(), *rng.choose(&LAST_NAMES).unwrap()),
+            id: Self::last_id(id, nex) + nex.first_person_id,
+            name: format!("{} {}",
+                          *rng.choose(&nex.first_names).unwrap(),
+                          *rng.choose(&nex.last_names).unwrap()),
             email_address: format!("{}@{}.com", rng.gen_string(7), rng.gen_string(5)),
             credit_card: (0..4).map(|_| format!("{:04}", rng.gen_range(0, 10000))).collect::<Vec<String>>().join(" "),
-            city: String::from(*rng.choose(&US_CITIES).unwrap()),
-            state: String::from(*rng.choose(&US_STATES).unwrap()),
+            city: rng.choose(&nex.us_cities).unwrap().clone(),
+            state: rng.choose(&nex.us_states).unwrap().clone(),
             date_time: time,
         }
     }
 
     fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMarkConfig) -> Id {
-        let people = Self::last_id(id) + 1;
+        let people = Self::last_id(id, nex) + 1;
         let active = min(people, nex.active_people);
-        people - active + rng.gen_range(0, active + PERSON_ID_LEAD)
+        people - active + rng.gen_range(0, active + nex.person_id_lead)
     }
 
-    fn last_id(id: usize) -> Id {
-        let epoch = id / PROPORTION_DENOMINATOR;
-        let mut offset = id % PROPORTION_DENOMINATOR;
-        if PERSON_PROPORTION <= offset { offset = PERSON_PROPORTION - 1; }
-        epoch * PERSON_PROPORTION + offset
+    fn last_id(id: usize, nex: &NEXMarkConfig) -> Id {
+        let epoch = id / nex.proportion_denominator;
+        let mut offset = id % nex.proportion_denominator;
+        if nex.person_proportion <= offset { offset = nex.person_proportion - 1; }
+        epoch * nex.person_proportion + offset
     }
 }
 
@@ -292,46 +341,46 @@ impl Auction {
     fn new(events_so_far: usize, id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         let initial_bid = rng.gen_price();
         let seller = if rng.gen_range(0, nex.hot_seller_ratio) > 0 {
-            (Person::last_id(id) / HOT_SELLER_RATIO) * HOT_SELLER_RATIO
+            (Person::last_id(id, nex) / nex.hot_seller_ratio_2) * nex.hot_seller_ratio_2
         } else {
             Person::next_id(id, rng, nex)
         };
         Auction {
-            id: Self::last_id(id) + FIRST_AUCTION_ID,
+            id: Self::last_id(id, nex) + nex.first_auction_id,
             item_name: rng.gen_string(20),
             description: rng.gen_string(100),
             initial_bid: initial_bid,
             reserve: initial_bid + rng.gen_price(),
             date_time: time,
             expires: time + Self::next_length(events_so_far, rng, time, nex),
-            seller: seller + FIRST_PERSON_ID,
-            category: FIRST_CATEGORY_ID + rng.gen_range(0, NUM_CATEGORIES),
+            seller: seller + nex.first_person_id,
+            category: nex.first_category_id + rng.gen_range(0, nex.num_categories),
         }
     }
 
     fn next_id(id: usize, rng: &mut StdRng, nex: &NEXMarkConfig) -> Id {
-        let max_auction = Self::last_id(id);
+        let max_auction = Self::last_id(id, nex);
         let min_auction = if max_auction < nex.in_flight_auctions { 0 } else { max_auction - nex.in_flight_auctions };
-        min_auction + rng.gen_range(0, max_auction - min_auction + 1 + AUCTION_ID_LEAD)
+        min_auction + rng.gen_range(0, max_auction - min_auction + 1 + nex.auction_id_lead)
     }
 
-    fn last_id(id: usize) -> Id {
-        let mut epoch = id / PROPORTION_DENOMINATOR;
-        let mut offset = id % PROPORTION_DENOMINATOR;
-        if offset < PERSON_PROPORTION {
+    fn last_id(id: usize, nex: &NEXMarkConfig) -> Id {
+        let mut epoch = id / nex.proportion_denominator;
+        let mut offset = id % nex.proportion_denominator;
+        if offset < nex.person_proportion {
             epoch -= 1;
-            offset = AUCTION_PROPORTION - 1;
-        } else if PERSON_PROPORTION + AUCTION_PROPORTION <= offset {
-            offset = AUCTION_PROPORTION - 1;
+            offset = nex.auction_proportion - 1;
+        } else if nex.person_proportion + nex.auction_proportion <= offset {
+            offset = nex.auction_proportion - 1;
         } else {
-            offset -= PERSON_PROPORTION;
+            offset -= nex.person_proportion;
         }
-        epoch * AUCTION_PROPORTION + offset
+        epoch * nex.auction_proportion + offset
     }
 
     fn next_length(events_so_far: usize, rng: &mut StdRng, time: Date, nex: &NEXMarkConfig) -> Date {
         let current_event = nex.next_adjusted_event(events_so_far);
-        let events_for_auctions = (nex.in_flight_auctions * PROPORTION_DENOMINATOR) / AUCTION_PROPORTION;
+        let events_for_auctions = (nex.in_flight_auctions * nex.proportion_denominator) / nex.auction_proportion;
         let future_auction = nex.event_timestamp(current_event+events_for_auctions);
         
         let horizon = future_auction - time;
@@ -358,18 +407,18 @@ impl Bid {
     
     fn new(id: usize, time: Date, rng: &mut StdRng, nex: &NEXMarkConfig) -> Self {
         let auction = if 0 < rng.gen_range(0, nex.hot_auction_ratio){
-            (Auction::last_id(id) / HOT_AUCTION_RATIO) * HOT_AUCTION_RATIO
+            (Auction::last_id(id, nex) / nex.hot_auction_ratio_2) * nex.hot_auction_ratio_2
         } else {
             Auction::next_id(id, rng, nex)
         };
         let bidder = if 0 < rng.gen_range(0, nex.hot_bidder_ratio) {
-            (Person::last_id(id) / HOT_BIDDER_RATIO) * HOT_BIDDER_RATIO + 1
+            (Person::last_id(id, nex) / nex.hot_bidder_ratio_2) * nex.hot_bidder_ratio_2 + 1
         } else {
             Person::next_id(id, rng, nex)
         };
         Bid {
-            auction: auction + FIRST_AUCTION_ID,
-            bidder: bidder + FIRST_PERSON_ID,
+            auction: auction + nex.first_auction_id,
+            bidder: bidder + nex.first_person_id,
             price: rng.gen_price(),
             date_time: time,
         }
@@ -529,8 +578,8 @@ impl TestImpl for Query4 {
             Drain::from_config(config)?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        hot_bids(stream)
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        hot_bids(stream, config.get_as_or("base-time", BASE_TIME))
             .average_by(|&(ref a, _)| a.category, |(_, p)| p)
     }
 }
@@ -592,8 +641,8 @@ impl TestImpl for Query6 {
             Drain::from_config(config)?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        hot_bids(stream)
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        hot_bids(stream, config.get_as_or("base-time", BASE_TIME))
             .partition(10, |&(ref a, _)| a.seller)
             .map(|p| (p[0].1, p.iter().map(|p| p.1 as f32).sum::<f32>() / p.len() as f32))
     }
@@ -694,7 +743,7 @@ impl Query9 {
     }
 }
 
-fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) -> Stream<Child<'scope, Root<Generic>, Date>, (Auction, usize)> {
+fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>, base_time: usize) -> Stream<Child<'scope, Root<Generic>, Date>, (Auction, usize)> {
     // FIXME: If bids arrive after the expiry of their auction
     //        they will be retained forever. I'm actually not
     //        sure how to remedy this beyond keeping /some/ data
@@ -710,7 +759,7 @@ fn hot_bids<'scope>(stream: &Stream<Child<'scope, Root<Generic>, Date>, Event>) 
     auctions.binary_notify(&bids, auction_ex, bid_ex, "HotBids", Vec::new(), move |input1, input2, output, notificator|{
         input1.for_each(|time, data|{
             data.drain(..).for_each(|a|{
-                let future = RootTimestamp::new(a.expires - BASE_TIME);
+                let future = RootTimestamp::new(a.expires - base_time);
                 let auctions = auction_map.entry(future).or_insert_with(Vec::new);
                 auctions.push(a);
                 notificator.notify_at(time.delayed(&future));
@@ -751,8 +800,8 @@ impl TestImpl for Query9 {
             Drain::from_config(config)?))
     }
 
-    fn construct_dataflow<'scope>(&self, _c: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
-        hot_bids(stream)
+    fn construct_dataflow<'scope>(&self, config: &Config, stream: &Stream<Child<'scope, Root<Generic>, Self::T>, Self::D>) -> Stream<Child<'scope, Root<Generic>, Self::T>, Self::DO> {
+        hot_bids(stream, config.get_as_or("base-time", BASE_TIME))
     }
 }
 
