@@ -171,30 +171,64 @@ The following options are available:
   --rate-shape SHAPE       (NEX) In what shape to generate delays between events. Can be one of:
                              SINE/SQUARE
                              Default: SINE
-  --next-event-rate NUM    (NEX)
-                             Default: events-per-second
-  --us-per-unit NUM        (NEX)
-                             Default: 1000000
-  --rate-period NUM        (NEX)
+  --rate-period            (NEX) 
                              Default: 600
-  --active-people NUM      (NEX)
+  --next-event-rate        (NEX) 
+                             Default: events-per-second
+  --active-people          (NEX) 
                              Default: 1000
-  --in-flight-auctions NUM (NEX)
+  --in-flight-auctions     (NEX) 
                              Default: 100
-  --out-of-order-group-size NUM (NEX)
+  --out-of-order-group-size  (NEX) 
                              Default: 1
-  --hot-seller-ratio NUM   (NEX)
+  --hot-seller-ratio       (NEX) 
                              Default: 4
-  --hot-auction-ratio NUM  (NEX)
+  --hot-auction-ratio      (NEX) 
                              Default: 2
-  --hot-bidder-ratio NUM   (NEX)
-                             Default: 2
-  --first-event-id NUM     (NEX)
+  --hot-bidder-ratio       (NEX) 
+                             Default: 4
+  --first-event-id         (NEX) 
                              Default: 0
-  --first-event-number NUM (NEX)
+  --first-event-number     (NEX) 
                              Default: 0
-  --base-time NUM          (NEX)
+  --num-categories         (NEX) 
+                             Default: 5
+  --auction-id-lead        (NEX) 
+                             Default: 10
+  --hot-seller-ratio-2     (NEX) 
+                             Default: 100
+  --hot-auction-ratio-2    (NEX) 
+                             Default: 100
+  --hot-bidder-ratio-2     (NEX) 
+                             Default: 100
+  --person-proportion      (NEX) 
+                             Default: 1
+  --auction-proportion     (NEX) 
+                             Default: 3
+  --bid-proportion         (NEX) 
+                             Default: 46
+  --first-auction-id       (NEX) 
+                             Default: 1000
+  --first-person-id        (NEX) 
+                             Default: 1000
+  --first-category-id      (NEX) 
+                             Default: 10
+  --person-id-lead         (NEX) 
+                             Default: 10
+  --sine-approx-steps      (NEX) 
+                             Default: 10
+  --base-time              (NEX) 
                              Default: 1436918400000 (2015-07-15T00:00:00.000Z)
+  --us-states              (NEX) 
+                             Default: az,ca,id,or,wa,wy
+  --us-cities              (NEX) 
+                             Default: phoenix,los angeles,san francisco,boise,portland,bend,redmond,seattle,kent,cheyenne
+  --first-names            (NEX) 
+                             Default: peter,paul,luke,john,saul,vicky,kate,julie,sarah,deiter,walter
+  --last-names             (NEX) 
+                             Default: shultz,abrams,spencer,white,bartels,walton,smith,jones,noris
+  --us-per-unit            (NEX) 
+                             Default: 1000000
 
 The following benchmarks and tests are available:");
         for benchmark in benchmarks {
