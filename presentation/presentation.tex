@@ -1,0 +1,264 @@
+\documentclass[14pt,t]{beamer}
+\usepackage{fontspec}
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{minted}
+\usepackage{pgfplots}
+\usepackage{etoolbox}
+\usepackage[group-separator={'}]{siunitx}
+
+%% These fonts are non-free.
+%% Comment out the lines if you don't have them.
+\setmainfont{Equity Text A}
+\setsansfont{Concourse T3}
+\setmonofont{Triplicate T4}
+
+\definecolor{bgcolor}{RGB}{20,25,28}
+\definecolor{codecolor}{RGB}{249,38,114}
+\hypersetup{colorlinks,linkcolor=,urlcolor=codecolor}
+\setbeamercolor{background canvas}{bg=bgcolor}
+\setbeamercolor{normal text}{fg=white}
+\setbeamercolor{itemize item}{fg=lightgray}
+\setbeamercolor{itemize subitem}{fg=lightgray}
+\setbeamercolor{itemize subsubitem}{fg=lightgray}
+\setbeamercolor{enumerate item}{fg=lightgray}
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{navigation symbols}{}
+\usemintedstyle{monokai}
+\newminted[rustcode]{rust}{fontsize=\footnotesize}
+
+\def\code#1{{\color{codecolor}\texttt{#1}}}
+
+\renewcommand{\theFancyVerbLine}{\color{darkgray}\large \oldstylenums{\arabic{FancyVerbLine}}}
+\renewcommand{\title}[1]{
+  {\huge #1} \vskip 0.4cm
+}
+\renewcommand{\subtitle}[1]{
+  \vskip 0.3cm {\Large #1} \vskip 0.2cm %
+}
+
+\usetikzlibrary{
+  pgfplots.colorbrewer,
+}
+\pgfplotsset{
+  % define a `cycle list' for marker
+  cycle list/.define={my marks}{
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=*\\
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=square*\\
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=triangle*\\
+    every mark/.append style={solid,fill=\pgfkeysvalueof{/pgfplots/mark list fill}},mark=diamond*\\
+  },
+}
+
+\pgfplotsset{tikzDefaults/.style=
+  {legend pos=outer north east,
+    legend style={fill=none},
+    ymajorgrids=true,
+    grid style=dashed,
+    cycle list/Spectral-11,
+    cycle multiindex* list={
+      Spectral-11
+      \nextlist
+      my marks
+      \nextlist
+      [3 of]linestyles
+      \nextlist
+      very thick
+      \nextlist},
+  }}
+
+\makeatletter
+\newcommand{\latencyplot}[3]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={Median Latency (#1 workers)},
+      ylabel={Rate [e/s]},
+      xlabel={Latency [s]},
+      xmode=log, ymode=log,
+      x tick label style={/pgf/number format/fixed},
+      ]
+      
+      \forcsvlist{\latencyplot@item{#1}}{#2}
+      \ifthenelse{ \equal{#3}{} }{}{\legend{#3}}
+    \end{axis}
+  \end{tikzpicture}}
+
+\newcommand{\latencyplot@item}[2]{%
+  \addplot table[y index=0, x index=#2] {../data/latency-#1.csv};%
+}
+
+\newcommand{\scalingplot}[3]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={Scaling (\num{#1} e/s)},
+      xlabel={Workers [n]},
+      ylabel={Latency [s]},
+      xmode=log,
+      log basis x={2},
+      scaled y ticks=false,
+      y tick label style={/pgf/number format/fixed},
+      xtick={1, 2, 4, 8, 16, 32},
+      ]
+      
+      \forcsvlist{\scalingplot@item{#1}}{#2}
+      \ifthenelse{ \equal{#3}{} }{}{\legend{#3}}
+    \end{axis}
+  \end{tikzpicture}}
+
+\newcommand{\scalingplot@item}[2]{%
+  \addplot table[x index=0, y index=#2] {../data/scaling-#1.csv};%
+}
+
+\newcommand{\cdfplot}[4]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={CDF (#1 workers, \num{#2} e/s)},
+      xlabel={Latency [s]},
+      ylabel={CDF [\%]},
+      xmode=log,
+      ]
+      
+      \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
+      \ifthenelse{ \equal{#4}{} }{}{\legend{#4}}
+    \end{axis}
+  \end{tikzpicture}}
+
+\newcommand{\cdfplot@item}[3]{%
+  \addplot table[skip first n=1, y index=0, x index=#3] {../data/cdf-#1-#2.csv};%
+}
+
+\newcommand{\ccdfplot}[4]{%
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={CCDF (#1 workers, #2 e/s)},
+      xlabel={Latency [s]},
+      ylabel={CCDF [\%]},
+      xmode=log, x dir=reverse
+      ]
+      
+      \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
+      \ifthenelse{ \equal{#4}{} }{}{\legend{#4}}
+    \end{axis}
+  \end{tikzpicture}}
+
+\makeatother
+
+\begin{document}
+\begin{frame}
+  \begin{center}
+    \vspace{2cm}
+    {\LARGE Implementation of a Benchmark Suite for Strymon} \\
+    \vspace{0.5cm}
+    Nicolas Hafner \\
+    \vspace*{2.9cm}
+    \hspace*{-1cm}\colorbox{white}{\begin{minipage}{\pagewidth}
+        \begin{center}
+          \includegraphics[width=5cm]{../systems-cover/ethlogo_black.pdf}
+          \hspace{1cm}
+          \includegraphics[width=5cm]{../systems-cover/inf-logo.pdf}
+        \end{center}
+      \end{minipage}} \\
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  \title{Motivation}
+\end{frame}
+
+\begin{frame}
+  \title{Other Works}
+\end{frame}
+
+\begin{frame}
+  \title{Timely}
+\end{frame}
+
+\begin{frame}
+  \title{Benchmarks}
+  \begin{itemize}
+  \item We implemented three benchmarks:
+  \end{itemize}
+  \begin{enumerate}
+  \item Intel's HiBench
+  \item Yahoo's Streaming Benchmark
+  \item Apache Beam's NEXMark
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \title{HiBench}
+  \begin{itemize}
+  \item General Big Data benchmark
+  \item Includes a section for streaming systems
+  \item Only four latency tests:
+  \end{itemize}
+  \begin{enumerate}
+  \item Identity
+  \item Repartition
+  \item Word Count
+  \item Window Reduce
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \title{YSB}
+  \begin{itemize}
+  \item Initially developed internally at Yahoo:
+  \item Count ad views for ad campaigns
+  \item Original setup requires Redis table lookup
+  \item Only one, relatively simple data flow:
+  \end{itemize}
+  \includegraphics[width=\textwidth]{../images/ysb-graphs.pdf}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark}
+  \begin{itemize}
+  \item Based on a paper by Tucker et al.
+  \item An adaptation of XMark for streaming
+  \item Implements an ``auctioning system''
+  \item 13 data flows in total
+  \item Uses filter, map, reduce, join, window, session, partition
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{Evaluation}
+  \begin{itemize}
+  \item Run on sgs-r815-03 (32 cores, 2.4GHz)
+  \item Measured closed-loop per-epoch latency
+  \item Data generated directly in memory
+  \item Timely performs very well!
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark Latency Scaling}
+  \latencyplot{32}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark Worker Scaling}
+  \scalingplot{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark CDF}
+  \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+\end{frame}
+
+\begin{frame}
+  \title{Conclusion}
+\end{frame}
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% TeX-engine: luatex
+%%% TeX-command-extra-options: "-shell-escape"
+%%% End:
