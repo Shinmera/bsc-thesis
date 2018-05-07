@@ -194,7 +194,7 @@ Since we know for certain that a bid's \code{date_time} stamp corresponds to an 
 We assume that epochs start at \code{0}, so we can use a timer to measure the elapsed wall clock time since the beginning of the dataflow run and correlate that to a real-time session. Note that for this to work at all, epochs need to be correlated to real-time seconds as well, and a closed-loop experiment with no regards for time constraints will crash.
 
 \subsection{Evaluation}
-We ran our experiments on an AMD Opteron 6378 2.4KHz 64bit machine with a total of 32 Cores and 504GB RAM. This machine is known to exhibit strange scaling behaviour due to non-uniform memory access patterns. You can see this behaviour in the \hyperref[figure:ysb-scaling]{scaling plot} at 16 workers. \\
+We ran our experiments on an AMD Opteron 6378 2.4GHz 64bit machine with a total of 32 Cores and 504GB RAM. This machine is known to exhibit strange scaling behaviour due to non-uniform memory access patterns. You can see this behaviour in the \hyperref[figure:ysb-scaling]{scaling plot} at 16 workers. \\
 
 Our measurement procedure involved a closed-loop data feed, meaning each epoch was run to completion before a new epoch with a new round of data was started. We only measured data flow execution time, excluding data generation time. Each measurement was gathered using 300 epochs of data. \\
 
