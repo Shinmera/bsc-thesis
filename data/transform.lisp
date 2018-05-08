@@ -15,7 +15,7 @@
                         "NEXMark Query 0" "NEXMark Query 1" "NEXMark Query 2" "NEXMark Query 3"
                         "NEXMark Query 4" "NEXMark Query 5" "NEXMark Query 6" "NEXMark Query 7"
                         "NEXMark Query 8" "NEXMark Query 9" "NEXMark Query 11"))
-(defparameter *rates* '(1000 10000 100000 1000000 2000000 4000000 8000000 10000000))
+(defparameter *rates* '(1000 10000 100000 1000000 10000000))
 (defparameter *workers* '(1 2 4 8 16 32))
 
 (defun read-file (file)
@@ -57,9 +57,9 @@
 
 (defun run (&key sync)
   (when sync (sync))
-  ;; (median-latency :workers 8)
+  (median-latency :workers 8)
   (median-latency :workers 16)
-  (median-latency)
+  (median-latency :workers 32)
   (scaling)
   (cdf))
 
