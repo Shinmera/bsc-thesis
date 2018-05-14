@@ -170,34 +170,21 @@
 
 \begin{frame}
   \title{Motivation}
-  \begin{itemize}
-  \item Performance is important for systems
-  \item Measuring performance can be tough
-  \item Would like to compare to competitors
-  \item Industry benchmarks need to be evaluated
-  \end{itemize}
 \end{frame}
 
 \begin{frame}
   \title{Other Works}
   \begin{itemize}
   \item Investigated 9 papers for other systems
+  \item Almost no paper used a standardised benchmark
   \item Often very simple benchmarks like Word Count
   \item Code and data often not published
-  \item No paper used a standardised benchmark
   \end{itemize}
 \end{frame}
 
 \begin{frame}
   \title{Timely}
-  \begin{itemize}
-  \item Streaming processing based on data parallelism
-  \item Computations expressed via data flow graphs
-  \item Each physical worker runs the entire data flow
-  \item Physical exchange of data handled by Timely
-  \item Data is separated into chunks called epochs
-  \item Computation progress tracked by epoch frontiers
-  \end{itemize}
+  \includegraphics[width=\linewidth]{timely.png}
 \end{frame}
 
 \begin{frame}
@@ -213,10 +200,9 @@
 \end{frame}
 
 \begin{frame}
-  \title{HiBench}
+  \title{Intel's HiBench}
   \begin{itemize}
-  \item General Big Data benchmark
-  \item Includes a section for streaming systems
+  \item Big Data micro-benchmark
   \item Only four latency tests:
   \end{itemize}
   \begin{enumerate}
@@ -228,21 +214,17 @@
 \end{frame}
 
 \begin{frame}
-  \title{YSB}
+  \title{Yahoo Stream Benchmark}
   \begin{itemize}
-  \item Initially developed internally at Yahoo:
   \item Count ad views for ad campaigns
-  \item Original setup requires Redis table lookup
   \item Only one, relatively simple data flow:
   \end{itemize}
   \includegraphics[height=0.75cm]{ysb.png}
 \end{frame}
 
 \begin{frame}
-  \title{NEXMark}
+  \title{Beam's NEXMark\footnotemark}
   \begin{itemize}
-  \item Based on a paper by Tucker et al.
-  \item An adaptation of XMark for streaming
   \item Implements an ``auctioning system''
   \item 13 data flows in total
   \item Uses filter, map, reduce, join, window, session, partition
@@ -251,16 +233,41 @@
   \includegraphics[height=1.5cm]{nex-5.png}
   \hfill
   \includegraphics[height=1.5cm]{nex-8.png}
+  \footnotetext{Pete Tucker et al. NEXMark–A Benchmark for Queries over Data Streams
+    (DRAFT). Tech. rep. Technical report, OGI School of Science \& Engineering
+    at OHSU, Septembers, 2008.}
 \end{frame}
 
 \begin{frame}
   \title{Evaluation}
   \begin{itemize}
-  \item Run on sgs-r815-03 (32 cores, 2.4GHz)
+  \item Run on sgs-r815-03 (AMD, 32 cores, 2.4GHz)
   \item Measured closed-loop per-epoch latency
   \item Data generated directly in memory
-  \item Timely performs very well!
+  \item Generation re-implemented in Rust
+  \item No foreign systems like Kafka used
+  \item Workload varied between 1K-10Me/s, 1-32 workers
   \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{HiBench Latency Scaling}
+  \latencyplot{32}{1,2,3,4}{Identity, Repartition, Wordcount, Fixwindow}
+\end{frame}
+
+\begin{frame}
+  \title{HiBench CDF}
+  \cdfplot{32}{10000000}{1,2,3,4}{Identity, Repartition, Wordcount, Fixwindow}
+\end{frame}
+
+\begin{frame}
+  \title{YSB Latency Scaling}
+  \latencyplot{32}{5}{}
+\end{frame}
+
+\begin{frame}
+  \title{YSB CDF}
+  \cdfplot{32}{10000000}{5}{}
 \end{frame}
 
 \begin{frame}
@@ -269,48 +276,47 @@
 \end{frame}
 
 \begin{frame}
+  \title{NEXMark CDF}
+  \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+\end{frame}
+
+% FIXME: Windowing plots
+
+\begin{frame}
+  \title{HiBench Worker Scaling}
+  \scalingplot{10000000}{1,2,3,4}{Identity, Repartition, Wordcount, Fixwindow}
+\end{frame}
+
+\begin{frame}
+  \title{YSB Worker Scaling}
+  \scalingplot{10000000}{5}{}
+\end{frame}
+
+\begin{frame}
   \title{NEXMark Worker Scaling}
   \scalingplot{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 \end{frame}
 
 \begin{frame}
-  \title{NEXMark CDF}
-  \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+  \title{Important Findings}
+  \begin{itemize}
+  \item 
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{Future Suggestions}
+  \begin{itemize}
+  \item Abstract model definitions for data flows
+  \item Various short and long data flows
+  \item Deterministically generated workloads
+  \item Correctness verification tools
+  \end{itemize}
 \end{frame}
 
 \begin{frame}
   \title{Conclusion}
-  \begin{itemize}
-  \item Timely competes very well with other systems
-  \item Existing benchmarks leave things to be desired
-  \item New benchmarks need:
-    \begin{itemize}
-    \item Abstract model definitions for data flows
-    \item Various short and long data flows
-    \item Deterministically generated workloads
-    \item Correctness verification tools
-    \end{itemize}
-  \end{itemize}
 \end{frame}
-
-\begin{frame}[b]
-  \title{Thanks}
-  Thanks to John Liagouris, Frank McSherry, and the whole DCModel team! \\
-  
-  \vfill
-  \hspace*{-1cm}\begin{minipage}{\pagewidth}
-    \begin{center}
-      \hspace{0.5cm}
-      \includegraphics[height=1cm]{../systems-cover/ethlogo_white.pdf}
-      \hfill
-      \includegraphics[height=1cm]{../systems-cover/inf-logo_white.pdf}
-      \hfill
-      \includegraphics[height=1cm]{../systems-cover/systemslogo-3colour_white.pdf}
-      \hspace*{0.5cm}
-    \end{center}
-  \end{minipage} \\
-\end{frame}
-\end{document}
 
 %%% Local Variables:
 %%% mode: latex
