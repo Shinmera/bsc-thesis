@@ -167,14 +167,34 @@
 
 \begin{frame}
   \title{Motivation}
+  \begin{itemize}
+  \item Performance is important for systems
+  \item Measuring performance can be tough
+  \item Would like to compare to competitors
+  \item Industry benchmarks need to be evaluated
+  \end{itemize}
 \end{frame}
 
 \begin{frame}
   \title{Other Works}
+  \begin{itemize}
+  \item Investigated 9 papers for other systems
+  \item Often very simple benchmarks like Word Count
+  \item Code and data often not published
+  \item No paper used a standardised benchmark
+  \end{itemize}
 \end{frame}
 
 \begin{frame}
   \title{Timely}
+  \begin{itemize}
+  \item Streaming processing based on data parallelism
+  \item Computations expressed via data flow graphs
+  \item Each physical worker runs the entire data flow
+  \item Physical exchange of data handled by Timely
+  \item Data is separated into chunks called epochs
+  \item Computation progress tracked by epoch frontiers
+  \end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -197,10 +217,10 @@
   \item Only four latency tests:
   \end{itemize}
   \begin{enumerate}
-  \item Identity
-  \item Repartition
-  \item Word Count
-  \item Window Reduce
+  \item Identity \hfill\raisebox{-.2\height}{\includegraphics[height=0.75cm]{hib-1.png}}
+  \item Repartition \hfill\raisebox{-.2\height}{\includegraphics[height=0.75cm]{hib-2.png}}
+  \item Word Count \hfill\raisebox{-.2\height}{\includegraphics[height=0.75cm]{hib-3.png}}
+  \item Window Reduce \hfill\raisebox{-.2\height}{\includegraphics[height=0.75cm]{hib-4.png}}
   \end{enumerate}
 \end{frame}
 
@@ -212,7 +232,7 @@
   \item Original setup requires Redis table lookup
   \item Only one, relatively simple data flow:
   \end{itemize}
-  \includegraphics[width=\textwidth]{../images/ysb-graphs.pdf}
+  \includegraphics[height=0.75cm]{ysb.png}
 \end{frame}
 
 \begin{frame}
@@ -223,7 +243,11 @@
   \item Implements an ``auctioning system''
   \item 13 data flows in total
   \item Uses filter, map, reduce, join, window, session, partition
+  \item Dataflows for Query 5 and 8:
   \end{itemize}
+  \includegraphics[height=1.5cm]{nex-5.png}
+  \hfill
+  \includegraphics[height=1.5cm]{nex-8.png}
 \end{frame}
 
 \begin{frame}
@@ -253,6 +277,31 @@
 
 \begin{frame}
   \title{Conclusion}
+  \begin{itemize}
+  \item Timely competes very well with other systems
+  \item Existing benchmarks leave things to be desired
+  \item New benchmarks need:
+    \begin{itemize}
+    \item Abstract model definitions for data flows
+    \item Various short and long data flows
+    \item Deterministically generated workloads
+    \item Correctness verification tools
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{Thanks}
+  Thanks to John Liagouris, Frank McSherry, and the whole DCModel team!
+  
+  \vspace*{5.3cm}
+  \hspace*{-1cm}\colorbox{white}{\begin{minipage}{\pagewidth}
+      \begin{center}
+        \includegraphics[width=5cm]{../systems-cover/ethlogo_black.pdf}
+        \hspace{1cm}
+        \includegraphics[width=5cm]{../systems-cover/inf-logo.pdf}
+      \end{center}
+    \end{minipage}} \\
 \end{frame}
 \end{document}
 
