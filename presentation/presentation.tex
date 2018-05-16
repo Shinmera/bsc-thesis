@@ -170,7 +170,9 @@
 \end{frame}
 
 \begin{frame}
-  \title{Motivation}
+  \makebox[\linewidth][c]{
+    \includegraphics[width=\pagewidth]{benchmarks.png}
+  }
 \end{frame}
 
 \begin{frame}
@@ -181,6 +183,10 @@
   \item Often very simple benchmarks like Word Count
   \item Code and data often not published
   \end{itemize}
+  \vspace{1cm}
+  \begin{center}
+    \includegraphics[height=0.75cm]{hib-3.png}
+  \end{center}
 \end{frame}
 
 \begin{frame}
@@ -200,6 +206,9 @@
   \item Yahoo's Streaming Benchmark
   \item Apache Beam's NEXMark
   \end{enumerate}
+  \begin{itemize}
+  \item Comparable against many other systems
+  \end{itemize}
 \end{frame}
 
 \begin{frame}
@@ -340,12 +349,15 @@
 \begin{frame}
   \title{Important Findings}
   \begin{itemize}
-  \item Test
+  \item Benchmarks are underspecified
+  \item No result verification
+  \item External systems compound complexity
+  \item Focus is only on latency
   \end{itemize}
 \end{frame}
 
 \begin{frame}
-  \title{Future Suggestions}
+  \title{Benchmark Suggestions}
   \begin{itemize}
   \item Abstract model definitions for data flows
   \item Various short and long data flows
@@ -356,6 +368,11 @@
 
 \begin{frame}
   \title{Conclusion}
+  \scalebox{0.5}{
+    \latencyplot{32}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}}
+  \scalebox{0.5}{
+    \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}} \\
+  Timely can keep up with 10 million events per second.
 \end{frame}
 \end{document}
 
