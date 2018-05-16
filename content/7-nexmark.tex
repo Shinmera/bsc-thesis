@@ -204,6 +204,47 @@ Our measurement procedure involved a closed-loop data feed, meaning each epoch w
 \scalingfigure[nex]{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 \cdffigure[nex]{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={Windowing (32 workers, \num{10000000} e/s)},
+      xlabel={Window Size [s]},
+      ylabel={Latency [s]},
+      ]
+      
+      \addplot table[x index=0, y index=1] {data/window-32-10000000.csv};
+      \addplot table[x index=0, y index=2] {data/window-32-10000000.csv};
+      \legend{Q7,Q8}
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Median latency behaviour for 10'000'00e/s, 32 workers when scaling up the window size for Queries 7 and 8.}
+  \label{figure:nex-windows}%
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={Window Slides Q5 (32 workers, \num{10000000} e/s)},
+      xlabel={Window Size [s]},
+      ylabel={Latency [s]},
+      ]
+      
+      \addplot table[x index=0, y index=1] {data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=2] {data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=3] {data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=4] {data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=5] {data/slide-32-10000000.csv};
+      \legend{5s, 10s, 20s, 40s, 60s}
+    \end{axis}
+  \end{tikzpicture}
+  \caption{Median latency behaviour for 10'000'00e/s, 32 workers when scaling up the window size for different slide sizes on Query 5.}
+  \label{figure:nex-slides}%
+\end{figure}
+
 \subsection{Remarks}\label{section:nexmark-remarks}
 NEXMark presents the most extensive benchmark of the three we have investigated. It shows a number of different applications that involve a variety of different operators and configurations. Unlike the other two, NEXMark was a research project designed to present a useful benchmark for streaming systems. As such it has a formal specification of the datastructures and queries involved, and presents a reference data generation implementation. These are vital pieces if it should be possible for third-parties to implement the benchmark and compare results. \\
 

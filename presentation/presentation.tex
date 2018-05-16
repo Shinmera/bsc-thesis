@@ -26,6 +26,7 @@
 \setbeamertemplate{navigation symbols}{}
 \usemintedstyle{monokai}
 \newminted[rustcode]{rust}{fontsize=\footnotesize}
+\renewcommand{\footnotesize}{\tiny}
 
 \def\code#1{{\color{codecolor}\texttt{#1}}}
 
@@ -184,7 +185,9 @@
 
 \begin{frame}
   \title{Timely}
-  \includegraphics[width=\linewidth]{timely.png}
+  \begin{center}
+    \includegraphics[height=8cm]{dataflow.png}
+  \end{center}
 \end{frame}
 
 \begin{frame}
@@ -298,9 +301,46 @@
 \end{frame}
 
 \begin{frame}
+  \title{NEXMark Window Scaling}
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={Windowing (32 workers, \num{10000000} e/s)},
+      xlabel={Window Size [s]},
+      ylabel={Latency [s]},
+      ]
+      
+      \addplot table[x index=0, y index=1] {../data/window-32-10000000.csv};
+      \addplot table[x index=0, y index=2] {../data/window-32-10000000.csv};
+      \legend{Q7,Q8}
+    \end{axis}
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark Slide Scaling}
+  \begin{tikzpicture}
+    \begin{axis}[
+      tikzDefaults,
+      title={Window Slides Q5 (32 workers, \num{10000000} e/s)},
+      xlabel={Window Size [s]},
+      ylabel={Latency [s]},
+      ]
+      
+      \addplot table[x index=0, y index=1] {../data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=2] {../data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=3] {../data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=4] {../data/slide-32-10000000.csv};
+      \addplot table[x index=0, y index=5] {../data/slide-32-10000000.csv};
+      \legend{5s, 10s, 20s, 40s, 60s}
+    \end{axis}
+  \end{tikzpicture}
+\end{frame}
+
+\begin{frame}
   \title{Important Findings}
   \begin{itemize}
-  \item 
+  \item Test
   \end{itemize}
 \end{frame}
 
@@ -317,6 +357,7 @@
 \begin{frame}
   \title{Conclusion}
 \end{frame}
+\end{document}
 
 %%% Local Variables:
 %%% mode: latex
