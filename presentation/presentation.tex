@@ -22,8 +22,18 @@
 \setbeamercolor{itemize subitem}{fg=lightgray}
 \setbeamercolor{itemize subsubitem}{fg=lightgray}
 \setbeamercolor{enumerate item}{fg=lightgray}
+\setbeamercolor{page number in head/foot}{fg=lightgray}
+\setbeamerfont{page number in head/foot}{size=\large}
 \setbeamertemplate{itemize items}[circle]
 \setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}{
+  \hfill%
+  \usebeamercolor[fg]{page number in head/foot}%
+  \usebeamerfont{page number in head/foot}%
+  \setbeamertemplate{page number in head/foot}[framenumber]%
+  \usebeamertemplate*{page number in head/foot}\kern1em\vskip2pt%
+}
+
 \usemintedstyle{monokai}
 \newminted[rustcode]{rust}{fontsize=\footnotesize}
 \renewcommand{\footnotesize}{\tiny}
@@ -149,7 +159,7 @@
 \makeatother
 
 \begin{document}
-\begin{frame}[b]
+\begin{frame}[b,plain]
   \begin{center}
     {\LARGE Implementation of a Benchmark Suite for Strymon} \\
     \vspace{0.5cm}
