@@ -31,6 +31,10 @@
   (let ((sorted (sort values #'<)))
     (nth (round (/ (length sorted) 2)) sorted)))
 
+(defun maximum (values)
+  (let ((val (loop for val in values maximize val)))
+    (unless (= 0 val) val)))
+
 (defun median-latency (&key (path "") (workers "32") (file (format NIL "latency-~a.csv" workers)))
   (with-open-file (out file :direction :output :if-exists :supersede)
     (dolist (rate *rates*)
@@ -63,7 +67,7 @@
         (let ((group (read-file (merge-pathnames (format NIL "~a@~a-w~a.csv" rate workers window) path))))
           (format out "~&~a~{ ~f~}" window
                   (loop for (k . v) in group
-                        collect (median v))))))))
+                        collect (maximum v))))))))
 
 (defun slide (&key (path "") (rate "10000000") (workers "32") (file (format NIL "slide-~a-~a.csv" workers rate)))
   (with-open-file (out file :direction :output :if-exists :supersede)
@@ -73,7 +77,7 @@
         (dolist (slide *slides*)
           (handler-case
               (let ((group (read-file (merge-pathnames (format NIL "~a@~a-w~as~a.csv" rate workers window slide) path))))
-                (format out " ~f" (or (median (cdr (first group))) "nan")))
+                (format out " ~f" (or (maximum (cdr (first group))) "nan")))
             (error (err)
               (declare (ignore err))
               (format out " nan"))))))))
