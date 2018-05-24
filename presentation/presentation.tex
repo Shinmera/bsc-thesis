@@ -84,8 +84,8 @@
     \begin{axis}[
       tikzDefaults,
       title={Median Latency (#1 workers)},
-      ylabel={Rate [e/s]},
-      xlabel={Latency [s]},
+      ylabel={Epoch Size [n]},
+      xlabel={Epoch Latency [s]},
       xmode=log, ymode=log,
       x tick label style={/pgf/number format/fixed},
       ]
@@ -103,9 +103,9 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Scaling (\num{#1} e/s)},
+      title={Scaling (\num{#1} events/epoch)},
       xlabel={Workers [n]},
-      ylabel={Latency [s]},
+      ylabel={Epoch Latency [s]},
       xmode=log,
       log basis x={2},
       scaled y ticks=false,
@@ -126,8 +126,8 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={CDF (#1 workers, \num{#2} e/s)},
-      xlabel={Latency [s]},
+      title={CDF (#1 workers, \num{#2} events/epoch)},
+      xlabel={Epoch Latency [s]},
       ylabel={CDF [\%]},
       xmode=log,
       ]
@@ -140,21 +140,6 @@
 \newcommand{\cdfplot@item}[3]{%
   \addplot table[skip first n=1, y index=0, x index=#3] {../data/cdf-#1-#2.csv};%
 }
-
-\newcommand{\ccdfplot}[4]{%
-  \begin{tikzpicture}
-    \begin{axis}[
-      tikzDefaults,
-      title={CCDF (#1 workers, #2 e/s)},
-      xlabel={Latency [s]},
-      ylabel={CCDF [\%]},
-      xmode=log, x dir=reverse
-      ]
-      
-      \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
-      \ifthenelse{ \equal{#4}{} }{}{\legend{#4}}
-    \end{axis}
-  \end{tikzpicture}}
 
 \makeatother
 
@@ -186,12 +171,12 @@
 \end{frame}
 
 \begin{frame}
-  \title{Other Works}
+  \title{Current Publications}
   \begin{itemize}
-  \item Investigated 9 papers for other systems
+  \item Investigated current practises in published papers
   \item Almost no paper used a standardised benchmark
-  \item Often very simple benchmarks like Word Count
   \item Code and data often not published
+  \item Often very simple benchmarks like Word Count:
   \end{itemize}
   \vspace{1cm}
   \begin{center}
@@ -203,6 +188,14 @@
   \title{Timely}
   \begin{center}
     \includegraphics[height=8cm]{dataflow.png}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  \title{Timely}
+  \vspace*{2cm}
+  \begin{center}
+    \includegraphics[height=2cm]{epochs.png}
   \end{center}
 \end{frame}
 
@@ -222,7 +215,7 @@
 \end{frame}
 
 \begin{frame}
-  \title{Intel's HiBench}
+  \title{Intel's HiBench\footnotemark}
   \begin{itemize}
   \item Big Data micro-benchmark
   \item Only four data flows:
@@ -233,15 +226,17 @@
   \item Word Count \hfill\raisebox{-.2\height}{\includegraphics[height=0.75cm]{hib-3.png}}
   \item Window Reduce \hfill\raisebox{-.2\height}{\includegraphics[height=0.75cm]{hib-4.png}}
   \end{enumerate}
+  \footnotetext{\url{https://github.com/intel-hadoop/HiBench}}
 \end{frame}
 
 \begin{frame}
-  \title{Yahoo Stream Benchmark}
+  \title{Yahoo Stream Benchmark\footnotemark}
   \begin{itemize}
   \item Count ad views for ad campaigns
   \item Only one, relatively simple data flow:
   \end{itemize}
   \includegraphics[height=0.75cm]{ysb.png}
+  \footnotetext{Sanket Chintapalli et al. “Benchmarking streaming computation engines: Storm, Flink and Spark streaming”. In: Parallel and Distributed Processing Symposium Workshops, 2016 IEEE International. IEEE. 2016, pp. 1789–1792.}
 \end{frame}
 
 \begin{frame}
@@ -255,25 +250,40 @@
   \includegraphics[height=1.5cm]{nex-5.png}
   \hfill
   \includegraphics[height=1.5cm]{nex-8.png}
-  \footnotetext{Pete Tucker et al. NEXMark–A Benchmark for Queries over Data Streams
-    (DRAFT). Tech. rep. Technical report, OGI School of Science \& Engineering
-    at OHSU, Septembers, 2008.}
+  \footnotetext{Based on original paper: Pete Tucker et al. NEXMark–A Benchmark for Queries over Data Streams (DRAFT). Tech. rep. Technical report, OGI School of Science \& Engineering at OHSU, Septembers, 2008.}
 \end{frame}
 
 \begin{frame}
-  \title{Evaluation}
+  \title{Testing Framework}
   \begin{itemize}
-  \item Run on sgs-r815-03 (AMD, 32 cores, 2.4GHz)
-  \item Measured closed-loop per-epoch latency
-  \item Data generated directly in memory
-  \item Generation re-implemented in Rust
-  \item No foreign systems like Kafka used
-  \item Workload varied between 1K-10Me/s, 1-32 workers
+  \item Implemented a general framework for benchmarks
+  \item Generic components for input/output handling
+  \item New, reusable operators for join, window, reduce, filtermap, session, partition
+  \item Implemented HiBench, YSB, NEXmark using this framework
   \end{itemize}
 \end{frame}
 
 \begin{frame}
-  \title{HiBench Latency Scaling}
+  \title{Evaluation System}
+  \begin{itemize}
+  \item Run on sgs-r815-03 (AMD, 64 cores, 2.4GHz)
+  \item Data generated directly in memory
+  \item Generation re-implemented in Rust
+  \item No foreign systems like Kafka used
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{Evaluation Setup}
+  \begin{itemize}
+  \item Measured closed-loop per-epoch latency
+  \item One epoch encompasses a logical second of data
+  \item Workload varied between 1K-10Me/s, 1-32 workers, 10-120s windows
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{HiBench Latency / Batch}
   \latencyplot{32}{1,2,3,4}{Identity, Repartition, Wordcount, Fixwindow}
 \end{frame}
 
@@ -283,7 +293,7 @@
 \end{frame}
 
 \begin{frame}
-  \title{YSB Latency Scaling}
+  \title{YSB Latency / Batch}
   \latencyplot{32}{5}{}
 \end{frame}
 
@@ -293,7 +303,7 @@
 \end{frame}
 
 \begin{frame}
-  \title{NEXMark Latency Scaling}
+  \title{NEXMark Latency / Batch}
   \latencyplot{32}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 \end{frame}
 
@@ -302,7 +312,49 @@
   \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
 \end{frame}
 
-% FIXME: Windowing plots
+\begin{frame}
+  \title{Benchmark Evaluation}
+  \begin{itemize}
+  \item Benchmarks are underspecified and undocumented
+    \pause
+  \item No result verification
+    \pause
+  \item External systems compound complexity
+    \pause
+  \item No tests for load balancing, fault-tolerance, etc.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \title{Benchmark Suggestions}
+  \begin{itemize}
+  \item Abstract model definitions for data flows
+  \item Correctness verification tools
+  \item Deterministically generated workloads
+  \item Various short and long data flows
+  \item Tests for both latency, \textit{and} fault-tolerance, etc.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \vspace*{1cm}
+  \scalebox{0.5}{
+    \latencyplot{32}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}}
+  \scalebox{0.5}{
+    \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}}
+  \vspace*{0.1cm}
+  \begin{center}
+    \small
+    \url{http://strymon.systems.ethz.ch/} \\
+    \vspace*{0.3cm}
+    \url{https://github.com/Shinmera/bsc-thesis}
+  \end{center}
+\end{frame}
+
+
+%%%%%%%%%%%%%%%%%%%
+%% BACKUP SLIDES %%
+%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
   \title{HiBench Worker Scaling}
@@ -325,8 +377,8 @@
     \begin{axis}[
       tikzDefaults,
       title={Windowing (32 workers, \num{10000000} e/s)},
-      xlabel={Window Size [s]},
-      ylabel={Latency [s]},
+      xlabel={Window Size [n]},
+      ylabel={Epoch Latency [s]},
       ]
       
       \addplot table[x index=0, y index=1] {../data/window-32-10000000.csv};
@@ -342,8 +394,8 @@
     \begin{axis}[
       tikzDefaults,
       title={Window Slides Q5 (32 workers, \num{10000000} e/s)},
-      xlabel={Window Size [s]},
-      ylabel={Latency [s]},
+      xlabel={Window Size [n]},
+      ylabel={Epoch Latency [s]},
       ]
       
       \addplot table[x index=0, y index=1] {../data/slide-32-10000000.csv};
@@ -356,34 +408,6 @@
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}
-  \title{Important Findings}
-  \begin{itemize}
-  \item Benchmarks are underspecified
-  \item No result verification
-  \item External systems compound complexity
-  \item Focus is only on latency
-  \end{itemize}
-\end{frame}
-
-\begin{frame}
-  \title{Benchmark Suggestions}
-  \begin{itemize}
-  \item Abstract model definitions for data flows
-  \item Various short and long data flows
-  \item Deterministically generated workloads
-  \item Correctness verification tools
-  \end{itemize}
-\end{frame}
-
-\begin{frame}
-  \title{Conclusion}
-  \scalebox{0.5}{
-    \latencyplot{32}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}}
-  \scalebox{0.5}{
-    \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}} \\
-  Timely can keep up with 10 million events per second.
-\end{frame}
 \end{document}
 
 %%% Local Variables:
