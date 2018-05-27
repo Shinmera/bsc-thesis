@@ -42,7 +42,7 @@
 
 \renewcommand{\theFancyVerbLine}{\color{darkgray}\large \oldstylenums{\arabic{FancyVerbLine}}}
 \renewcommand{\title}[1]{
-  {\huge #1} \vskip 0.4cm
+  {\LARGE #1} \vskip 0.4cm
 }
 \renewcommand{\subtitle}[1]{
   \vskip 0.3cm {\Large #1} \vskip 0.2cm %
@@ -83,11 +83,10 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Median Latency (#1 workers)},
-      ylabel={Epoch Size [n]},
+      title={#1 workers},
+      ylabel={Epoch Size [events]},
       xlabel={Epoch Latency [s]},
       xmode=log, ymode=log,
-      x tick label style={/pgf/number format/fixed},
       ]
       
       \forcsvlist{\latencyplot@item{#1}}{#2}
@@ -103,8 +102,8 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Scaling (\num{#1} events/epoch)},
-      xlabel={Workers [n]},
+      title={\num{#1} events/epoch},
+      xlabel={Workers [events]},
       ylabel={Epoch Latency [s]},
       xmode=log,
       log basis x={2},
@@ -126,10 +125,9 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={CDF (#1 workers, \num{#2} events/epoch)},
+      title={#1 workers, \num{#2} events/epoch},
       xlabel={Epoch Latency [s]},
-      ylabel={CDF [\%]},
-      xmode=log,
+      ylabel={CDF [\%]}
       ]
       
       \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
@@ -283,33 +281,43 @@
 \end{frame}
 
 \begin{frame}
-  \title{HiBench Latency / Batch}
+  \title{HiBench Latency / Epoch}
   \latencyplot{32}{1,2,3,4}{Identity, Repartition, Wordcount, Fixwindow}
 \end{frame}
 
 \begin{frame}
-  \title{HiBench CDF}
+  \title{HiBench Latency CDF}
   \cdfplot{32}{10000000}{1,2,3,4}{Identity, Repartition, Wordcount, Fixwindow}
 \end{frame}
 
 \begin{frame}
-  \title{YSB Latency / Batch}
+  \title{YSB Latency / Epoch}
   \latencyplot{32}{5}{}
 \end{frame}
 
 \begin{frame}
-  \title{YSB CDF}
+  \title{YSB Latency CDF}
   \cdfplot{32}{10000000}{5}{}
 \end{frame}
 
 \begin{frame}
-  \title{NEXMark Latency / Batch}
-  \latencyplot{32}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+  \title{NEXMark Latency / Epoch}
+  \latencyplot{32}{6,7,8,9,10,12,15}{Q0, Q1, Q2, Q3, Q4, Q6, Q9}
 \end{frame}
 
 \begin{frame}
-  \title{NEXMark CDF}
-  \cdfplot{32}{10000000}{6,7,8,9,10,11,12,13,14,15,16}{Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q11}
+  \title{NEXMark Latency / Epoch}
+  \latencyplot{32}{11,13,14,16}{Q5, Q7, Q8, Q11}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark Latency CDF}
+  \cdfplot{32}{10000000}{6,7,8,9,10,12,15}{Q0, Q1, Q2, Q3, Q4, Q6, Q9}
+\end{frame}
+
+\begin{frame}
+  \title{NEXMark Latency CDF}
+  \cdfplot{32}{10000000}{11,13,14,16}{Q5, Q7, Q8, Q11}
 \end{frame}
 
 \begin{frame}
@@ -377,7 +385,7 @@
     \begin{axis}[
       tikzDefaults,
       title={Windowing (32 workers, \num{10000000} e/s)},
-      xlabel={Window Size [n]},
+      xlabel={Window Size [events]},
       ylabel={Epoch Latency [s]},
       ]
       
@@ -394,7 +402,7 @@
     \begin{axis}[
       tikzDefaults,
       title={Window Slides Q5 (32 workers, \num{10000000} e/s)},
-      xlabel={Window Size [n]},
+      xlabel={Window Size [events]},
       ylabel={Epoch Latency [s]},
       ]
       
