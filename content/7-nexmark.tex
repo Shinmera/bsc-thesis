@@ -209,9 +209,9 @@ Our measurement procedure involved a closed-loop data feed, meaning each epoch w
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Windowing (32 workers, \num{10000000} e/s)},
-      xlabel={Window Size [s]},
-      ylabel={Latency [s]},
+      title={Windowing (32 workers, \num{10000000} events/epoch)},
+      xlabel={Window Size [epochs]},
+      ylabel={Epoch Latency [s]},
       ]
       
       \addplot table[x index=0, y index=1] {data/window-32-10000000.csv};
@@ -228,9 +228,9 @@ Our measurement procedure involved a closed-loop data feed, meaning each epoch w
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Window Slides Q5 (32 workers, \num{10000000} e/s)},
-      xlabel={Window Size [s]},
-      ylabel={Latency [s]},
+      title={Window Slides Q5 (32 workers, \num{10000000} events/epoch)},
+      xlabel={Window Size [epochs]},
+      ylabel={Epoch Latency [s]},
       ]
       
       \addplot table[x index=0, y index=1] {data/slide-32-10000000.csv};

@@ -106,10 +106,9 @@
     \begin{axis}[
       tikzDefaults,
       title={Median Latency (#1 workers)},
-      ylabel={Rate [e/s]},
-      xlabel={Latency [s]},
+      ylabel={Epoch Size [events]},
+      xlabel={Epoch Latency [s]},
       xmode=log, ymode=log,
-      x tick label style={/pgf/number format/fixed},
       ]
       
       \forcsvlist{\latencyplot@item{#1}}{#2}
@@ -125,9 +124,9 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={Scaling (\num{#1} e/s)},
+      title={Scaling (\num{#1} events/epoch)},
       xlabel={Workers [n]},
-      ylabel={Latency [s]},
+      ylabel={Epoch Latency [s]},
       xmode=log,
       log basis x={2},
       scaled y ticks=false,
@@ -148,10 +147,9 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={CDF (#1 workers, \num{#2} e/s)},
-      xlabel={Latency [s]},
+      title={CDF (#1 workers, \num{#2} events/epoch)},
+      xlabel={Epoch Latency [s]},
       ylabel={CDF [\%]},
-      xmode=log,
       ]
       
       \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
@@ -167,10 +165,10 @@
   \begin{tikzpicture}
     \begin{axis}[
       tikzDefaults,
-      title={CCDF (#1 workers, #2 e/s)},
-      xlabel={Latency [s]},
+      title={CCDF (#1 workers, #2 events/epoch)},
+      xlabel={Epoch Latency [s]},
       ylabel={CCDF [\%]},
-      xmode=log, x dir=reverse
+      x dir=reverse
       ]
       
       \forcsvlist{\cdfplot@item{#1}{#2}}{#3}
